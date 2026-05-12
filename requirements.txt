@@ -1,0 +1,8 @@
+pyttsx3
+SpeechRecognition
+tensorflow
+numpy
+psutil
+pyautogui
+scikit-learn
+pyaudio
