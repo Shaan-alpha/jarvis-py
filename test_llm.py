@@ -1,5 +1,6 @@
-from core.llm.ollama_engine import ask_llm
+import pyttsx3
 
-response = ask_llm("Who are you?")
+engine = pyttsx3.init("sapi5")
 
-print(response)
+engine.say("Hello Shaan. Jarvis voice test successful.")
+engine.runAndWait()

@@ -1,0 +1,18 @@
+[
+    {
+        "user": "open chrome",
+        "assistant": "Opening Chrome for your convenience... Done! Is there anything specific you'd like to search for in the browser?"
+    },
+    {
+        "user": "open file explorer",
+        "assistant": "Accessing File Explorer now. How can I assist with files or directories today?"
+    },
+    {
+        "user": "can you tell me the folders on desktop",
+        "assistant": "Certainly, here are common folder names typically found on a Windows Desktop: \"Documents,\" \"Downloads,\" and \"Pictures.\" Are there any specific files or subfolders within these that you're looking for?"
+    },
+    {
+        "user": "can you tell me where is movies folder in my",
+        "assistant": "Certainly, the default location of a Movies folder on your desktop might be under \"Movies\" or similar. Is this what you're looking for?"
+    }
+]
