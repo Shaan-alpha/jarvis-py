@@ -1,89 +1,136 @@
 import sys
-import os
-import json
-import pickle
-import random
-import numpy as np
 import pyautogui
-from tensorflow.keras.models import load_model
-from tensorflow.keras.preprocessing.sequence import pad_sequences
-
-# Add project root to path if necessary
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from core.speech.engine import speak, command
 from core.utils.helpers import wishMe
 from core.commands.handlers import social_media, schedule, browsing
 from core.automation.system import openApp, closeApp, condition
+from core.llm.ollama_engine import ask_llm
 
-# Define paths for models
-MODELS_DIR = os.path.join(os.path.dirname(__file__), "models")
-INTENTS_PATH = os.path.join(MODELS_DIR, "intents.json")
-MODEL_PATH = os.path.join(MODELS_DIR, "chat_model.h5")
-TOKENIZER_PATH = os.path.join(MODELS_DIR, "tokenizer.pkl")
-LABEL_ENCODER_PATH = os.path.join(MODELS_DIR, "label_encoder.pkl")
 
-# Load model artifacts
-with open(INTENTS_PATH) as file:
-    data = json.load(file)
+def handle_volume(query):
+    if any(v in query for v in ["volume up", "increase volume"]):
+        pyautogui.press("volumeup")
+        speak("Volume increased")
+        return True
 
-model = load_model(MODEL_PATH)
+    elif any(v in query for v in ["volume down", "decrease volume"]):
+        pyautogui.press("volumedown")
+        speak("Volume decreased")
+        return True
 
-with open(TOKENIZER_PATH, "rb") as f:
-    tokenizer = pickle.load(f)
+    elif any(v in query for v in ["volume mute", "mute the sound"]):
+        pyautogui.press("volumemute")
+        speak("Volume muted")
+        return True
 
-with open(LABEL_ENCODER_PATH, "rb") as encoder_file:
-    label_encoder = pickle.load(encoder_file)
+    return False
 
-if __name__ == "__main__":
+
+def handle_apps(query):
+    if any(app in query for app in [
+        "open calculator",
+        "open notepad",
+        "open paint"
+    ]):
+        openApp(query, speak)
+        return True
+
+    elif any(app in query for app in [
+        "close calculator",
+        "close notepad",
+        "close paint"
+    ]):
+        closeApp(query, speak)
+        return True
+
+    return False
+
+
+def handle_system(query):
+    if any(sys_c in query for sys_c in [
+        "system condition",
+        "condition of the system"
+    ]):
+        speak("Checking the system condition")
+        condition(speak)
+        return True
+
+    return False
+
+
+def handle_browser(query):
+    if any(br in query for br in [
+        "open google",
+        "open edge"
+    ]):
+        browsing(query, speak, command)
+        return True
+
+    return False
+
+
+def handle_social(query):
+    if any(sm in query for sm in [
+        "facebook",
+        "discord",
+        "whatsapp",
+        "instagram",
+        "youtube"
+    ]):
+        social_media(query, speak)
+        return True
+
+    return False
+
+
+def handle_schedule(query):
+    if any(sch in query for sch in [
+        "university time table",
+        "schedule"
+    ]):
+        schedule(speak)
+        return True
+
+    return False
+
+
+def main():
     wishMe(speak)
-    
+
     while True:
-        query = command().lower()
-        
+        query = command().lower().strip()
+
         if query == "none":
             continue
 
-        if any(sm in query for sm in ['facebook', 'discord', 'whatsapp', 'instagram', 'youtube']):
-            social_media(query, speak)
-            
-        elif any(sch in query for sch in ["university time table", "schedule"]):
-            schedule(speak)
-            
-        elif any(v in query for v in ["volume up", "increase volume"]):
-            pyautogui.press("volumeup")
-            speak("Volume increased")
-            
-        elif any(v in query for v in ["volume down", "decrease volume"]):
-            pyautogui.press("volumedown")
-            speak("Volume decreased")
-            
-        elif any(v in query for v in ["volume mute", "mute the sound"]):
-            pyautogui.press("volumemute")
-            speak("Volume muted")
-            
-        elif any(app in query for app in ["open calculator", "open notepad", "open paint"]):
-            openApp(query, speak)
-            
-        elif any(app in query for app in ["close calculator", "close notepad", "close paint"]):
-            closeApp(query, speak)
-            
-        elif any(kw in query for kw in ["what", "who", "how", "hi", "thanks", "hello"]):
-            padded_sequences = pad_sequences(tokenizer.texts_to_sequences([query]), maxlen=20, truncating='post')
-            result = model.predict(padded_sequences)
-            tag = label_encoder.inverse_transform([np.argmax(result)])
+        print(f"User: {query}")
 
-            for i in data['intents']:
-                if i['tag'] == tag:
-                    speak(np.random.choice(i['responses']))
-                    
-        elif any(br in query for br in ["open google", "open edge"]):
-            browsing(query, speak, command)
-            
-        elif any(sys_c in query for sys_c in ["system condition", "condition of the system"]):
-            speak("checking the system condition")
-            condition(speak)
-            
-        elif "exit" in query:
+        # Exit
+        if "exit" in query:
             speak("Goodbye Boss!")
             sys.exit()
+
+        # Command handlers
+        handled = (
+            handle_social(query)
+            or handle_schedule(query)
+            or handle_volume(query)
+            or handle_apps(query)
+            or handle_browser(query)
+            or handle_system(query)
+        )
+
+        # Fallback to LLM
+        if not handled:
+            speak("Thinking...")
+
+            response = ask_llm(query)
+
+            print(f"Jarvis: {response}")
+
+            speak(response)
+
+
+if __name__ == "__main__":
+    main()
