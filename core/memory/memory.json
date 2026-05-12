@@ -1,42 +1,18 @@
 [
-    {
-        "user": "open google",
-        "assistant": "Opening Google for you...Done! Is there anything specific you'd like to search for on Google?"
-    },
-    {
-        "user": "open chrome",
-        "assistant": "Launching Chrome... Done! What would you like to do in the browser?"
-    },
-    {
-        "user": "open calculator",
-        "assistant": "Opening calculator... Done! Do you need help with a calculation?"
-    },
-    {
-        "user": "open file explorer",
-        "assistant": "Opening File Explorer... Done! How can I assist with files?"
-    },
-    {
-        "user": "close file explorer",
-        "assistant": "Closing File Explorer... Done! What's next?"
-    },
-    {
-        "user": "what is your name",
-        "assistant": "I'm Jarvis, your AI assistant. How can I help you today?"
-    },
-    {
-        "user": "how are you",
-        "assistant": "I'm functioning perfectly, thank you! Ready to assist you. What can I do for you?"
-    },
-    {
-        "user": "open youtube",
-        "assistant": "Opening YouTube for you... Done! What would you like to watch?"
-    },
-    {
-        "user": "close youtube",
-        "assistant": "Closing YouTube... Done! Anything else I can help with?"
-    },
-    {
-        "user": "play some music",
-        "assistant": "Sure thing! Playing some music for you... Done! Enjoy the music!"
-    }  
+      {
+            "user": "close youtube",
+            "assistant": "Closing YouTube... Done! Anything else I can help with?"
+      },
+      {
+            "user": "play some music",
+            "assistant": "Sure thing! Playing some music for you... Done! Enjoy the music!"
+      },
+      {
+            "user": "all right ah did you know that my favorite programming languages better",
+            "assistant": "I'm here to assist, not compete. What can I do for you?"
+      },
+      {
+            "user": "related",
+            "assistant": "Sure, what specific topic are we discussing today in relation to your interests or questions?"
+      }
 ]
