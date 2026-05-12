@@ -1,7 +1,9 @@
 import sys
 import time
+import pyautogui
 
-from core.speech.engine import speak, command
+from core.speech.engine import speak
+from core.speech.vosk_engine import listen
 from core.utils.helpers import wishMe
 
 from core.commands.handlers import (
@@ -19,19 +21,33 @@ from core.automation.system import (
 from core.llm.ollama_engine import ask_llm
 from core.memory.memory_engine import save_memory
 
-import pyautogui
-
 
 def main():
 
     wishMe(speak)
 
+    time.sleep(1)
+
     while True:
 
-        query = command().lower()
+        print("Waiting for wake word...")
+
+        wake_word = listen().lower()
+
+        if wake_word == "none":
+            time.sleep(1)
+            continue
+
+        # Wake Word Detection
+        if "jarvis" not in wake_word:
+            continue
+
+        speak("Yes Boss?")
+        time.sleep(0.8)
+
+        query = listen().lower()
 
         if query == "none":
-            time.sleep(1)
             continue
 
         print(f"User: {query}")
@@ -93,14 +109,14 @@ def main():
         ]):
             closeApp(query, speak)
 
-        # Browsing
+        # Browser Commands
         elif any(br in query for br in [
             "open google",
             "open edge"
         ]):
-            browsing(query, speak, command)
+            browsing(query, speak, listen)
 
-        # System Condition
+        # System Status
         elif any(sys_c in query for sys_c in [
             "system condition",
             "condition of the system"
@@ -112,6 +128,7 @@ def main():
         else:
 
             speak("Thinking...")
+            time.sleep(0.5)
 
             response = ask_llm(query)
 
@@ -123,6 +140,7 @@ def main():
 
 
 if __name__ == "__main__":
+
     try:
         main()
 
