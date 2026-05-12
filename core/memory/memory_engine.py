@@ -36,4 +36,4 @@ def save_memory(user_input, assistant_response):
     memory = memory[-4:]
 
     with open(MEMORY_FILE, "w") as file:
-        json.dump(memory, file, indent=4)
+        json.dump(memory, file, indent=6)

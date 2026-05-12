@@ -1,18 +1,42 @@
 [
     {
+        "user": "open google",
+        "assistant": "Opening Google for you...Done! Is there anything specific you'd like to search for on Google?"
+    },
+    {
         "user": "open chrome",
-        "assistant": "Opening Chrome for your convenience... Done! Is there anything specific you'd like to search for in the browser?"
+        "assistant": "Launching Chrome... Done! What would you like to do in the browser?"
+    },
+    {
+        "user": "open calculator",
+        "assistant": "Opening calculator... Done! Do you need help with a calculation?"
     },
     {
         "user": "open file explorer",
-        "assistant": "Accessing File Explorer now. How can I assist with files or directories today?"
+        "assistant": "Opening File Explorer... Done! How can I assist with files?"
     },
     {
-        "user": "can you tell me the folders on desktop",
-        "assistant": "Certainly, here are common folder names typically found on a Windows Desktop: \"Documents,\" \"Downloads,\" and \"Pictures.\" Are there any specific files or subfolders within these that you're looking for?"
+        "user": "close file explorer",
+        "assistant": "Closing File Explorer... Done! What's next?"
     },
     {
-        "user": "can you tell me where is movies folder in my",
-        "assistant": "Certainly, the default location of a Movies folder on your desktop might be under \"Movies\" or similar. Is this what you're looking for?"
-    }
+        "user": "what is your name",
+        "assistant": "I'm Jarvis, your AI assistant. How can I help you today?"
+    },
+    {
+        "user": "how are you",
+        "assistant": "I'm functioning perfectly, thank you! Ready to assist you. What can I do for you?"
+    },
+    {
+        "user": "open youtube",
+        "assistant": "Opening YouTube for you... Done! What would you like to watch?"
+    },
+    {
+        "user": "close youtube",
+        "assistant": "Closing YouTube... Done! Anything else I can help with?"
+    },
+    {
+        "user": "play some music",
+        "assistant": "Sure thing! Playing some music for you... Done! Enjoy the music!"
+    }  
 ]
