@@ -129,6 +129,14 @@ def _speak_thread(text):
         current_engine = None
 
 
+def speak_sync(text):
+    """Speak `text` and block until it has finished playing."""
+
+    with speech_lock:
+
+        _speak_thread(text)
+
+
 def speak(text):
 
     global speech_thread
@@ -200,25 +208,25 @@ def command():
 
         recognizer.dynamic_energy_threshold = True
 
-        recognizer.pause_threshold = 1.2
+        recognizer.pause_threshold = 0.8
 
-        recognizer.non_speaking_duration = 0.5
+        recognizer.non_speaking_duration = 0.4
 
-        recognizer.phrase_threshold = 0.3
+        recognizer.phrase_threshold = 0.2
 
-        recognizer.operation_timeout = 5
+        recognizer.operation_timeout = 8
 
         recognizer.adjust_for_ambient_noise(
             source,
-            duration=1
+            duration=0.5
         )
 
         try:
 
             audio = recognizer.listen(
                 source,
-                timeout=5,
-                phrase_time_limit=5
+                timeout=6,
+                phrase_time_limit=12
             )
 
         except sr.WaitTimeoutError:

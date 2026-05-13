@@ -61,36 +61,39 @@ Assistant: {memory['assistant']}
         prompt
     )
 
-    document_text = "\n".join(
-        document_context
-    )
+    document_block = ""
+
+    if document_context:
+
+        document_text = "\n".join(document_context)
+
+        document_block = (
+            f"\nRelevant Documents (only use if "
+            f"the user's question is clearly about them):\n"
+            f"{document_text}\n"
+        )
 
     # -------------------- #
     # PROMPT
     # -------------------- #
 
-    final_prompt = f"""
-You are Jarvis, a concise AI assistant.
+    final_prompt = f"""You are Jarvis, a concise voice assistant.
 
 User Profile:
 {profile_context}
-
-{memory_context}
-
-Relevant Documents:
-{document_text}
-
+{memory_context}{document_block}
 Rules:
-- Keep answers concise
-- Speak naturally
-- Avoid unnecessary explanations
-- Use document context if relevant
-- Personalize responses when useful
+- Answer the user's question directly. Two sentences max.
+- Only use the User Profile or Relevant Documents if the user's
+  question is clearly about them. Otherwise IGNORE them completely
+  and answer from general knowledge.
+- Do NOT invent details about projects, jobs, or tools that were
+  not asked about.
+- Speak naturally for voice playback. No markdown, no emojis.
 
 User: {prompt}
 
-Jarvis:
-"""
+Jarvis:"""
 
     payload = {
         "model": MODEL_NAME,

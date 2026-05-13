@@ -37,22 +37,24 @@ Architecture first. No giant single files.
 
 ## Current Status
 
-### v3.0.0 — Production release (shipped)
+### v3.1.0 — Interactive UX (shipped)
 
 | Area | Status |
 |---|---|
 | Local LLM via Ollama (Phi-3) | done |
 | Streaming token responses | done |
 | Semantic memory + caching | done |
-| Document RAG (FAISS) | done |
+| Document RAG (FAISS) + similarity threshold | done |
 | Wake-word detection (openWakeWord) | done |
+| Wake-word **barge-in** during TTS playback | done |
 | Offline STT (Vosk) + Online STT (Google) with auto-fallback | done |
-| Streaming TTS queue | done |
-| Tool-agent + fast keyword router | done |
+| Streaming TTS queue (serialized, no collisions) | done |
+| Tool-agent + fast keyword router + action-verb gate | done |
 | One-shot reminders (threading.Timer) | done |
 | Slim install — fastembed (ONNX), no torch/transformers | done |
 | User profile-driven context | done |
 | Structured logging | done |
+| Privacy-clean repo (no user data, no bundled models) | done |
 
 ### Release history
 
@@ -64,10 +66,11 @@ Architecture first. No giant single files.
 | v2.3.0 | Hybrid online/offline STT |
 | v2.4.0 | Lean install + faster routing + accurate reminders |
 | v3.0.0 | fastembed swap, lazy wake-word, production-ready |
+| v3.1.0 | Wake-word barge-in, doc-RAG threshold, repo privacy |
 
 ---
 
-## v3.1 — Polish & Packaging
+## v3.2 — Polish & Packaging
 
 Goal: ship-ready binary you can hand someone.
 
@@ -81,7 +84,7 @@ Goal: ship-ready binary you can hand someone.
 
 ---
 
-## v3.2 — Agent Capabilities
+## v3.3 — Agent Capabilities
 
 Goal: make the tool-agent useful for real tasks, not just demos.
 
@@ -95,7 +98,7 @@ Goal: make the tool-agent useful for real tasks, not just demos.
 
 ---
 
-## v3.3 — Smarter Memory
+## v3.4 — Smarter Memory
 
 Goal: memory that gets better over time.
 

@@ -1,3 +1,50 @@
+## v3.1.0
+
+### Features
+- **Wake-word barge-in**: say "hey jarvis" while Jarvis is speaking
+  to cut the response and immediately listen for a new command.
+  Internally: `wait_until_done_or_barge_in()` spawns a cancellable
+  background wake-word listener while the TTS queue drains.
+
+### Fixes
+- **TTS no longer collides mid-sentence.** Streamed sentences used to
+  spawn overlapping pyttsx3 threads producing "run loop already
+  started" errors. The TTS worker now calls `engine.speak_sync()` so
+  each sentence finishes fully before the next is dequeued.
+- **Wake-word residual buffer.** A previous session's "hey jarvis" (or
+  TTS bleed) used to re-trigger detection within 200 ms of returning to
+  sleep mode. Now the listener calls `model.reset()` plus drains 12
+  audio chunks on every call.
+- **STT capture window widened.** Phrases were truncated mid-sentence
+  (`"explain transformers in two lines"` → `"transformers in two
+  lines"`). `pause_threshold` 1.2→0.8, `phrase_time_limit` 5→12.
+- **Tool agent over-triggering fixed.** Casual queries like
+  "transformers in two lines" used to be routed to `open_youtube`.
+  Now there is an action-verb gate before the LLM call, the prompt is
+  much stricter with explicit refusal examples, JSON extraction is
+  tolerant of stray prose, and tool names are case-normalised.
+- **Doc-RAG was leaking the user's résumé into every prompt.** Added
+  `DOCUMENT_SIMILARITY_THRESHOLD` (default 0.45) — chunks below score
+  are dropped. LLM prompt also tells the model to ignore profile +
+  documents unless the question is clearly about them.
+- **`WAKE_THRESHOLD` 0.5 → 0.4** for a bit of margin (testing peak
+  was 0.97).
+- **`system status`, `system info`, `cpu usage`, `battery
+  status/level/percentage`** now map to `handle_system_status` (was
+  only `system condition` / `condition of the system`).
+
+### Privacy / Repository hygiene
+- `data/profile/user_profile.json` and the bundled Vosk model
+  (`models/vosk/vosk-model-small-en-us-0.15/`, ~70 MB) are no longer
+  tracked — they were leaking on `origin/main`.
+- `.gitignore` now uses allowlist patterns so each runtime folder
+  keeps a placeholder `README.md` explaining what goes in it, but no
+  user data or models.
+
+### Tooling
+- New `debug_wake.py` script for diagnosing wake-word detection
+  (lists input devices, shows live RMS + confidence per chunk).
+
 ## v3.0.0
 - Swapped `sentence-transformers` (~2 GB with torch/transformers) for
   `fastembed` (ONNX-only, ~90 MB model). venv site-packages: 2050 MB
