@@ -1,5 +1,10 @@
 # JARVIS-PY
 
+![Python](https://img.shields.io/badge/Python-3.13-blue)
+![Ollama](https://img.shields.io/badge/LLM-Ollama-black)
+![Status](https://img.shields.io/badge/status-active-success)
+![License](https://img.shields.io/badge/license-MIT-green)
+
 > Local-first AI voice assistant with online/offline speech recognition, wake-word detection, semantic memory, document RAG, streaming LLM responses, and a tool-agent.
 
 ## Overview
