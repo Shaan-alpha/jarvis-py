@@ -1,9 +1,17 @@
+# pyrefly: ignore [missing-import]
+
 import re
 import threading
+
 # pyrefly: ignore [missing-import]
 import pyttsx3
 # pyrefly: ignore [missing-import]
 import speech_recognition as sr
+
+from config.settings import (
+    VOICE_RATE,
+    VOICE_VOLUME
+)
 
 
 speech_lock = threading.Lock()
@@ -19,13 +27,22 @@ def create_engine():
 
     voices = engine.getProperty("voices")
 
-    engine.setProperty("voice", voices[1].id)
+    engine.setProperty(
+        "voice",
+        voices[1].id
+    )
 
     rate = engine.getProperty("rate")
 
-    engine.setProperty("rate", rate - 25)
+    engine.setProperty(
+        "rate",
+        rate + VOICE_RATE
+    )
 
-    engine.setProperty("volume", 1.0)
+    engine.setProperty(
+        "volume",
+        VOICE_VOLUME
+    )
 
     return engine
 

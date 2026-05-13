@@ -1,24 +1,46 @@
 import json
 import requests
 
-from core.speech.tts_queue import add_to_queue
+from config.settings import (
+    MODEL_NAME,
+    OLLAMA_URL
+)
 
+from core.speech.tts_queue import (
+    add_to_queue
+)
 
-OLLAMA_URL = "http://localhost:11434/api/generate"
+from core.memory.semantic_memory import (
+    search_memory
+)
 
 
 def ask_llm(prompt):
 
+    memory = search_memory(prompt)
+
+    memory_context = ""
+
+    if memory:
+
+        memory_context = f"""
+Relevant Memory:
+User: {memory['user']}
+Assistant: {memory['assistant']}
+"""
+
     payload = {
-        "model": "phi3",
+        "model": MODEL_NAME,
         "prompt": f"""
 You are Jarvis, a concise AI assistant.
+
+{memory_context}
 
 Rules:
 - Keep answers short
 - Speak naturally
 - Avoid roleplay
-- Avoid long explanations unless asked
+- Avoid unnecessary explanations
 
 User: {prompt}
 Jarvis:
@@ -39,7 +61,11 @@ Jarvis:
 
         sentence_buffer = ""
 
-        print("Jarvis: ", end="", flush=True)
+        print(
+            "Jarvis: ",
+            end="",
+            flush=True
+        )
 
         for line in response.iter_lines():
 
@@ -56,16 +82,23 @@ Jarvis:
                         ""
                     )
 
-                    print(token, end="", flush=True)
+                    print(
+                        token,
+                        end="",
+                        flush=True
+                    )
 
                     full_response += token
 
                     sentence_buffer += token
 
-                    # Speak complete sentence
                     if any(
                         punctuation in sentence_buffer
-                        for punctuation in [".", "!", "?"]
+                        for punctuation in [
+                            ".",
+                            "!",
+                            "?"
+                        ]
                     ):
 
                         add_to_queue(
@@ -78,7 +111,6 @@ Jarvis:
 
                     continue
 
-        # leftover text
         if sentence_buffer.strip():
 
             add_to_queue(

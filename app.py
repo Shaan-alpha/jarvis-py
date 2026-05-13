@@ -1,26 +1,54 @@
 import sys
 import time
 
+from config.settings import (
+    SESSION_TIMEOUT
+)
+
 from core.speech.engine import (
     speak,
     command,
     stop_speaking
 )
 
-from core.speech.wake_listener import detect_wake_word
+from core.speech.openwakeword_listener import (
+    detect_wake_word
+)
 
 from core.speech.tts_queue import (
     start_tts_queue,
     stop_tts_queue
 )
 
-from core.utils.helpers import wishMe
+from core.utils.helpers import (
+    wishMe
+)
 
-from core.llm.ollama_engine import ask_llm
-from core.memory.memory_engine import save_memory
+from core.ai.ollama_engine import (
+    ask_llm
+)
 
-from core.router.intent_router import route_intent
-from core.state.session_manager import SessionManager
+from core.memory.semantic_memory import (
+    save_memory
+)
+
+from core.router.intent_router import (
+    route_intent
+)
+
+from core.state.session_manager import (
+    SessionManager
+)
+
+# pyrefly: ignore [missing-import]
+from core.agent.tool_agent import (
+    decide_tool
+)
+
+# pyrefly: ignore [missing-import]
+from core.tools.tool_executor import (
+    execute_tool
+)
 
 
 EXIT_WORDS = [
@@ -40,7 +68,9 @@ def main():
 
     time.sleep(1)
 
-    session = SessionManager(timeout=20)
+    session = SessionManager(
+        timeout=SESSION_TIMEOUT
+    )
 
     while True:
 
@@ -51,8 +81,6 @@ def main():
             # -------------------- #
 
             if not session.active:
-
-                print("\nWaiting for wake word...")
 
                 if detect_wake_word():
 
@@ -90,7 +118,10 @@ def main():
             # EXIT COMMANDS
             # -------------------- #
 
-            if any(word in query for word in EXIT_WORDS):
+            if any(
+                word in query
+                for word in EXIT_WORDS
+            ):
 
                 stop_speaking()
 
@@ -101,7 +132,21 @@ def main():
                 continue
 
             # -------------------- #
-            # ROUTE INTENTS
+            # AI TOOL AGENT
+            # -------------------- #
+
+            tool = decide_tool(query)
+
+            if tool != "none":
+
+                response = execute_tool(tool)
+
+                speak(response)
+
+                continue
+
+            # -------------------- #
+            # LEGACY INTENT ROUTER
             # -------------------- #
 
             handler = route_intent(query)
@@ -110,7 +155,10 @@ def main():
 
                 try:
 
-                    if handler.__name__ == "handle_browser":
+                    if (
+                        handler.__name__
+                        == "handle_browser"
+                    ):
 
                         handler(
                             query,
@@ -127,7 +175,9 @@ def main():
 
                 except Exception as e:
 
-                    print(f"Intent Error: {e}")
+                    print(
+                        f"Intent Error: {e}"
+                    )
 
                     speak(
                         "Something went wrong while executing that command."
@@ -139,8 +189,6 @@ def main():
             # LLM FALLBACK
             # -------------------- #
 
-            print("Jarvis: ", end="", flush=True)
-
             response = ask_llm(query)
 
             save_memory(
@@ -150,7 +198,9 @@ def main():
 
         except KeyboardInterrupt:
 
-            print("\nShutting down Jarvis gracefully...")
+            print(
+                "\nShutting down Jarvis gracefully..."
+            )
 
             stop_tts_queue()
 
@@ -160,7 +210,9 @@ def main():
 
         except Exception as e:
 
-            print(f"Main Loop Error: {e}")
+            print(
+                f"Main Loop Error: {e}"
+            )
 
             time.sleep(1)
 
