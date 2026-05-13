@@ -1,8 +1,25 @@
-pyttsx3
-SpeechRecognition
-tensorflow
-numpy
-psutil
-pyautogui
-scikit-learn
-pyaudio
+# Audio I/O
+PyAudio==0.2.14
+pyttsx3==2.99
+comtypes==1.4.16
+
+# Speech recognition
+SpeechRecognition==3.16.1
+vosk==0.3.45
+
+# Wake word
+openwakeword==0.6.0
+onnxruntime==1.26.0
+
+# LLM
+requests==2.34.0
+
+# Memory & document RAG  (ONNX-only, no torch/transformers)
+fastembed==0.8.0
+faiss-cpu==1.13.2
+pypdf==6.11.0
+numpy==2.4.4
+
+# System automation
+PyAutoGUI==0.9.54
+psutil==7.2.2

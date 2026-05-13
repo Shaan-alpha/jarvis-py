@@ -1,43 +1,264 @@
+# pyrefly: ignore [missing-import]
+
+import re
+import socket
+import threading
+import time
+
+# pyrefly: ignore [missing-import]
 import pyttsx3
+# pyrefly: ignore [missing-import]
 import speech_recognition as sr
 
-def initialize_engine():
+from config.settings import (
+    ONLINE_CACHE_TTL,
+    ONLINE_CHECK_HOST,
+    ONLINE_CHECK_PORT,
+    ONLINE_CHECK_TIMEOUT,
+    VOICE_RATE,
+    VOICE_VOLUME
+)
+
+from core.speech.online_recognizer import (
+    recognize_online
+)
+
+from core.speech.offline_recognizer import (
+    recognize_offline
+)
+
+from core.utils.logger import (
+    logger
+)
+
+
+speech_lock = threading.Lock()
+
+current_engine = None
+
+speech_thread = None
+
+
+_online_cache = {
+    "value": None,
+    "checked_at": 0.0
+}
+
+
+def is_online():
+
+    now = time.time()
+
+    cached = _online_cache["value"]
+
+    if (
+        cached is not None
+        and now - _online_cache["checked_at"]
+        < ONLINE_CACHE_TTL
+    ):
+
+        return cached
+
+    try:
+
+        with socket.create_connection(
+            (ONLINE_CHECK_HOST, ONLINE_CHECK_PORT),
+            timeout=ONLINE_CHECK_TIMEOUT
+        ):
+
+            online = True
+
+    except OSError:
+
+        online = False
+
+    _online_cache["value"] = online
+    _online_cache["checked_at"] = now
+
+    return online
+
+
+def create_engine():
+
     engine = pyttsx3.init("sapi5")
-    voices = engine.getProperty('voices')
-    engine.setProperty('voice', voices[1].id)
-    rate = engine.getProperty('rate')
-    engine.setProperty('rate', rate - 50)
-    volume = engine.getProperty('volume')
-    engine.setProperty('volume', volume + 0.25)
+
+    voices = engine.getProperty("voices")
+
+    engine.setProperty(
+        "voice",
+        voices[1].id
+    )
+
+    rate = engine.getProperty("rate")
+
+    engine.setProperty(
+        "rate",
+        rate + VOICE_RATE
+    )
+
+    engine.setProperty(
+        "volume",
+        VOICE_VOLUME
+    )
+
     return engine
 
+
+def _speak_thread(text):
+
+    global current_engine
+
+    try:
+
+        engine = create_engine()
+
+        current_engine = engine
+
+        engine.say(text)
+
+        engine.runAndWait()
+
+        engine.stop()
+
+    except Exception as e:
+
+        print(f"TTS Error: {e}")
+
+    finally:
+
+        current_engine = None
+
+
 def speak(text):
-    engine = initialize_engine()
-    engine.say(text)
-    engine.runAndWait()
+
+    global speech_thread
+
+    try:
+
+        stop_speaking()
+
+        if speech_thread and speech_thread.is_alive():
+
+            speech_thread.join(timeout=0.2)
+
+        speech_thread = threading.Thread(
+            target=_speak_thread,
+            args=(text,),
+            daemon=True
+        )
+
+        speech_thread.start()
+
+    except Exception as e:
+
+        print(f"Speak Error: {e}")
+
+
+def stop_speaking():
+
+    global current_engine
+
+    try:
+
+        if current_engine:
+
+            current_engine.stop()
+
+            current_engine = None
+
+    except Exception as e:
+
+        print(f"Stop Speech Error: {e}")
+
+
+def clean_query(query):
+
+    query = query.lower().strip()
+
+    query = re.sub(
+        r"[^a-zA-Z0-9\s]",
+        "",
+        query
+    )
+
+    query = re.sub(
+        r"\s+",
+        " ",
+        query
+    )
+
+    return query
+
 
 def command():
-    r = sr.Recognizer()
+
+    recognizer = sr.Recognizer()
+
     with sr.Microphone() as source:
-        r.adjust_for_ambient_noise(source, duration=0.5)
-        print("Listening.......", end="", flush=True)
-        r.pause_threshold = 1.0
-        r.phrase_threshold = 0.3
-        r.sample_rate = 48000
-        r.dynamic_energy_threshold = True
-        r.operation_timeout = 5
-        r.non_speaking_duration = 0.5
-        r.dynamic_energy_adjustment = 2
-        r.energy_threshold = 4000
-        r.phrase_time_limit = 10
-        audio = r.listen(source)
-    try:
-        print("\r", end="", flush=True)
-        print("Recognizing......", end="", flush=True)
-        query = r.recognize_google(audio, language='en-in')
-        print("\r", end="", flush=True)
-        print(f"User said : {query}\n")
-    except Exception as e:
-        print("Say that again please")
-        return "None"
-    return query
+
+        print("Listening...")
+
+        recognizer.dynamic_energy_threshold = True
+
+        recognizer.pause_threshold = 1.2
+
+        recognizer.non_speaking_duration = 0.5
+
+        recognizer.phrase_threshold = 0.3
+
+        recognizer.operation_timeout = 5
+
+        recognizer.adjust_for_ambient_noise(
+            source,
+            duration=1
+        )
+
+        try:
+
+            audio = recognizer.listen(
+                source,
+                timeout=5,
+                phrase_time_limit=5
+            )
+
+        except sr.WaitTimeoutError:
+
+            return "none"
+
+    online = is_online()
+
+    mode = "online" if online else "offline"
+
+    print(f"Recognizing ({mode})...")
+
+    if online:
+
+        result = recognize_online(
+            recognizer,
+            audio
+        )
+
+        if result is None:
+
+            logger.info(
+                "Online STT unreachable, "
+                "falling back to offline"
+            )
+
+            result = recognize_offline(
+                recognizer,
+                audio
+            )
+
+    else:
+
+        result = recognize_offline(
+            recognizer,
+            audio
+        )
+
+    if not result or result == "none":
+
+        return "none"
+
+    return clean_query(result)

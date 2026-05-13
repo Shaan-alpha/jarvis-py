@@ -1,89 +1,294 @@
 import sys
-import os
-import json
-import pickle
-import random
-import numpy as np
-import pyautogui
-from tensorflow.keras.models import load_model
-from tensorflow.keras.preprocessing.sequence import pad_sequences
+import threading
+import time
 
-# Add project root to path if necessary
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from config.settings import (
+    SESSION_TIMEOUT
+)
 
-from core.speech.engine import speak, command
-from core.utils.helpers import wishMe
-from core.commands.handlers import social_media, schedule, browsing
-from core.automation.system import openApp, closeApp, condition
+from core.speech.engine import (
+    speak,
+    command,
+    stop_speaking
+)
 
-# Define paths for models
-MODELS_DIR = os.path.join(os.path.dirname(__file__), "models")
-INTENTS_PATH = os.path.join(MODELS_DIR, "intents.json")
-MODEL_PATH = os.path.join(MODELS_DIR, "chat_model.h5")
-TOKENIZER_PATH = os.path.join(MODELS_DIR, "tokenizer.pkl")
-LABEL_ENCODER_PATH = os.path.join(MODELS_DIR, "label_encoder.pkl")
+from core.speech.tts_queue import (
+    start_tts_queue,
+    stop_tts_queue
+)
 
-# Load model artifacts
-with open(INTENTS_PATH) as file:
-    data = json.load(file)
+from core.speech.openwakeword_listener import (
+    detect_wake_word
+)
 
-model = load_model(MODEL_PATH)
+from core.speech.offline_recognizer import (
+    warm_up as warm_up_offline
+)
 
-with open(TOKENIZER_PATH, "rb") as f:
-    tokenizer = pickle.load(f)
+from core.utils.helpers import (
+    wishMe
+)
 
-with open(LABEL_ENCODER_PATH, "rb") as encoder_file:
-    label_encoder = pickle.load(encoder_file)
+from core.utils.logger import (
+    logger
+)
+
+from core.ai.ollama_engine import (
+    ask_llm
+)
+
+from core.memory.semantic_memory import (
+    save_memory
+)
+
+from core.memory.profile_extractor import (
+    extract_personal_info
+)
+
+from core.memory.profile_memory import (
+    update_profile
+)
+
+from core.router.intent_router import (
+    route_intent
+)
+
+from core.state.session_manager import (
+    SessionManager
+)
+
+from core.agent.tool_agent import (
+    decide_tool
+)
+
+from core.agent.tool_executor import (
+    execute_tool
+)
+
+from core.tasks.task_manager import (
+    TaskManager
+)
+
+from core.tasks.task_parser import (
+    parse_reminder
+)
+
+
+EXIT_WORDS = [
+    "bye",
+    "goodbye",
+    "exit",
+    "shutdown",
+    "stop listening",
+]
+
+
+def _run_intent_handler(handler, query):
+
+    if handler.__name__ == "handle_browser":
+
+        handler(query, speak, command)
+
+    else:
+
+        handler(query, speak)
+
+
+def main():
+
+    logger.info("Starting Jarvis...")
+
+    wishMe(speak)
+
+    start_tts_queue()
+
+    threading.Thread(
+        target=warm_up_offline,
+        daemon=True
+    ).start()
+
+    time.sleep(1)
+
+    session = SessionManager(
+        timeout=SESSION_TIMEOUT
+    )
+
+    task_manager = TaskManager()
+
+    task_manager.start()
+
+    logger.info("Task Manager Started")
+
+    while True:
+
+        try:
+
+            if not session.active:
+
+                detect_wake_word()
+
+                logger.info("Wake word activated")
+
+                stop_speaking()
+
+                speak("Yes Boss?")
+
+                session.activate()
+
+                continue
+
+            stop_speaking()
+
+            query = command()
+
+            if query == "none":
+
+                if session.is_expired():
+
+                    logger.info("Session expired")
+
+                    speak("Going back to sleep.")
+
+                    session.deactivate()
+
+                continue
+
+            query = query.lower().strip()
+
+            logger.info(f"User Query: {query}")
+
+            print(f"\nUser: {query}")
+
+            session.update_interaction()
+
+            if any(
+                word in query
+                for word in EXIT_WORDS
+            ):
+
+                logger.info("Session manually ended")
+
+                stop_speaking()
+
+                speak("Going back to sleep.")
+
+                session.deactivate()
+
+                continue
+
+            personal_info = extract_personal_info(query)
+
+            if personal_info:
+
+                update_profile(
+                    personal_info["key"],
+                    personal_info["value"]
+                )
+
+                logger.info(
+                    f"Profile Updated: {personal_info}"
+                )
+
+            reminder = parse_reminder(query)
+
+            if reminder:
+
+                task_manager.add_reminder_in_minutes(
+                    reminder["minutes"],
+                    reminder["message"]
+                )
+
+                logger.info(
+                    f"Reminder Created: {reminder}"
+                )
+
+                speak(
+                    f"Reminder set for "
+                    f"{reminder['minutes']} minutes."
+                )
+
+                continue
+
+            # -------------------- #
+            # FAST PATH: keyword intent router
+            # -------------------- #
+
+            handler = route_intent(query)
+
+            if handler:
+
+                try:
+
+                    logger.info(
+                        f"Intent Handler: {handler.__name__}"
+                    )
+
+                    _run_intent_handler(handler, query)
+
+                except Exception as e:
+
+                    logger.exception(f"Intent Error: {e}")
+
+                    speak(
+                        "Something went wrong "
+                        "while executing that command."
+                    )
+
+                continue
+
+            # -------------------- #
+            # SLOW PATH: LLM tool agent
+            # -------------------- #
+
+            tool = decide_tool(query)
+
+            if tool != "none":
+
+                logger.info(f"Executed Tool: {tool}")
+
+                response = execute_tool(tool)
+
+                if response:
+
+                    speak(response)
+
+                continue
+
+            # -------------------- #
+            # FALLBACK: LLM chat
+            # -------------------- #
+
+            logger.info("Generating LLM response")
+
+            response = ask_llm(query)
+
+            logger.info("LLM response generated")
+
+            save_memory(query, response)
+
+            logger.info("Conversation saved to memory")
+
+        except KeyboardInterrupt:
+
+            logger.info("Jarvis shutting down gracefully")
+
+            print("\nShutting down Jarvis gracefully...")
+
+            stop_tts_queue()
+
+            stop_speaking()
+
+            break
+
+        except Exception as e:
+
+            logger.exception(f"Main Loop Error: {e}")
+
+            time.sleep(1)
+
 
 if __name__ == "__main__":
-    wishMe(speak)
-    
-    while True:
-        query = command().lower()
-        
-        if query == "none":
-            continue
 
-        if any(sm in query for sm in ['facebook', 'discord', 'whatsapp', 'instagram', 'youtube']):
-            social_media(query, speak)
-            
-        elif any(sch in query for sch in ["university time table", "schedule"]):
-            schedule(speak)
-            
-        elif any(v in query for v in ["volume up", "increase volume"]):
-            pyautogui.press("volumeup")
-            speak("Volume increased")
-            
-        elif any(v in query for v in ["volume down", "decrease volume"]):
-            pyautogui.press("volumedown")
-            speak("Volume decreased")
-            
-        elif any(v in query for v in ["volume mute", "mute the sound"]):
-            pyautogui.press("volumemute")
-            speak("Volume muted")
-            
-        elif any(app in query for app in ["open calculator", "open notepad", "open paint"]):
-            openApp(query, speak)
-            
-        elif any(app in query for app in ["close calculator", "close notepad", "close paint"]):
-            closeApp(query, speak)
-            
-        elif any(kw in query for kw in ["what", "who", "how", "hi", "thanks", "hello"]):
-            padded_sequences = pad_sequences(tokenizer.texts_to_sequences([query]), maxlen=20, truncating='post')
-            result = model.predict(padded_sequences)
-            tag = label_encoder.inverse_transform([np.argmax(result)])
+    main()
 
-            for i in data['intents']:
-                if i['tag'] == tag:
-                    speak(np.random.choice(i['responses']))
-                    
-        elif any(br in query for br in ["open google", "open edge"]):
-            browsing(query, speak, command)
-            
-        elif any(sys_c in query for sys_c in ["system condition", "condition of the system"]):
-            speak("checking the system condition")
-            condition(speak)
-            
-        elif "exit" in query:
-            speak("Goodbye Boss!")
-            sys.exit()
+    sys.exit()

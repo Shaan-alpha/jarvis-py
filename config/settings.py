@@ -1,0 +1,31 @@
+MODEL_NAME = "phi3"
+
+OLLAMA_URL = "http://localhost:11434/api/generate"
+
+WAKE_THRESHOLD = 0.5
+
+SESSION_TIMEOUT = 20
+
+VOICE_RATE = -25
+
+VOICE_VOLUME = 1.0
+
+MEMORY_SIMILARITY_THRESHOLD = 0.45
+
+VOSK_MODEL_PATH = (
+    "models/vosk/vosk-model-small-en-us-0.15"
+)
+
+WAKE_WORD = "hey_jarvis"
+
+WAKE_MODEL_PATH = (
+    "models/wake/hey_jarvis_v0.1.onnx"
+)
+
+ONLINE_CHECK_HOST = "8.8.8.8"
+
+ONLINE_CHECK_PORT = 53
+
+ONLINE_CHECK_TIMEOUT = 1.0
+
+ONLINE_CACHE_TTL = 5.0
