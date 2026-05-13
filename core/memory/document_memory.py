@@ -8,6 +8,10 @@ import numpy as np
 # pyrefly: ignore [missing-import]
 from pypdf import PdfReader
 
+from config.settings import (
+    DOCUMENT_SIMILARITY_THRESHOLD
+)
+
 from core.memory.embedder import (
     encode
 )
@@ -129,10 +133,20 @@ def search_documents(query, top_k=3):
 
     query_matrix = _encode_matrix([query])
 
-    _, indices = index.search(query_matrix, top_k)
+    scores, indices = index.search(query_matrix, top_k)
 
-    return [
-        chunks[idx]
-        for idx in indices[0]
-        if idx < len(chunks)
-    ]
+    results = []
+
+    for score, idx in zip(scores[0], indices[0]):
+
+        if idx < 0 or idx >= len(chunks):
+
+            continue
+
+        if float(score) < DOCUMENT_SIMILARITY_THRESHOLD:
+
+            continue
+
+        results.append(chunks[idx])
+
+    return results

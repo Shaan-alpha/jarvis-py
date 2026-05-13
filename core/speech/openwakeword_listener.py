@@ -85,9 +85,14 @@ def _get_model():
     return _model
 
 
-def detect_wake_word():
+DRAIN_CHUNKS = 12
+
+
+def detect_wake_word(stop_event=None, verbose=True):
 
     model = _get_model()
+
+    model.reset()
 
     audio = pyaudio.PyAudio()
 
@@ -99,18 +104,46 @@ def detect_wake_word():
         frames_per_buffer=CHUNK
     )
 
-    logger.info(
-        f"Listening for wake word: '{WAKE_WORD}'"
-    )
+    if verbose:
 
-    print(
-        f"\nListening for wake word "
-        f"('{WAKE_WORD.replace('_', ' ')}')..."
-    )
+        logger.info(
+            f"Listening for wake word: '{WAKE_WORD}'"
+        )
+
+        print(
+            f"\nListening for wake word "
+            f"('{WAKE_WORD.replace('_', ' ')}')..."
+        )
 
     try:
 
+        # Drain stale audio + warm the model on fresh silence so a
+        # previous session's "hey jarvis" or TTS bleed does not
+        # immediately re-trigger detection.
+
+        for _ in range(DRAIN_CHUNKS):
+
+            if stop_event is not None and stop_event.is_set():
+
+                return False
+
+            audio_data = stream.read(
+                CHUNK,
+                exception_on_overflow=False
+            )
+
+            audio_np = np.frombuffer(
+                audio_data,
+                dtype=np.int16
+            )
+
+            model.predict(audio_np)
+
         while True:
+
+            if stop_event is not None and stop_event.is_set():
+
+                return False
 
             audio_data = stream.read(
                 CHUNK,

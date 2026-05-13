@@ -42,7 +42,14 @@ def route_intent(query):
     # System status
     elif any(word in query for word in [
         "system condition",
-        "condition of the system"
+        "condition of the system",
+        "system status",
+        "system info",
+        "system information",
+        "cpu usage",
+        "battery status",
+        "battery level",
+        "battery percentage"
     ]):
         return handle_system_status
 

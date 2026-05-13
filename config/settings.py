@@ -2,7 +2,7 @@ MODEL_NAME = "phi3"
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
 
-WAKE_THRESHOLD = 0.5
+WAKE_THRESHOLD = 0.4
 
 SESSION_TIMEOUT = 20
 
@@ -11,6 +11,8 @@ VOICE_RATE = -25
 VOICE_VOLUME = 1.0
 
 MEMORY_SIMILARITY_THRESHOLD = 0.45
+
+DOCUMENT_SIMILARITY_THRESHOLD = 0.45
 
 VOSK_MODEL_PATH = (
     "models/vosk/vosk-model-small-en-us-0.15"
