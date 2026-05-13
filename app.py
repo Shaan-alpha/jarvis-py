@@ -1,8 +1,18 @@
 import sys
 import time
 
-from core.speech.engine import speak, command
+from core.speech.engine import (
+    speak,
+    command,
+    stop_speaking
+)
+
 from core.speech.wake_listener import detect_wake_word
+
+from core.speech.tts_queue import (
+    start_tts_queue,
+    stop_tts_queue
+)
 
 from core.utils.helpers import wishMe
 
@@ -26,6 +36,8 @@ def main():
 
     wishMe(speak)
 
+    start_tts_queue()
+
     time.sleep(1)
 
     session = SessionManager(timeout=20)
@@ -44,6 +56,8 @@ def main():
 
                 if detect_wake_word():
 
+                    stop_speaking()
+
                     speak("Yes Boss?")
 
                     session.activate()
@@ -53,6 +67,8 @@ def main():
             # -------------------- #
             # ACTIVE SESSION MODE
             # -------------------- #
+
+            stop_speaking()
 
             query = command()
 
@@ -76,6 +92,8 @@ def main():
 
             if any(word in query for word in EXIT_WORDS):
 
+                stop_speaking()
+
                 speak("Going back to sleep.")
 
                 session.deactivate()
@@ -92,14 +110,20 @@ def main():
 
                 try:
 
-                    # Browser intent special handling
                     if handler.__name__ == "handle_browser":
 
-                        handler(query, speak, command)
+                        handler(
+                            query,
+                            speak,
+                            command
+                        )
 
                     else:
 
-                        handler(query, speak)
+                        handler(
+                            query,
+                            speak
+                        )
 
                 except Exception as e:
 
@@ -115,19 +139,22 @@ def main():
             # LLM FALLBACK
             # -------------------- #
 
-            speak("Thinking")
+            print("Jarvis: ", end="", flush=True)
 
             response = ask_llm(query)
 
-            save_memory(query, response)
-
-            print(f"Jarvis: {response}")
-
-            speak(response)
+            save_memory(
+                query,
+                response
+            )
 
         except KeyboardInterrupt:
 
             print("\nShutting down Jarvis gracefully...")
+
+            stop_tts_queue()
+
+            stop_speaking()
 
             break
 

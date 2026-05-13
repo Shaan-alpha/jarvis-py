@@ -1,3 +1,4 @@
+# pyrefly: ignore [missing-import]
 from rapidfuzz import fuzz
 
 from core.speech.engine import command

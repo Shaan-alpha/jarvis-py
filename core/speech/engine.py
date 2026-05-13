@@ -1,8 +1,16 @@
 import re
+import threading
 # pyrefly: ignore [missing-import]
 import pyttsx3
 # pyrefly: ignore [missing-import]
 import speech_recognition as sr
+
+
+speech_lock = threading.Lock()
+
+current_engine = None
+
+speech_thread = None
 
 
 def create_engine():
@@ -22,13 +30,15 @@ def create_engine():
     return engine
 
 
-def speak(text):
+def _speak_thread(text):
+
+    global current_engine
 
     try:
 
-        print(f"Jarvis: {text}")
-
         engine = create_engine()
+
+        current_engine = engine
 
         engine.say(text)
 
@@ -40,16 +50,70 @@ def speak(text):
 
         print(f"TTS Error: {e}")
 
+    finally:
+
+        current_engine = None
+
+
+def speak(text):
+
+    global speech_thread
+
+    try:
+
+        stop_speaking()
+
+        if speech_thread and speech_thread.is_alive():
+
+            speech_thread.join(timeout=0.2)
+
+        print(f"Jarvis: {text}")
+
+        speech_thread = threading.Thread(
+            target=_speak_thread,
+            args=(text,),
+            daemon=True
+        )
+
+        speech_thread.start()
+
+    except Exception as e:
+
+        print(f"Speak Error: {e}")
+
+
+def stop_speaking():
+
+    global current_engine
+
+    try:
+
+        if current_engine:
+
+            current_engine.stop()
+
+            current_engine = None
+
+    except Exception as e:
+
+        print(f"Stop Speech Error: {e}")
+
 
 def clean_query(query):
 
     query = query.lower().strip()
 
-    # Remove special characters
-    query = re.sub(r"[^a-zA-Z0-9\s]", "", query)
+    query = re.sub(
+        r"[^a-zA-Z0-9\s]",
+        "",
+        query
+    )
 
-    # Remove extra spaces
-    query = re.sub(r"\s+", " ", query)
+    query = re.sub(
+        r"\s+",
+        " ",
+        query
+    )
 
     return query
 
