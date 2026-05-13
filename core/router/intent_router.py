@@ -10,33 +10,39 @@ from core.intents.browser import handle_browser
 
 def route_intent(query):
 
-    # App Control
+    # App control
     if any(word in query for word in [
-        "open",
-        "close"
+        "open calculator",
+        "open notepad",
+        "open paint",
+        "close calculator",
+        "close notepad",
+        "close paint"
     ]):
         return handle_app_control
 
-    # Media Control
+    # Media control
     elif any(word in query for word in [
-        "volume",
-        "mute"
+        "volume up",
+        "increase volume",
+        "volume down",
+        "decrease volume",
+        "mute",
+        "volume mute"
     ]):
         return handle_media_control
 
     # Browser
     elif any(word in query for word in [
-        "google",
-        "edge",
-        "browser"
+        "open google",
+        "open edge"
     ]):
         return handle_browser
 
-    # System Status
+    # System status
     elif any(word in query for word in [
         "system condition",
-        "battery",
-        "cpu"
+        "condition of the system"
     ]):
         return handle_system_status
 

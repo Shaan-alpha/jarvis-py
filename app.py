@@ -2,24 +2,30 @@ import sys
 import time
 import pyautogui
 
-from core.speech.engine import speak
-from core.speech.vosk_engine import listen
+from core.speech.engine import speak, command
 from core.utils.helpers import wishMe
-
-from core.commands.handlers import (
-    social_media,
-    schedule,
-    browsing
-)
-
-from core.automation.system import (
-    openApp,
-    closeApp,
-    condition
-)
 
 from core.llm.ollama_engine import ask_llm
 from core.memory.memory_engine import save_memory
+
+from core.router.intent_router import route_intent
+from core.state.session_manager import SessionManager
+
+
+WAKE_WORDS = [
+    "jarvis wake up",
+    "hey jarvis",
+    "wake up jarvis",
+    "jarvis",
+]
+
+EXIT_WORDS = [
+    "bye",
+    "goodbye",
+    "exit",
+    "shutdown",
+    "stop listening",
+]
 
 
 def main():
@@ -28,107 +34,100 @@ def main():
 
     time.sleep(1)
 
+    session = SessionManager(timeout=20)
+
     while True:
 
-        print("Waiting for wake word...")
+        try:
 
-        wake_word = listen().lower()
+            # -------------------- #
+            # SLEEP MODE
+            # -------------------- #
 
-        if wake_word == "none":
-            time.sleep(1)
-            continue
+            if not session.active:
 
-        # Wake Word Detection
-        if "jarvis" not in wake_word:
-            continue
+                print("\nWaiting for wake word...")
 
-        speak("Yes Boss?")
-        time.sleep(0.8)
+                wake_query = command().lower()
 
-        query = listen().lower()
+                if wake_query == "none":
+                    continue
 
-        if query == "none":
-            continue
+                print(f"User said: {wake_query}")
 
-        print(f"User: {query}")
+                if any(word in wake_query for word in WAKE_WORDS):
 
-        # Exit Commands
-        if any(word in query for word in [
-            "exit",
-            "bye",
-            "goodbye",
-            "shutdown",
-            "stop"
-        ]):
-            speak("Goodbye Boss!")
-            sys.exit()
+                    speak("Yes Boss?")
 
-        # Social Media
-        elif any(sm in query for sm in [
-            "facebook",
-            "discord",
-            "whatsapp",
-            "instagram",
-            "youtube"
-        ]):
-            social_media(query, speak)
+                    session.activate()
 
-        # Schedule
-        elif any(sch in query for sch in [
-            "schedule",
-            "timetable"
-        ]):
-            schedule(speak)
+                continue
 
-        # Volume Controls
-        elif "volume up" in query:
-            pyautogui.press("volumeup")
-            speak("Volume increased")
+            # -------------------- #
+            # ACTIVE SESSION MODE
+            # -------------------- #
 
-        elif "volume down" in query:
-            pyautogui.press("volumedown")
-            speak("Volume decreased")
+            query = command().lower()
 
-        elif "mute" in query:
-            pyautogui.press("volumemute")
-            speak("Volume muted")
+            if query == "none":
 
-        # Open Apps
-        elif any(app in query for app in [
-            "open calculator",
-            "open notepad",
-            "open paint"
-        ]):
-            openApp(query, speak)
+                # Session timeout check
+                if session.is_expired():
 
-        # Close Apps
-        elif any(app in query for app in [
-            "close calculator",
-            "close notepad",
-            "close paint"
-        ]):
-            closeApp(query, speak)
+                    speak("Going back to sleep.")
 
-        # Browser Commands
-        elif any(br in query for br in [
-            "open google",
-            "open edge"
-        ]):
-            browsing(query, speak, listen)
+                    session.deactivate()
 
-        # System Status
-        elif any(sys_c in query for sys_c in [
-            "system condition",
-            "condition of the system"
-        ]):
-            speak("Checking system condition")
-            condition(speak)
+                continue
 
-        # AI Fallback
-        else:
+            print(f"\nUser: {query}")
 
-            speak("Thinking...")
-            time.sleep(0.5)
+            session.update_interaction()
+
+            # -------------------- #
+            # EXIT COMMANDS
+            # -------------------- #
+
+            if any(word in query for word in EXIT_WORDS):
+
+                speak("Going back to sleep.")
+
+                session.deactivate()
+
+                continue
+
+            # -------------------- #
+            # ROUTE INTENTS
+            # -------------------- #
+
+            handler = route_intent(query)
+
+            if handler:
+
+                try:
+
+                    # Browser intent special handling
+                    if handler.__name__ == "handle_browser":
+
+                        handler(query, speak, command)
+
+                    else:
+
+                        handler(query, speak)
+
+                except Exception as e:
+
+                    print(f"Intent Error: {e}")
+
+                    speak("Something went wrong while executing that command.")
+
+                continue
+
+            # -------------------- #
+            # AI FALLBACK
+            # -------------------- #
+
+            speak("Thinking")
 
             response = ask_llm(query)
 
@@ -136,16 +135,21 @@ def main():
 
             speak(response)
 
+        except KeyboardInterrupt:
+
+            print("\nShutting down Jarvis gracefully...")
+
+            break
+
+        except Exception as e:
+
+            print(f"Main Loop Error: {e}")
+
             time.sleep(1)
 
 
 if __name__ == "__main__":
 
-    try:
-        main()
+    main()
 
-    except KeyboardInterrupt:
-        print("\nShutting down Jarvis gracefully...")
-
-    finally:
-        sys.exit()
+    sys.exit()
