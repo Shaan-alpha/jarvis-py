@@ -1,3 +1,8 @@
+![Python](https://img.shields.io/badge/Python-3.13-blue)
+![Ollama](https://img.shields.io/badge/LLM-Ollama-black)
+![Status](https://img.shields.io/badge/status-active-success)
+![License](https://img.shields.io/badge/license-MIT-green)
+
 **JARVIS – Python AI Voice Assistant**
 Jarvis is a Python-based AI voice assistant designed to listen, understand, and execute user commands through natural language interaction.
 It combines speech recognition, machine learning, and system automation to deliver a smart desktop assistant experience.
