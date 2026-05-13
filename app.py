@@ -1,5 +1,4 @@
 import sys
-import threading
 import time
 
 from config.settings import (
@@ -14,15 +13,12 @@ from core.speech.engine import (
 
 from core.speech.tts_queue import (
     start_tts_queue,
-    stop_tts_queue
+    stop_tts_queue,
+    wait_until_done_or_barge_in
 )
 
 from core.speech.openwakeword_listener import (
     detect_wake_word
-)
-
-from core.speech.offline_recognizer import (
-    warm_up as warm_up_offline
 )
 
 from core.utils.helpers import (
@@ -102,11 +98,6 @@ def main():
 
     start_tts_queue()
 
-    threading.Thread(
-        target=warm_up_offline,
-        daemon=True
-    ).start()
-
     time.sleep(1)
 
     session = SessionManager(
@@ -137,7 +128,9 @@ def main():
 
                 continue
 
-            stop_speaking()
+            if wait_until_done_or_barge_in():
+
+                logger.info("Barge-in: user interrupted")
 
             query = command()
 
