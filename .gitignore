@@ -4,10 +4,29 @@ __pycache__/
 .env
 
 logs/
-models/
 
-# Generated indexes / caches
+# Models — bundled at runtime, never committed
+models/*
+!models/README.md
+!models/wake/
+models/wake/*
+!models/wake/README.md
+!models/vosk/
+models/vosk/*
+!models/vosk/README.md
+!models/embeddings/
+models/embeddings/*
+!models/embeddings/README.md
+
+# Data — user content + runtime caches
+data/documents/*
+!data/documents/README.md
+data/profile/*
+!data/profile/README.md
+data/tasks/*
+!data/tasks/README.md
 data/vector.index
 data/chunks.pkl
+
+# Memory — conversation history is private
 core/memory/semantic_memory.json
-data/tasks/tasks.json
