@@ -1,7 +1,6 @@
-import time
 import threading
-# pyrefly: ignore [missing-import]
-import schedule
+import uuid
+
 from datetime import datetime, timedelta
 
 from core.speech.engine import (
@@ -13,115 +12,19 @@ from core.tasks.task_storage import (
     save_tasks
 )
 
+from core.utils.logger import (
+    logger
+)
+
 
 class TaskManager:
 
     def __init__(self):
 
         self.running = False
-
         self.tasks = load_tasks()
-
-        self.restore_tasks()
-
-    # -------------------- #
-    # REMINDER ACTION
-    # -------------------- #
-
-    def reminder_job(
-        self,
-        message
-    ):
-
-        speak(
-            f"Reminder. {message}"
-        )
-
-    # -------------------- #
-    # ADD REMINDER
-    # -------------------- #
-
-    def add_reminder_in_minutes(
-        self,
-        minutes,
-        message
-    ):
-
-        trigger_time = (
-            datetime.now()
-            + timedelta(minutes=minutes)
-        )
-
-        task = {
-            "time": trigger_time.isoformat(),
-            "message": message
-        }
-
-        self.tasks.append(task)
-
-        save_tasks(self.tasks)
-
-        schedule.every(
-            minutes
-        ).minutes.do(
-            self.execute_task,
-            task
-        )
-
-    # -------------------- #
-    # EXECUTE TASK
-    # -------------------- #
-
-    def execute_task(
-        self,
-        task
-    ):
-
-        self.reminder_job(
-            task["message"]
-        )
-
-        self.tasks.remove(task)
-
-        save_tasks(self.tasks)
-
-        return schedule.CancelJob
-
-    # -------------------- #
-    # RESTORE TASKS
-    # -------------------- #
-
-    def restore_tasks(self):
-
-        now = datetime.now()
-
-        for task in self.tasks:
-
-            task_time = datetime.fromisoformat(
-                task["time"]
-            )
-
-            remaining = (
-                task_time - now
-            ).total_seconds()
-
-            if remaining > 0:
-
-                minutes = max(
-                    1,
-                    int(remaining / 60)
-                )
-
-                schedule.every(
-                    minutes
-                ).minutes.do(
-                    self.execute_task,
-                    task
-                )
-
-    # -------------------- #
-    # START LOOP
-    # -------------------- #
+        self._timers = {}
+        self._lock = threading.Lock()
 
     def start(self):
 
@@ -131,19 +34,104 @@ class TaskManager:
 
         self.running = True
 
-        threading.Thread(
-            target=self.run_scheduler,
-            daemon=True
-        ).start()
+        self._restore_tasks()
 
-    # -------------------- #
-    # SCHEDULER LOOP
-    # -------------------- #
+    def add_reminder_in_minutes(self, minutes, message):
 
-    def run_scheduler(self):
+        trigger_time = (
+            datetime.now() + timedelta(minutes=minutes)
+        )
 
-        while self.running:
+        task = {
+            "id": uuid.uuid4().hex,
+            "time": trigger_time.isoformat(),
+            "message": message
+        }
 
-            schedule.run_pending()
+        with self._lock:
 
-            time.sleep(1)
+            self.tasks.append(task)
+
+            save_tasks(self.tasks)
+
+        delay = minutes * 60
+
+        self._schedule(task, delay)
+
+    def _schedule(self, task, delay_seconds):
+
+        timer = threading.Timer(
+            max(0.0, delay_seconds),
+            self._fire,
+            args=(task,)
+        )
+
+        timer.daemon = True
+
+        timer.start()
+
+        self._timers[task["id"]] = timer
+
+    def _fire(self, task):
+
+        try:
+
+            speak(f"Reminder. {task['message']}")
+
+        finally:
+
+            with self._lock:
+
+                self.tasks = [
+                    t for t in self.tasks
+                    if t["id"] != task["id"]
+                ]
+
+                save_tasks(self.tasks)
+
+            self._timers.pop(task["id"], None)
+
+    def _restore_tasks(self):
+
+        now = datetime.now()
+
+        survivors = []
+
+        for task in self.tasks:
+
+            if "id" not in task:
+
+                task["id"] = uuid.uuid4().hex
+
+            task_time = datetime.fromisoformat(task["time"])
+
+            remaining = (task_time - now).total_seconds()
+
+            if remaining <= 0:
+
+                logger.info(
+                    f"Skipping expired reminder: "
+                    f"{task['message']}"
+                )
+
+                continue
+
+            survivors.append(task)
+
+            self._schedule(task, remaining)
+
+        if len(survivors) != len(self.tasks):
+
+            self.tasks = survivors
+
+            save_tasks(self.tasks)
+
+    def stop(self):
+
+        self.running = False
+
+        for timer in list(self._timers.values()):
+
+            timer.cancel()
+
+        self._timers.clear()

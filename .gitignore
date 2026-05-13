@@ -1,6 +1,13 @@
 venv/
 __pycache__/
 *.pyc
+.env
+
 logs/
 models/
-.env
+
+# Generated indexes / caches
+data/vector.index
+data/chunks.pkl
+core/memory/semantic_memory.json
+data/tasks/tasks.json

@@ -11,6 +11,10 @@ import pyttsx3
 import speech_recognition as sr
 
 from config.settings import (
+    ONLINE_CACHE_TTL,
+    ONLINE_CHECK_HOST,
+    ONLINE_CHECK_PORT,
+    ONLINE_CHECK_TIMEOUT,
     VOICE_RATE,
     VOICE_VOLUME
 )
@@ -40,8 +44,6 @@ _online_cache = {
     "checked_at": 0.0
 }
 
-_ONLINE_CACHE_TTL = 5.0
-
 
 def is_online():
 
@@ -52,7 +54,7 @@ def is_online():
     if (
         cached is not None
         and now - _online_cache["checked_at"]
-        < _ONLINE_CACHE_TTL
+        < ONLINE_CACHE_TTL
     ):
 
         return cached
@@ -60,8 +62,8 @@ def is_online():
     try:
 
         with socket.create_connection(
-            ("8.8.8.8", 53),
-            timeout=1
+            (ONLINE_CHECK_HOST, ONLINE_CHECK_PORT),
+            timeout=ONLINE_CHECK_TIMEOUT
         ):
 
             online = True

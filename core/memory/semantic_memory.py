@@ -1,9 +1,7 @@
 import json
 import os
 
-from sklearn.metrics.pairwise import (
-    cosine_similarity
-)
+import numpy as np
 
 from config.settings import (
     MEMORY_SIMILARITY_THRESHOLD
@@ -68,6 +66,17 @@ def save_memory(user, assistant):
     _invalidate_cache()
 
 
+def _normalize(matrix):
+
+    norms = np.linalg.norm(
+        matrix,
+        axis=1,
+        keepdims=True
+    )
+
+    return matrix / np.clip(norms, 1e-12, None)
+
+
 def _get_embeddings():
 
     memories = _cache["memories"]
@@ -85,8 +94,10 @@ def _get_embeddings():
                 for m in memories
             ]
 
-            _cache["embeddings"] = embedder.encode(
-                memory_texts
+            raw = embedder.encode(memory_texts)
+
+            _cache["embeddings"] = _normalize(
+                np.asarray(raw)
             )
 
         else:
@@ -106,25 +117,21 @@ def search_memory(query):
 
         return None
 
-    query_embedding = embedder.encode(
-        [query]
+    query_vec = _normalize(
+        np.asarray(embedder.encode([query]))
     )
 
-    similarities = cosine_similarity(
-        query_embedding,
-        memory_embeddings
-    )[0]
+    similarities = (
+        memory_embeddings @ query_vec[0]
+    )
 
-    best_index = similarities.argmax()
+    best_index = int(similarities.argmax())
 
-    best_score = similarities[
-        best_index
-    ]
+    best_score = float(
+        similarities[best_index]
+    )
 
-    if (
-        best_score
-        < MEMORY_SIMILARITY_THRESHOLD
-    ):
+    if best_score < MEMORY_SIMILARITY_THRESHOLD:
 
         return None
 

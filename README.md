@@ -1,51 +1,44 @@
 # JARVIS-PY
 
-> Offline AI voice assistant with semantic memory, streaming responses, local LLM inference, wake-word detection, and modular tool-agent architecture.
+> Local-first AI voice assistant with online/offline speech recognition, wake-word detection, semantic memory, document RAG, streaming LLM responses, and a tool-agent.
 
 ## Overview
 
-JARVIS-PY is a local-first AI assistant built in Python with a focus on:
+JARVIS-PY is a Python voice assistant built for:
 
-- Fast local inference
-- Offline-first architecture
-- Modular engineering
-- Real-time voice interaction
-- Semantic memory retrieval
-- AI-driven tool execution
-
-Unlike traditional assistant tutorials, this project focuses heavily on scalable architecture, concurrency, streaming systems, and deployability.
+- Local-first, offline-capable operation
+- Real-time voice interaction with interruptible TTS
+- Semantic conversation memory + PDF document RAG
+- AI-driven tool routing
+- Fast keyword routing for known intents
+- Modular, easy-to-package architecture
 
 ---
 
 ## Core Features
 
-### AI + Reasoning
-- Local LLM inference using Ollama
-- Streaming token responses
-- Semantic memory retrieval
-- Context-aware prompting
-- AI tool-routing agent
+### Speech
+- **Wake word**: openWakeWord (`hey_jarvis`)
+- **STT online**: Google (`speech_recognition.recognize_google`)
+- **STT offline**: Vosk (local model, auto-fallback when offline)
+- **TTS**: pyttsx3 (SAPI5 / NSSpeechSynthesizer / espeak)
+- Streaming sentence-level TTS queue for low-latency replies
 
-### Voice System
-- Wake-word detection
-- Interruptible speech
-- Streaming TTS queue
-- Concurrent audio handling
-- Real-time speech recognition
+### Brain
+- Local LLM via Ollama (default `phi3`)
+- Streaming token output
+- Semantic memory retrieval (sentence-transformers + numpy cosine)
+- Document RAG over PDFs (FAISS index)
+- User profile context injected into every prompt
 
-### Automation
-- System automation
-- Volume control
-- Application launching
-- Browser interaction
-- Extensible tool execution layer
+### Routing
+- Fast keyword router for app/media/browser/system intents
+- LLM tool agent fallback for fuzzy matches
+- LLM chat as final fallback
 
-### Architecture
-- Modular folder structure
-- Session state management
-- Centralized configuration system
-- Local-first deployment design
-- Threaded concurrency model
+### Tasks
+- Voice-set reminders ("remind me in 10 minutes to ...")
+- Persisted across restarts, fired by `threading.Timer`
 
 ---
 
@@ -54,142 +47,126 @@ Unlike traditional assistant tutorials, this project focuses heavily on scalable
 ```text
 USER SPEAKS
     ↓
-Wake Word Detection
+Wake-word Detection (openWakeWord)
     ↓
-Speech Recognition
-    ↓
-Tool Agent Decision
-    ↓
-Tool Execution OR LLM
-    ↓
-Semantic Memory Retrieval
-    ↓
-Streaming Response
-    ↓
-TTS Queue System
+STT  ─── online? ─── Google ──┐
+       └── offline ── Vosk ───┤
+                              ▼
+              clean_query → router
+                              │
+        ┌─── reminders / exit / profile capture
+        ├─── fast keyword router (intents)
+        ├─── LLM tool agent (slow path)
+        └─── LLM chat fallback (Ollama)
+                              ↓
+                     Streaming TTS queue
+                              ↓
+                       pyttsx3 speak
 ```
 
-Detailed architecture:
-
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+Detailed: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology |
+| Layer | Tech |
 |---|---|
-| LLM | Ollama + Phi3 |
-| Memory | SentenceTransformers |
-| Similarity | Scikit-learn |
-| Speech Recognition | SpeechRecognition |
-| Wake Word | OpenWakeWord |
+| LLM | Ollama (Phi3 default) |
+| Embeddings | sentence-transformers |
+| Vector index | FAISS |
+| STT online | SpeechRecognition + Google |
+| STT offline | Vosk (small-en-us) |
+| Wake word | openWakeWord (ONNX) |
 | TTS | pyttsx3 |
-| Automation | PyAutoGUI |
-| Runtime | Python |
+| System control | PyAutoGUI, psutil |
 
 ---
 
-## Project Structure
+## Project Layout
 
 ```text
 jarvis-py/
-│
+├── app.py                  # main loop
+├── build_memory.py         # rebuild PDF vector index
+├── config/settings.py
 ├── core/
-│   ├── ai/
-│   ├── agent/
-│   ├── speech/
-│   ├── memory/
-│   ├── router/
-│   ├── state/
-│   └── utils/
-│
-├── config/
-├── docs/
-├── logs/
-├── tests/
-└── models/
+│   ├── ai/                 # ollama LLM client
+│   ├── agent/              # tool agent + registry + executor
+│   ├── speech/             # wake, engine, online/offline STT, TTS queue
+│   ├── memory/             # embedder, semantic, document, profile
+│   ├── router/             # fast keyword intent router
+│   ├── intents/            # intent handlers
+│   ├── tasks/              # reminders + persistence
+│   ├── state/              # session
+│   ├── commands/           # browser/social/schedule helpers
+│   ├── automation/         # OS app open/close, sys status
+│   └── utils/              # logger, greetings
+├── data/                   # documents, profile, tasks (runtime)
+└── models/                 # vosk model (not committed)
 ```
 
 ---
 
 ## Installation
 
-### Clone Repository
-
 ```bash
 git clone https://github.com/Shaan-alpha/jarvis-py.git
 cd jarvis-py
-```
-
-### Create Virtual Environment
-
-```bash
 python -m venv venv
-```
-
-### Activate Environment
-
-#### Windows
-
-```bash
-venv\Scripts\activate
-```
-
-### Install Dependencies
-
-```bash
+venv\Scripts\activate          # Windows
 pip install -r requirements.txt
 ```
 
-### Install Ollama
+### Ollama
 
-Download:
-
-https://ollama.com/
-
-Run model:
+Install: <https://ollama.com/>
 
 ```bash
-ollama run phi3
+ollama pull phi3
 ```
+
+### Vosk model (offline STT)
+
+Download `vosk-model-small-en-us-0.15` from <https://alphacephei.com/vosk/models> and unzip into `models/vosk/vosk-model-small-en-us-0.15`. If missing, the assistant auto-downloads to `~/.cache/vosk/` on first offline use.
+
+### Wake-word model
+
+Auto-downloaded on first run (one-time, ~1 MB) into the openWakeWord package directory.
 
 ---
 
-## Run JARVIS
+## Run
 
 ```bash
 python app.py
 ```
 
----
+Speak the wake phrase ("hey jarvis"), wait for "Yes Boss?", then issue your command.
 
-## Current Status
+Index your documents (optional):
 
-### Stable Features
-- Semantic memory
-- Streaming LLM responses
-- Streaming TTS queue
-- AI tool routing
-- Wake-word system
-- Session management
-- Interruptible speech
-- Modular architecture
+```bash
+# drop PDFs into data/documents/
+python build_memory.py
+```
 
 ---
 
-## Future Roadmap
+## Config
 
-- Piper TTS integration
-- GUI overlay
-- Event bus architecture
-- Advanced agent workflows
-- Better wake-word models
-- Packaging with Nuitka
-- Plugin system
+All config in [config/settings.py](config/settings.py):
+
+| Key | Default | Purpose |
+|---|---|---|
+| `MODEL_NAME` | `phi3` | Ollama model |
+| `WAKE_THRESHOLD` | `0.5` | Wake-word confidence cutoff |
+| `SESSION_TIMEOUT` | `20` | Seconds of silence → back to wake mode |
+| `MEMORY_SIMILARITY_THRESHOLD` | `0.45` | Min cosine for memory recall |
+| `VOSK_MODEL_PATH` | `models/vosk/...` | Local Vosk model directory |
 
 ---
 
 ## License
 
-MIT License
+MIT

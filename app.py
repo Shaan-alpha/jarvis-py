@@ -1,4 +1,5 @@
 import sys
+import threading
 import time
 
 from config.settings import (
@@ -11,13 +12,17 @@ from core.speech.engine import (
     stop_speaking
 )
 
+from core.speech.tts_queue import (
+    start_tts_queue,
+    stop_tts_queue
+)
+
 from core.speech.openwakeword_listener import (
     detect_wake_word
 )
 
-from core.speech.tts_queue import (
-    start_tts_queue,
-    stop_tts_queue
+from core.speech.offline_recognizer import (
+    warm_up as warm_up_offline
 )
 
 from core.utils.helpers import (
@@ -78,19 +83,29 @@ EXIT_WORDS = [
 ]
 
 
+def _run_intent_handler(handler, query):
+
+    if handler.__name__ == "handle_browser":
+
+        handler(query, speak, command)
+
+    else:
+
+        handler(query, speak)
+
+
 def main():
 
-    # -------------------- #
-    # STARTUP
-    # -------------------- #
-
-    logger.info(
-        "Starting Jarvis..."
-    )
+    logger.info("Starting Jarvis...")
 
     wishMe(speak)
 
     start_tts_queue()
+
+    threading.Thread(
+        target=warm_up_offline,
+        daemon=True
+    ).start()
 
     time.sleep(1)
 
@@ -102,41 +117,25 @@ def main():
 
     task_manager.start()
 
-    logger.info(
-        "Task Manager Started"
-    )
-
-    # -------------------- #
-    # MAIN LOOP
-    # -------------------- #
+    logger.info("Task Manager Started")
 
     while True:
 
         try:
 
-            # -------------------- #
-            # SLEEP MODE
-            # -------------------- #
-
             if not session.active:
 
-                if detect_wake_word():
+                detect_wake_word()
 
-                    logger.info(
-                        "Wake word detected"
-                    )
+                logger.info("Wake word activated")
 
-                    stop_speaking()
+                stop_speaking()
 
-                    speak("Yes Boss?")
+                speak("Yes Boss?")
 
-                    session.activate()
+                session.activate()
 
                 continue
-
-            # -------------------- #
-            # ACTIVE SESSION
-            # -------------------- #
 
             stop_speaking()
 
@@ -146,35 +145,38 @@ def main():
 
                 if session.is_expired():
 
-                    logger.info(
-                        "Session expired"
-                    )
+                    logger.info("Session expired")
 
-                    speak(
-                        "Going back to sleep."
-                    )
+                    speak("Going back to sleep.")
 
                     session.deactivate()
 
                 continue
 
-            logger.info(
-                f"User Query: {query}"
-            )
+            query = query.lower().strip()
+
+            logger.info(f"User Query: {query}")
 
             print(f"\nUser: {query}")
 
             session.update_interaction()
 
-            # -------------------- #
-            # PROFILE MEMORY
-            # -------------------- #
+            if any(
+                word in query
+                for word in EXIT_WORDS
+            ):
 
-            personal_info = (
-                extract_personal_info(
-                    query
-                )
-            )
+                logger.info("Session manually ended")
+
+                stop_speaking()
+
+                speak("Going back to sleep.")
+
+                session.deactivate()
+
+                continue
+
+            personal_info = extract_personal_info(query)
 
             if personal_info:
 
@@ -184,40 +186,10 @@ def main():
                 )
 
                 logger.info(
-                    f"Profile Updated: "
-                    f"{personal_info}"
+                    f"Profile Updated: {personal_info}"
                 )
 
-            # -------------------- #
-            # EXIT COMMANDS
-            # -------------------- #
-
-            if any(
-                word in query
-                for word in EXIT_WORDS
-            ):
-
-                logger.info(
-                    "Session manually ended"
-                )
-
-                stop_speaking()
-
-                speak(
-                    "Going back to sleep."
-                )
-
-                session.deactivate()
-
-                continue
-
-            # -------------------- #
-            # REMINDER SYSTEM
-            # -------------------- #
-
-            reminder = parse_reminder(
-                query
-            )
+            reminder = parse_reminder(query)
 
             if reminder:
 
@@ -227,8 +199,7 @@ def main():
                 )
 
                 logger.info(
-                    f"Reminder Created: "
-                    f"{reminder}"
+                    f"Reminder Created: {reminder}"
                 )
 
                 speak(
@@ -239,27 +210,7 @@ def main():
                 continue
 
             # -------------------- #
-            # AI TOOL AGENT
-            # -------------------- #
-
-            tool = decide_tool(query)
-
-            if tool != "none":
-
-                logger.info(
-                    f"Executed Tool: {tool}"
-                )
-
-                response = execute_tool(
-                    tool
-                )
-
-                speak(response)
-
-                continue
-
-            # -------------------- #
-            # LEGACY ROUTER
+            # FAST PATH: keyword intent router
             # -------------------- #
 
             handler = route_intent(query)
@@ -269,33 +220,14 @@ def main():
                 try:
 
                     logger.info(
-                        f"Intent Handler: "
-                        f"{handler.__name__}"
+                        f"Intent Handler: {handler.__name__}"
                     )
 
-                    if (
-                        handler.__name__
-                        == "handle_browser"
-                    ):
-
-                        handler(
-                            query,
-                            speak,
-                            command
-                        )
-
-                    else:
-
-                        handler(
-                            query,
-                            speak
-                        )
+                    _run_intent_handler(handler, query)
 
                 except Exception as e:
 
-                    logger.exception(
-                        f"Intent Error: {e}"
-                    )
+                    logger.exception(f"Intent Error: {e}")
 
                     speak(
                         "Something went wrong "
@@ -305,37 +237,42 @@ def main():
                 continue
 
             # -------------------- #
-            # LLM FALLBACK
+            # SLOW PATH: LLM tool agent
             # -------------------- #
 
-            logger.info(
-                "Generating LLM response"
-            )
+            tool = decide_tool(query)
+
+            if tool != "none":
+
+                logger.info(f"Executed Tool: {tool}")
+
+                response = execute_tool(tool)
+
+                if response:
+
+                    speak(response)
+
+                continue
+
+            # -------------------- #
+            # FALLBACK: LLM chat
+            # -------------------- #
+
+            logger.info("Generating LLM response")
 
             response = ask_llm(query)
 
-            logger.info(
-                "LLM response generated"
-            )
+            logger.info("LLM response generated")
 
-            save_memory(
-                query,
-                response
-            )
+            save_memory(query, response)
 
-            logger.info(
-                "Conversation saved to memory"
-            )
+            logger.info("Conversation saved to memory")
 
         except KeyboardInterrupt:
 
-            logger.info(
-                "Jarvis shutting down gracefully"
-            )
+            logger.info("Jarvis shutting down gracefully")
 
-            print(
-                "\nShutting down Jarvis gracefully..."
-            )
+            print("\nShutting down Jarvis gracefully...")
 
             stop_tts_queue()
 
@@ -345,9 +282,7 @@ def main():
 
         except Exception as e:
 
-            logger.exception(
-                f"Main Loop Error: {e}"
-            )
+            logger.exception(f"Main Loop Error: {e}")
 
             time.sleep(1)
 

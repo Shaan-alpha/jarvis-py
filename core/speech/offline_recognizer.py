@@ -1,7 +1,12 @@
 import json
+import os
 
 # pyrefly: ignore [missing-import]
 import vosk
+
+from config.settings import (
+    VOSK_MODEL_PATH
+)
 
 from core.utils.logger import (
     logger
@@ -20,12 +25,25 @@ def _get_model():
 
     if _model is None:
 
-        logger.info(
-            "Loading Vosk offline STT model "
-            "(downloads ~40MB on first run)"
-        )
+        if os.path.isdir(VOSK_MODEL_PATH):
 
-        _model = vosk.Model(lang="en-us")
+            logger.info(
+                f"Loading local Vosk model: "
+                f"{VOSK_MODEL_PATH}"
+            )
+
+            _model = vosk.Model(
+                model_path=VOSK_MODEL_PATH
+            )
+
+        else:
+
+            logger.info(
+                "Local Vosk model missing, "
+                "falling back to auto-download"
+            )
+
+            _model = vosk.Model(lang="en-us")
 
     return _model
 
