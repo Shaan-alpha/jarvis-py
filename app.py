@@ -24,12 +24,24 @@ from core.utils.helpers import (
     wishMe
 )
 
+from core.utils.logger import (
+    logger
+)
+
 from core.ai.ollama_engine import (
     ask_llm
 )
 
 from core.memory.semantic_memory import (
     save_memory
+)
+
+from core.memory.profile_extractor import (
+    extract_personal_info
+)
+
+from core.memory.profile_memory import (
+    update_profile
 )
 
 from core.router.intent_router import (
@@ -40,14 +52,20 @@ from core.state.session_manager import (
     SessionManager
 )
 
-# pyrefly: ignore [missing-import]
 from core.agent.tool_agent import (
     decide_tool
 )
 
-# pyrefly: ignore [missing-import]
-from core.tools.tool_executor import (
+from core.agent.tool_executor import (
     execute_tool
+)
+
+from core.tasks.task_manager import (
+    TaskManager
+)
+
+from core.tasks.task_parser import (
+    parse_reminder
 )
 
 
@@ -62,6 +80,14 @@ EXIT_WORDS = [
 
 def main():
 
+    # -------------------- #
+    # STARTUP
+    # -------------------- #
+
+    logger.info(
+        "Starting Jarvis..."
+    )
+
     wishMe(speak)
 
     start_tts_queue()
@@ -71,6 +97,18 @@ def main():
     session = SessionManager(
         timeout=SESSION_TIMEOUT
     )
+
+    task_manager = TaskManager()
+
+    task_manager.start()
+
+    logger.info(
+        "Task Manager Started"
+    )
+
+    # -------------------- #
+    # MAIN LOOP
+    # -------------------- #
 
     while True:
 
@@ -84,6 +122,10 @@ def main():
 
                 if detect_wake_word():
 
+                    logger.info(
+                        "Wake word detected"
+                    )
+
                     stop_speaking()
 
                     speak("Yes Boss?")
@@ -93,7 +135,7 @@ def main():
                 continue
 
             # -------------------- #
-            # ACTIVE SESSION MODE
+            # ACTIVE SESSION
             # -------------------- #
 
             stop_speaking()
@@ -104,15 +146,47 @@ def main():
 
                 if session.is_expired():
 
-                    speak("Going back to sleep.")
+                    logger.info(
+                        "Session expired"
+                    )
+
+                    speak(
+                        "Going back to sleep."
+                    )
 
                     session.deactivate()
 
                 continue
 
+            logger.info(
+                f"User Query: {query}"
+            )
+
             print(f"\nUser: {query}")
 
             session.update_interaction()
+
+            # -------------------- #
+            # PROFILE MEMORY
+            # -------------------- #
+
+            personal_info = (
+                extract_personal_info(
+                    query
+                )
+            )
+
+            if personal_info:
+
+                update_profile(
+                    personal_info["key"],
+                    personal_info["value"]
+                )
+
+                logger.info(
+                    f"Profile Updated: "
+                    f"{personal_info}"
+                )
 
             # -------------------- #
             # EXIT COMMANDS
@@ -123,11 +197,44 @@ def main():
                 for word in EXIT_WORDS
             ):
 
+                logger.info(
+                    "Session manually ended"
+                )
+
                 stop_speaking()
 
-                speak("Going back to sleep.")
+                speak(
+                    "Going back to sleep."
+                )
 
                 session.deactivate()
+
+                continue
+
+            # -------------------- #
+            # REMINDER SYSTEM
+            # -------------------- #
+
+            reminder = parse_reminder(
+                query
+            )
+
+            if reminder:
+
+                task_manager.add_reminder_in_minutes(
+                    reminder["minutes"],
+                    reminder["message"]
+                )
+
+                logger.info(
+                    f"Reminder Created: "
+                    f"{reminder}"
+                )
+
+                speak(
+                    f"Reminder set for "
+                    f"{reminder['minutes']} minutes."
+                )
 
                 continue
 
@@ -139,14 +246,20 @@ def main():
 
             if tool != "none":
 
-                response = execute_tool(tool)
+                logger.info(
+                    f"Executed Tool: {tool}"
+                )
+
+                response = execute_tool(
+                    tool
+                )
 
                 speak(response)
 
                 continue
 
             # -------------------- #
-            # LEGACY INTENT ROUTER
+            # LEGACY ROUTER
             # -------------------- #
 
             handler = route_intent(query)
@@ -154,6 +267,11 @@ def main():
             if handler:
 
                 try:
+
+                    logger.info(
+                        f"Intent Handler: "
+                        f"{handler.__name__}"
+                    )
 
                     if (
                         handler.__name__
@@ -175,12 +293,13 @@ def main():
 
                 except Exception as e:
 
-                    print(
+                    logger.exception(
                         f"Intent Error: {e}"
                     )
 
                     speak(
-                        "Something went wrong while executing that command."
+                        "Something went wrong "
+                        "while executing that command."
                     )
 
                 continue
@@ -189,14 +308,30 @@ def main():
             # LLM FALLBACK
             # -------------------- #
 
+            logger.info(
+                "Generating LLM response"
+            )
+
             response = ask_llm(query)
+
+            logger.info(
+                "LLM response generated"
+            )
 
             save_memory(
                 query,
                 response
             )
 
+            logger.info(
+                "Conversation saved to memory"
+            )
+
         except KeyboardInterrupt:
+
+            logger.info(
+                "Jarvis shutting down gracefully"
+            )
 
             print(
                 "\nShutting down Jarvis gracefully..."
@@ -210,7 +345,7 @@ def main():
 
         except Exception as e:
 
-            print(
+            logger.exception(
                 f"Main Loop Error: {e}"
             )
 
