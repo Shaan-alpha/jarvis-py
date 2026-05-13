@@ -1,22 +1,69 @@
-import queue
+import os
+
 import pyaudio
 import numpy as np
 
 # pyrefly: ignore [missing-import]
 from openwakeword.model import Model
+# pyrefly: ignore [missing-import]
+from openwakeword.utils import download_models
+# pyrefly: ignore [missing-import]
+import openwakeword
 
-
-model = Model(
-    wakeword_models=None
+from config.settings import (
+    WAKE_THRESHOLD
 )
 
-audio_queue = queue.Queue()
+from core.utils.logger import (
+    logger
+)
 
+
+WAKE_WORD = "hey_jarvis"
 
 FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 16000
 CHUNK = 1280
+
+
+def _model_path():
+
+    base = os.path.dirname(
+        os.path.abspath(openwakeword.__file__)
+    )
+
+    return os.path.join(
+        base,
+        "resources",
+        "models",
+        f"{WAKE_WORD}_v0.1.onnx"
+    )
+
+
+def _ensure_model():
+
+    path = _model_path()
+
+    if os.path.exists(path):
+
+        return
+
+    logger.info(
+        f"Downloading wake-word model: "
+        f"{WAKE_WORD}"
+    )
+
+    download_models([WAKE_WORD])
+
+
+_ensure_model()
+
+
+_model = Model(
+    wakeword_models=[_model_path()],
+    inference_framework="onnx"
+)
 
 
 def detect_wake_word():
@@ -31,34 +78,49 @@ def detect_wake_word():
         frames_per_buffer=CHUNK
     )
 
-    print("Waiting for wake word...")
+    logger.info(
+        f"Listening for wake word: "
+        f"'{WAKE_WORD}'"
+    )
 
-    while True:
+    print(
+        f"\nListening for wake word "
+        f"('{WAKE_WORD.replace('_', ' ')}')..."
+    )
 
-        audio_data = stream.read(
-            CHUNK,
-            exception_on_overflow=False
-        )
+    try:
 
-        audio_np = np.frombuffer(
-            audio_data,
-            dtype=np.int16
-        )
+        while True:
 
-        prediction = model.predict(audio_np)
+            audio_data = stream.read(
+                CHUNK,
+                exception_on_overflow=False
+            )
 
-        for wakeword, score in prediction.items():
+            audio_np = np.frombuffer(
+                audio_data,
+                dtype=np.int16
+            )
 
-            if score > 0.5:
+            prediction = _model.predict(
+                audio_np
+            )
 
-                print(
-                    f"Wake word detected: {wakeword}"
-                )
+            for wakeword, score in prediction.items():
 
-                stream.stop_stream()
+                if score > WAKE_THRESHOLD:
 
-                stream.close()
+                    logger.info(
+                        f"Wake word detected: "
+                        f"{wakeword} ({score:.2f})"
+                    )
 
-                audio.terminate()
+                    return True
 
-                return True
+    finally:
+
+        stream.stop_stream()
+
+        stream.close()
+
+        audio.terminate()
