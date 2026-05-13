@@ -7,13 +7,11 @@ import sounddevice as sd
 from vosk import Model, KaldiRecognizer
 
 
-MODEL_PATH = "models/vosk-model"
+MODEL_PATH = "models/vosk/vosk-model-small-en-us-0.15"
 
 model = Model(MODEL_PATH)
 
-samplerate = 16000
-
-q = queue.Queue()
+audio_queue = queue.Queue()
 
 
 def callback(indata, frames, time, status):
@@ -21,15 +19,15 @@ def callback(indata, frames, time, status):
     if status:
         print(status)
 
-    q.put(bytes(indata))
+    audio_queue.put(bytes(indata))
 
 
 def listen():
 
-    recognizer = KaldiRecognizer(model, samplerate)
+    recognizer = KaldiRecognizer(model, 16000)
 
     with sd.RawInputStream(
-        samplerate=samplerate,
+        samplerate=16000,
         blocksize=8000,
         dtype="int16",
         channels=1,
@@ -40,7 +38,7 @@ def listen():
 
         while True:
 
-            data = q.get()
+            data = audio_queue.get()
 
             if recognizer.AcceptWaveform(data):
 
@@ -48,8 +46,10 @@ def listen():
                     recognizer.Result()
                 )
 
-                text = result.get("text", "").strip()
+                query = result.get("text", "").lower()
 
-                if text:
-                    print(f"User said: {text}\n")
-                    return text.lower()
+                if query:
+
+                    print(f"User said: {query}")
+
+                    return query

@@ -1,8 +1,9 @@
 import sys
 import time
-import pyautogui
 
 from core.speech.engine import speak, command
+from core.speech.wake_listener import detect_wake_word
+
 from core.utils.helpers import wishMe
 
 from core.llm.ollama_engine import ask_llm
@@ -11,13 +12,6 @@ from core.memory.memory_engine import save_memory
 from core.router.intent_router import route_intent
 from core.state.session_manager import SessionManager
 
-
-WAKE_WORDS = [
-    "jarvis wake up",
-    "hey jarvis",
-    "wake up jarvis",
-    "jarvis",
-]
 
 EXIT_WORDS = [
     "bye",
@@ -48,14 +42,7 @@ def main():
 
                 print("\nWaiting for wake word...")
 
-                wake_query = command().lower()
-
-                if wake_query == "none":
-                    continue
-
-                print(f"User said: {wake_query}")
-
-                if any(word in wake_query for word in WAKE_WORDS):
+                if detect_wake_word():
 
                     speak("Yes Boss?")
 
@@ -67,11 +54,10 @@ def main():
             # ACTIVE SESSION MODE
             # -------------------- #
 
-            query = command().lower()
+            query = command()
 
             if query == "none":
 
-                # Session timeout check
                 if session.is_expired():
 
                     speak("Going back to sleep.")
@@ -119,12 +105,14 @@ def main():
 
                     print(f"Intent Error: {e}")
 
-                    speak("Something went wrong while executing that command.")
+                    speak(
+                        "Something went wrong while executing that command."
+                    )
 
                 continue
 
             # -------------------- #
-            # AI FALLBACK
+            # LLM FALLBACK
             # -------------------- #
 
             speak("Thinking")
@@ -132,6 +120,8 @@ def main():
             response = ask_llm(query)
 
             save_memory(query, response)
+
+            print(f"Jarvis: {response}")
 
             speak(response)
 
