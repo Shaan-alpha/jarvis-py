@@ -1,7 +1,9 @@
 # pyrefly: ignore [missing-import]
 
 import re
+import socket
 import threading
+import time
 
 # pyrefly: ignore [missing-import]
 import pyttsx3
@@ -13,12 +15,65 @@ from config.settings import (
     VOICE_VOLUME
 )
 
+from core.speech.online_recognizer import (
+    recognize_online
+)
+
+from core.speech.offline_recognizer import (
+    recognize_offline
+)
+
+from core.utils.logger import (
+    logger
+)
+
 
 speech_lock = threading.Lock()
 
 current_engine = None
 
 speech_thread = None
+
+
+_online_cache = {
+    "value": None,
+    "checked_at": 0.0
+}
+
+_ONLINE_CACHE_TTL = 5.0
+
+
+def is_online():
+
+    now = time.time()
+
+    cached = _online_cache["value"]
+
+    if (
+        cached is not None
+        and now - _online_cache["checked_at"]
+        < _ONLINE_CACHE_TTL
+    ):
+
+        return cached
+
+    try:
+
+        with socket.create_connection(
+            ("8.8.8.8", 53),
+            timeout=1
+        ):
+
+            online = True
+
+    except OSError:
+
+        online = False
+
+    _online_cache["value"] = online
+    _online_cache["checked_at"] = now
+
+    return online
 
 
 def create_engine():
@@ -168,33 +223,40 @@ def command():
 
             return "none"
 
-    try:
+    online = is_online()
 
-        print("Recognizing...")
+    mode = "online" if online else "offline"
 
-        query = recognizer.recognize_google(
-            audio,
-            language="en-in"
+    print(f"Recognizing ({mode})...")
+
+    if online:
+
+        result = recognize_online(
+            recognizer,
+            audio
         )
 
-        query = clean_query(query)
+        if result is None:
 
-        return query
+            logger.info(
+                "Online STT unreachable, "
+                "falling back to offline"
+            )
 
-    except sr.UnknownValueError:
+            result = recognize_offline(
+                recognizer,
+                audio
+            )
 
-        print("Could not understand audio")
+    else:
+
+        result = recognize_offline(
+            recognizer,
+            audio
+        )
+
+    if not result or result == "none":
 
         return "none"
 
-    except sr.RequestError:
-
-        print("Speech recognition service unavailable")
-
-        return "none"
-
-    except Exception as e:
-
-        print(f"Recognition Error: {e}")
-
-        return "none"
+    return clean_query(result)

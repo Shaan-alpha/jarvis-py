@@ -1,5 +1,8 @@
+import urllib.parse
 import webbrowser
+
 from core.utils.helpers import cal_day
+
 
 def social_media(command_text, speak_func):
     if 'facebook' in command_text:
@@ -20,6 +23,7 @@ def social_media(command_text, speak_func):
     else:
         speak_func("No result found")
 
+
 def schedule(speak_func):
     day = cal_day().lower()
     speak_func("Boss today's schedule is ")
@@ -35,8 +39,20 @@ def schedule(speak_func):
     if day in week.keys():
         speak_func(week[day])
 
+
 def browsing(query, speak_func, command_func):
     if 'google' in query:
-        speak_func("Boss, what should i search on google..")
-        s = command_func().lower()
-        webbrowser.open(f"{s}")
+        speak_func("Boss, what should I search on Google?")
+        search_term = command_func()
+
+        if not search_term or search_term == "none":
+            speak_func("I didn't catch that. Try again.")
+            return
+
+        url = (
+            "https://www.google.com/search?q="
+            + urllib.parse.quote_plus(search_term)
+        )
+
+        speak_func(f"Searching Google for {search_term}")
+        webbrowser.open(url)
