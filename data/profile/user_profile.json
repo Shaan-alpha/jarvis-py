@@ -1,1 +1,11 @@
-{}
+{
+    "name": "Shaan Satsangi",
+    "role": "Engineering Student",
+    "college": "JECRC Jaipur",
+    "interests": [
+        "AI",
+        "Data Engineering",
+        "Backend Development",
+        "RAS Preparation"
+    ]
+}

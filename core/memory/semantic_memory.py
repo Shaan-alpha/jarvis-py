@@ -1,11 +1,6 @@
 import json
 import os
 
-# pyrefly: ignore [missing-import]
-from sentence_transformers import (
-    SentenceTransformer
-)
-
 from sklearn.metrics.pairwise import (
     cosine_similarity
 )
@@ -14,14 +9,26 @@ from config.settings import (
     MEMORY_SIMILARITY_THRESHOLD
 )
 
+from core.memory.embedder import (
+    embedder
+)
+
 
 MEMORY_PATH = (
     "core/memory/semantic_memory.json"
 )
 
-model = SentenceTransformer(
-    "all-MiniLM-L6-v2"
-)
+
+_cache = {
+    "memories": None,
+    "embeddings": None
+}
+
+
+def _invalidate_cache():
+
+    _cache["memories"] = None
+    _cache["embeddings"] = None
 
 
 def load_memories():
@@ -58,26 +65,49 @@ def save_memory(user, assistant):
             indent=4
         )
 
+    _invalidate_cache()
+
+
+def _get_embeddings():
+
+    memories = _cache["memories"]
+
+    if memories is None:
+
+        memories = load_memories()
+
+        _cache["memories"] = memories
+
+        if memories:
+
+            memory_texts = [
+                f"{m['user']} {m['assistant']}"
+                for m in memories
+            ]
+
+            _cache["embeddings"] = embedder.encode(
+                memory_texts
+            )
+
+        else:
+
+            _cache["embeddings"] = None
+
+    return memories, _cache["embeddings"]
+
 
 def search_memory(query):
 
-    memories = load_memories()
+    memories, memory_embeddings = (
+        _get_embeddings()
+    )
 
     if not memories:
 
         return None
 
-    memory_texts = [
-        f"{m['user']} {m['assistant']}"
-        for m in memories
-    ]
-
-    query_embedding = model.encode(
+    query_embedding = embedder.encode(
         [query]
-    )
-
-    memory_embeddings = model.encode(
-        memory_texts
     )
 
     similarities = cosine_similarity(

@@ -84,8 +84,6 @@ def speak(text):
 
             speech_thread.join(timeout=0.2)
 
-        print(f"Jarvis: {text}")
-
         speech_thread = threading.Thread(
             target=_speak_thread,
             args=(text,),
@@ -180,8 +178,6 @@ def command():
         )
 
         query = clean_query(query)
-
-        print(f"User said: {query}")
 
         return query
 

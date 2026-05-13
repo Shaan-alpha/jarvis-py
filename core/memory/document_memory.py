@@ -6,9 +6,8 @@ import pickle
 # pyrefly: ignore [missing-import]
 from pypdf import PdfReader
 
-# pyrefly: ignore [missing-import]
-from sentence_transformers import (
-    SentenceTransformer
+from core.memory.embedder import (
+    embedder
 )
 
 
@@ -19,9 +18,16 @@ INDEX_PATH = "data/vector.index"
 CHUNKS_PATH = "data/chunks.pkl"
 
 
-model = SentenceTransformer(
-    "all-MiniLM-L6-v2"
-)
+_cache = {
+    "index": None,
+    "chunks": None
+}
+
+
+def _invalidate_cache():
+
+    _cache["index"] = None
+    _cache["chunks"] = None
 
 
 def read_pdf(path):
@@ -76,7 +82,7 @@ def build_index():
                 chunk_text(text)
             )
 
-    embeddings = model.encode(
+    embeddings = embedder.encode(
         documents
     )
 
@@ -103,21 +109,28 @@ def build_index():
             file
         )
 
+    _invalidate_cache()
+
     print(
         f"Indexed {len(documents)} chunks."
     )
 
 
-def search_documents(
-    query,
-    top_k=3
-):
+def _load_index_and_chunks():
+
+    if _cache["index"] is not None:
+
+        return _cache["index"], _cache["chunks"]
 
     if not os.path.exists(INDEX_PATH):
 
-        return []
+        return None, None
 
-    index = faiss.read_index(
+    if not os.path.exists(CHUNKS_PATH):
+
+        return None, None
+
+    _cache["index"] = faiss.read_index(
         INDEX_PATH
     )
 
@@ -126,9 +139,25 @@ def search_documents(
         "rb"
     ) as file:
 
-        chunks = pickle.load(file)
+        _cache["chunks"] = pickle.load(file)
 
-    query_embedding = model.encode(
+    return _cache["index"], _cache["chunks"]
+
+
+def search_documents(
+    query,
+    top_k=3
+):
+
+    index, chunks = (
+        _load_index_and_chunks()
+    )
+
+    if index is None:
+
+        return []
+
+    query_embedding = embedder.encode(
         [query]
     )
 

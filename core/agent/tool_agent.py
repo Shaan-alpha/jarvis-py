@@ -1,8 +1,34 @@
 import json
 import requests
 
+from config.settings import (
+    MODEL_NAME,
+    OLLAMA_URL
+)
 
-OLLAMA_URL = "http://localhost:11434/api/generate"
+from core.agent.tool_registry import (
+    TOOLS
+)
+
+from core.utils.logger import (
+    logger
+)
+
+
+def _tool_list_text():
+
+    lines = []
+
+    for index, (name, meta) in enumerate(
+        TOOLS.items(),
+        start=1
+    ):
+
+        lines.append(
+            f"{index}. {name}\n- {meta['description']}"
+        )
+
+    return "\n\n".join(lines)
 
 
 def decide_tool(query):
@@ -12,17 +38,7 @@ You are an AI tool selector.
 
 Available tools:
 
-1. open_calculator
-- Opens calculator
-
-2. increase_volume
-- Increases volume
-
-3. decrease_volume
-- Decreases volume
-
-4. mute_volume
-- Mutes volume
+{_tool_list_text()}
 
 Rules:
 - Return ONLY valid JSON
@@ -35,7 +51,7 @@ User Request:
 """
 
     payload = {
-        "model": "phi3",
+        "model": MODEL_NAME,
         "prompt": prompt,
         "stream": False
     }
@@ -57,10 +73,18 @@ User Request:
 
         parsed = json.loads(text)
 
-        return parsed.get("tool", "none")
+        tool = parsed.get("tool", "none")
+
+        if tool != "none" and tool not in TOOLS:
+
+            return "none"
+
+        return tool
 
     except Exception as e:
 
-        print(f"Tool Agent Error: {e}")
+        logger.exception(
+            f"Tool Agent Error: {e}"
+        )
 
         return "none"

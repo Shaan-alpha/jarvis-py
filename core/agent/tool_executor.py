@@ -1,36 +1,69 @@
-# pyrefly: ignore [missing-import]
-from core.actions.system_actions import (
-    open_calculator,
-    volume_up,
-    volume_down,
-    mute_volume
+import os
+import webbrowser
+
+import pyautogui
+
+from core.utils.logger import (
+    logger
 )
 
 
-def execute_tool(tool_name):
+def execute_tool(tool):
 
-    if tool_name == "open_calculator":
+    try:
 
-        open_calculator()
+        if tool == "open_calculator":
 
-        return "Opening calculator."
+            os.startfile(
+                r"C:\Windows\System32\calc.exe"
+            )
 
-    elif tool_name == "increase_volume":
+            return "Opening calculator."
 
-        volume_up()
+        elif tool == "open_youtube":
 
-        return "Increasing volume."
+            webbrowser.open(
+                "https://youtube.com"
+            )
 
-    elif tool_name == "decrease_volume":
+            return "Opening YouTube."
 
-        volume_down()
+        elif tool == "open_google":
 
-        return "Decreasing volume."
+            webbrowser.open(
+                "https://google.com"
+            )
 
-    elif tool_name == "mute_volume":
+            return "Opening Google."
 
-        mute_volume()
+        elif tool == "increase_volume":
 
-        return "Muting volume."
+            for _ in range(5):
 
-    return "Unknown tool."
+                pyautogui.press("volumeup")
+
+            return "Increasing volume."
+
+        elif tool == "decrease_volume":
+
+            for _ in range(5):
+
+                pyautogui.press("volumedown")
+
+            return "Decreasing volume."
+
+        elif tool == "mute_volume":
+
+            pyautogui.press("volumemute")
+
+            return "Volume muted."
+
+        return None
+
+    except Exception as e:
+
+        logger.exception(
+            f"Tool Execution Error: {e}"
+        )
+
+        return "Tool execution failed."
