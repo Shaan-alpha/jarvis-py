@@ -1,3 +1,20 @@
+## v3.0.0
+- Swapped `sentence-transformers` (~2 GB with torch/transformers) for
+  `fastembed` (ONNX-only, ~90 MB model). venv site-packages: 2050 MB
+  → 552 MB.
+- Embedding model cached at `models/embeddings/`; fastembed already
+  returns L2-normalized vectors.
+- FAISS index switched from `IndexFlatL2` → `IndexFlatIP` for true
+  cosine similarity on normalized vectors. **Breaking:** existing
+  vector indexes must be rebuilt — run `python build_memory.py`.
+- Wake-word listener now lazy-loads on first call and prefers a
+  project-local `models/wake/hey_jarvis_v0.1.onnx` (settings:
+  `WAKE_WORD`, `WAKE_MODEL_PATH`). Package + auto-download as
+  fallbacks.
+- `system_status` now speaks one tight sentence (CPU %, battery %,
+  charging state) instead of 3-5 separate utterances.
+- README, CHANGELOG, requirements updated for the new stack.
+
 ## v2.4.0
 - Removed dead Keras intent-classifier pipeline (chat_model.h5, train.py,
   tokenizer, label_encoder, model_test)

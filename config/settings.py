@@ -16,6 +16,12 @@ VOSK_MODEL_PATH = (
     "models/vosk/vosk-model-small-en-us-0.15"
 )
 
+WAKE_WORD = "hey_jarvis"
+
+WAKE_MODEL_PATH = (
+    "models/wake/hey_jarvis_v0.1.onnx"
+)
+
 ONLINE_CHECK_HOST = "8.8.8.8"
 
 ONLINE_CHECK_PORT = 53

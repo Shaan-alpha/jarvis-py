@@ -1,13 +1,15 @@
 import os
+import pickle
+
 # pyrefly: ignore [missing-import]
 import faiss
-import pickle
+import numpy as np
 
 # pyrefly: ignore [missing-import]
 from pypdf import PdfReader
 
 from core.memory.embedder import (
-    embedder
+    encode
 )
 
 
@@ -30,6 +32,13 @@ def _invalidate_cache():
     _cache["chunks"] = None
 
 
+def _encode_matrix(texts):
+
+    vectors = encode(texts)
+
+    return np.stack(vectors).astype(np.float32)
+
+
 def read_pdf(path):
 
     reader = PdfReader(path)
@@ -43,24 +52,12 @@ def read_pdf(path):
     return text
 
 
-def chunk_text(
-    text,
-    chunk_size=500
-):
+def chunk_text(text, chunk_size=500):
 
-    chunks = []
-
-    for i in range(
-        0,
-        len(text),
-        chunk_size
-    ):
-
-        chunks.append(
-            text[i:i + chunk_size]
-        )
-
-    return chunks
+    return [
+        text[i:i + chunk_size]
+        for i in range(0, len(text), chunk_size)
+    ]
 
 
 def build_index():
@@ -69,51 +66,34 @@ def build_index():
 
     for file in os.listdir(DOCS_PATH):
 
-        path = os.path.join(
-            DOCS_PATH,
-            file
-        )
+        path = os.path.join(DOCS_PATH, file)
 
         if file.endswith(".pdf"):
 
             text = read_pdf(path)
 
-            documents.extend(
-                chunk_text(text)
-            )
+            documents.extend(chunk_text(text))
 
-    embeddings = embedder.encode(
-        documents
-    )
+    if not documents:
 
-    dimension = embeddings.shape[1]
+        print("No PDFs found to index.")
+        return
 
-    index = faiss.IndexFlatL2(
-        dimension
-    )
+    matrix = _encode_matrix(documents)
 
-    index.add(embeddings)
+    index = faiss.IndexFlatIP(matrix.shape[1])
 
-    faiss.write_index(
-        index,
-        INDEX_PATH
-    )
+    index.add(matrix)
 
-    with open(
-        CHUNKS_PATH,
-        "wb"
-    ) as file:
+    faiss.write_index(index, INDEX_PATH)
 
-        pickle.dump(
-            documents,
-            file
-        )
+    with open(CHUNKS_PATH, "wb") as file:
+
+        pickle.dump(documents, file)
 
     _invalidate_cache()
 
-    print(
-        f"Indexed {len(documents)} chunks."
-    )
+    print(f"Indexed {len(documents)} chunks.")
 
 
 def _load_index_and_chunks():
@@ -130,50 +110,29 @@ def _load_index_and_chunks():
 
         return None, None
 
-    _cache["index"] = faiss.read_index(
-        INDEX_PATH
-    )
+    _cache["index"] = faiss.read_index(INDEX_PATH)
 
-    with open(
-        CHUNKS_PATH,
-        "rb"
-    ) as file:
+    with open(CHUNKS_PATH, "rb") as file:
 
         _cache["chunks"] = pickle.load(file)
 
     return _cache["index"], _cache["chunks"]
 
 
-def search_documents(
-    query,
-    top_k=3
-):
+def search_documents(query, top_k=3):
 
-    index, chunks = (
-        _load_index_and_chunks()
-    )
+    index, chunks = _load_index_and_chunks()
 
     if index is None:
 
         return []
 
-    query_embedding = embedder.encode(
-        [query]
-    )
+    query_matrix = _encode_matrix([query])
 
-    distances, indices = index.search(
-        query_embedding,
-        top_k
-    )
+    _, indices = index.search(query_matrix, top_k)
 
-    results = []
-
-    for idx in indices[0]:
-
-        if idx < len(chunks):
-
-            results.append(
-                chunks[idx]
-            )
-
-    return results
+    return [
+        chunks[idx]
+        for idx in indices[0]
+        if idx < len(chunks)
+    ]

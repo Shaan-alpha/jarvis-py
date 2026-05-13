@@ -4,14 +4,16 @@ import pyaudio
 import numpy as np
 
 # pyrefly: ignore [missing-import]
+import openwakeword
+# pyrefly: ignore [missing-import]
 from openwakeword.model import Model
 # pyrefly: ignore [missing-import]
 from openwakeword.utils import download_models
-# pyrefly: ignore [missing-import]
-import openwakeword
 
 from config.settings import (
-    WAKE_THRESHOLD
+    WAKE_MODEL_PATH,
+    WAKE_THRESHOLD,
+    WAKE_WORD
 )
 
 from core.utils.logger import (
@@ -19,15 +21,16 @@ from core.utils.logger import (
 )
 
 
-WAKE_WORD = "hey_jarvis"
-
 FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 16000
 CHUNK = 1280
 
 
-def _model_path():
+_model = None
+
+
+def _package_model_path():
 
     base = os.path.dirname(
         os.path.abspath(openwakeword.__file__)
@@ -41,32 +44,50 @@ def _model_path():
     )
 
 
-def _ensure_model():
+def _resolve_model_path():
 
-    path = _model_path()
+    if os.path.exists(WAKE_MODEL_PATH):
 
-    if os.path.exists(path):
+        return WAKE_MODEL_PATH
 
-        return
+    package_path = _package_model_path()
+
+    if os.path.exists(package_path):
+
+        return package_path
 
     logger.info(
-        f"Downloading wake-word model: "
-        f"{WAKE_WORD}"
+        f"Downloading wake-word model: {WAKE_WORD}"
     )
 
     download_models([WAKE_WORD])
 
+    return package_path
 
-_ensure_model()
 
+def _get_model():
 
-_model = Model(
-    wakeword_models=[_model_path()],
-    inference_framework="onnx"
-)
+    global _model
+
+    if _model is None:
+
+        path = _resolve_model_path()
+
+        logger.info(
+            f"Loading wake-word model: {path}"
+        )
+
+        _model = Model(
+            wakeword_models=[path],
+            inference_framework="onnx"
+        )
+
+    return _model
 
 
 def detect_wake_word():
+
+    model = _get_model()
 
     audio = pyaudio.PyAudio()
 
@@ -79,8 +100,7 @@ def detect_wake_word():
     )
 
     logger.info(
-        f"Listening for wake word: "
-        f"'{WAKE_WORD}'"
+        f"Listening for wake word: '{WAKE_WORD}'"
     )
 
     print(
@@ -102,9 +122,7 @@ def detect_wake_word():
                 dtype=np.int16
             )
 
-            prediction = _model.predict(
-                audio_np
-            )
+            prediction = model.predict(audio_np)
 
             for wakeword, score in prediction.items():
 

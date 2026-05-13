@@ -8,7 +8,7 @@ from config.settings import (
 )
 
 from core.memory.embedder import (
-    embedder
+    encode
 )
 
 
@@ -66,17 +66,6 @@ def save_memory(user, assistant):
     _invalidate_cache()
 
 
-def _normalize(matrix):
-
-    norms = np.linalg.norm(
-        matrix,
-        axis=1,
-        keepdims=True
-    )
-
-    return matrix / np.clip(norms, 1e-12, None)
-
-
 def _get_embeddings():
 
     memories = _cache["memories"]
@@ -89,15 +78,13 @@ def _get_embeddings():
 
         if memories:
 
-            memory_texts = [
+            texts = [
                 f"{m['user']} {m['assistant']}"
                 for m in memories
             ]
 
-            raw = embedder.encode(memory_texts)
-
-            _cache["embeddings"] = _normalize(
-                np.asarray(raw)
+            _cache["embeddings"] = np.stack(
+                encode(texts)
             )
 
         else:
@@ -109,27 +96,19 @@ def _get_embeddings():
 
 def search_memory(query):
 
-    memories, memory_embeddings = (
-        _get_embeddings()
-    )
+    memories, matrix = _get_embeddings()
 
     if not memories:
 
         return None
 
-    query_vec = _normalize(
-        np.asarray(embedder.encode([query]))
-    )
+    query_vec = encode([query])[0]
 
-    similarities = (
-        memory_embeddings @ query_vec[0]
-    )
+    similarities = matrix @ query_vec
 
     best_index = int(similarities.argmax())
 
-    best_score = float(
-        similarities[best_index]
-    )
+    best_score = float(similarities[best_index])
 
     if best_score < MEMORY_SIMILARITY_THRESHOLD:
 
