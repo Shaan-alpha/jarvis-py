@@ -15,8 +15,6 @@ is_running = False
 
 def tts_worker():
 
-    global is_running
-
     while is_running:
 
         try:

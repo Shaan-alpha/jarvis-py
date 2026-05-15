@@ -1,3 +1,8 @@
+## v3.1.4
+
+### Bug Fixes
+- **Code Quality**: Removed unused global variable declaration in `tts_queue.py` to ensure pristine compliance with automated `flake8` linter checks in CI pipeline.
+
 ## v3.1.3
 
 ### Bug Fixes
