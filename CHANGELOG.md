@@ -1,3 +1,9 @@
+## v3.1.2
+
+### CI & Automated Release Management
+- **Continuous Integration**: Added `.github/workflows/ci.yml` to automatically verify Python syntax and run pytest on all pull requests and pushes to `main`.
+- **Release Drafter Bot**: Deployed Release Drafter workflow (`release-drafter.yml`) to automatically compile semantic release notes based on PR labels (`bug`, `enhancement`, `ci`).
+
 ## v3.1.1
 
 ### Community & Repository Virality

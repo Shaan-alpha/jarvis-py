@@ -1,0 +1,44 @@
+name-template: "v$RESOLVED_VERSION 🚀"
+tag-template: "v$RESOLVED_VERSION"
+categories:
+  - title: "💥 Breaking Changes"
+    labels:
+      - "breaking-change"
+  - title: "✨ New Features & Tool Agents"
+    labels:
+      - "feature"
+      - "enhancement"
+  - title: "🐞 Bug Fixes"
+    labels:
+      - "bug"
+      - "fix"
+  - title: "⚙️ CI & Automation"
+    labels:
+      - "ci"
+      - "automation"
+  - title: "📖 Documentation & Community"
+    labels:
+      - "documentation"
+      - "community"
+change-template: "- $TITLE (#$NUMBER) @$AUTHOR"
+version-resolver:
+  major:
+    labels:
+      - "major"
+      - "breaking-change"
+  minor:
+    labels:
+      - "minor"
+      - "feature"
+  patch:
+    labels:
+      - "patch"
+      - "bug"
+      - "fix"
+      - "ci"
+      - "documentation"
+  default: patch
+template: |
+  ## What's Changed in Jarvis-py 🎉
+
+  $CHANGES
