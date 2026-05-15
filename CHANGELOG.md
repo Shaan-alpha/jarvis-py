@@ -1,3 +1,8 @@
+## v3.1.3
+
+### Bug Fixes
+- **Continuous Integration**: Installed `portaudio19-dev` and `libasound2-dev` system packages in Ubuntu runner to support successful `PyAudio` wheel builds in automated CI pipelines.
+
 ## v3.1.2
 
 ### CI & Automated Release Management
