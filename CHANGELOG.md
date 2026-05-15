@@ -1,3 +1,9 @@
+## v3.1.1
+
+### Community & Repository Virality
+- **Sponsor & Funding Integration**: Added `.github/FUNDING.yml` enabling the Sponsor button to support continuous local AI assistant research.
+- **Community Health Files**: Added interactive YAML issue templates (`bug_report.yml`, `feature_request.yml`) and a professional `PULL_REQUEST_TEMPLATE.md` to streamline OSS contributions.
+
 ## v3.1.0
 
 ### Features

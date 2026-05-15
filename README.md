@@ -4,6 +4,7 @@
 ![Ollama](https://img.shields.io/badge/LLM-Ollama-black)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![License](https://img.shields.io/badge/license-MIT-green)
+[![Sponsor](https://img.shields.io/badge/Sponsor-💖_Support-EC4899)](https://github.com/sponsors/Shaan-alpha)
 
 > Local-first AI voice assistant with online/offline speech recognition, wake-word detection, semantic memory, document RAG, streaming LLM responses, a tool-agent, and interruptible TTS.
 
@@ -191,6 +192,14 @@ All config in [config/settings.py](config/settings.py):
 | `MEMORY_SIMILARITY_THRESHOLD` | `0.45` | Min cosine for conversation-memory recall |
 | `DOCUMENT_SIMILARITY_THRESHOLD` | `0.45` | Min cosine for doc-RAG injection |
 | `ONLINE_CHECK_*` | `8.8.8.8:53`, 1 s timeout, 5 s cache | Online/offline auto-detection |
+
+---
+
+## ⭐ Star History & Community
+
+We welcome contributions, bug reports, and feature requests! Check out our new interactive issue forms if you have ideas for new tool agents or integrations. If you find Jarvis helpful, consider giving it a star or sponsoring the project!
+
+[![Star History Chart](https://api.star-history.com/svg?repos=Shaan-alpha/jarvis-py&type=Date)](https://star-history.com/#Shaan-alpha/jarvis-py&Date)
 
 ---
 

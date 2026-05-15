@@ -1,0 +1,58 @@
+name: 🐞 Bug Report
+description: Create a structured report to help us fix an issue with Jarvis-py.
+title: "[Bug]: "
+labels: ["bug"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### Thanks for reporting an issue in Jarvis-py! 🤖
+        Please ensure you have checked the existing issues and verified your audio/microphone setup before submitting.
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Prerequisites
+      options:
+        - label: I have verified my microphone is working and default audio devices are correctly configured.
+          required: true
+        - label: I am using Python 3.10 or higher.
+          required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      description: Which OS are you running Jarvis on?
+      options:
+        - Windows
+        - macOS
+        - Linux / Ubuntu
+        - Raspberry Pi / Edge Device
+    validations:
+      required: true
+  - type: dropdown
+    id: stt
+    attributes:
+      label: Speech-to-Text Engine in Use
+      options:
+        - Vosk (Offline)
+        - Google STT (Online)
+        - Hybrid / Both
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: What exactly happened? What was expected vs. actual behavior?
+      placeholder: e.g. When saying 'hey jarvis', openWakeWord triggers but TTS hangs...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Console Logs / Error Traceback
+      description: Paste any terminal error messages or output from running `debug_wake.py`.
+      render: shell
+    validations:
+      required: false
