@@ -1,3 +1,8 @@
+## v3.1.5
+
+### Automated Testing & CI
+- **Unit Test Suite**: Added `tests/test_imports.py` and configured `PYTHONPATH` in CI workflow to ensure robust automated pytest collection and verification.
+
 ## v3.1.4
 
 ### Bug Fixes
