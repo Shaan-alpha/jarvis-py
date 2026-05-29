@@ -3,6 +3,9 @@ __pycache__/
 *.pyc
 .env
 
+# Superpowers brainstorming visual-companion working dir
+.superpowers/
+
 logs/
 
 # Models — bundled at runtime, never committed

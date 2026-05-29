@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jarvis-py"
+version = "3.1.5"
+description = "Local-first AI voice assistant with online/offline STT, wake-word detection, semantic memory, document RAG, streaming LLM responses, a tool-agent, and interruptible TTS."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Shaan Satsangi" }]
+keywords = [
+    "voice-assistant",
+    "jarvis",
+    "ollama",
+    "speech-recognition",
+    "wake-word",
+    "offline-ai",
+    "rag",
+    "local-llm",
+]
+
+[tool.pytest.ini_options]
+# Lets `pytest` find the `core`/`config` packages without exporting
+# PYTHONPATH=. first (CI still sets it too, which is harmless).
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-q"

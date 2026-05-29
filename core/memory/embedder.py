@@ -15,8 +15,10 @@ logging.getLogger("huggingface_hub").setLevel(
     logging.WARNING
 )
 
+# Imported after the env/logging setup above on purpose, so the noisy
+# upstream warnings are silenced before fastembed initialises them.
 # pyrefly: ignore [missing-import]
-from fastembed import TextEmbedding
+from fastembed import TextEmbedding  # noqa: E402
 
 
 MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"

@@ -1,8 +1,9 @@
 # JARVIS-PY
 
-![Python](https://img.shields.io/badge/Python-3.13-blue)
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![Ollama](https://img.shields.io/badge/LLM-Ollama-black)
-![Status](https://img.shields.io/badge/status-active-success)
+![Platform](https://img.shields.io/badge/platform-Windows-0078D6)
+[![CI](https://github.com/Shaan-alpha/jarvis-py/actions/workflows/ci.yml/badge.svg)](https://github.com/Shaan-alpha/jarvis-py/actions/workflows/ci.yml)
 ![License](https://img.shields.io/badge/license-MIT-green)
 [![Sponsor](https://img.shields.io/badge/Sponsor-💖_Support-EC4899)](https://github.com/sponsors/Shaan-alpha)
 
@@ -18,6 +19,17 @@ JARVIS-PY is a Python voice assistant built for:
 - AI-driven tool routing
 - Fast keyword routing for known intents
 - Modular, easy-to-package architecture
+
+---
+
+## Platform support
+
+JARVIS-PY is **developed and tested on Windows**. The voice/LLM/memory core
+(wake word, STT, TTS, Ollama, semantic + document memory) is portable, but the
+built-in OS automation — app launch/close and system status — currently targets
+Windows (`os.startfile`, `taskkill`, SAPI5 voices). macOS/Linux parity is on the
+[roadmap](PLAN.md). TTS uses `pyttsx3.init()` and will pick the native driver per
+platform (SAPI5 / NSSpeechSynthesizer / espeak).
 
 ---
 

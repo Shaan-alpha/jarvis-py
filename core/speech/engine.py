@@ -80,14 +80,22 @@ def is_online():
 
 def create_engine():
 
-    engine = pyttsx3.init("sapi5")
+    # No driver arg -> pyttsx3 auto-selects the platform driver
+    # (sapi5 on Windows, nsss on macOS, espeak on Linux).
+    engine = pyttsx3.init()
 
     voices = engine.getProperty("voices")
 
-    engine.setProperty(
-        "voice",
-        voices[1].id
-    )
+    if voices:
+
+        # Prefer the second voice (often a different/female voice on
+        # Windows SAPI5) but fall back to the first if unavailable.
+        voice_index = 1 if len(voices) > 1 else 0
+
+        engine.setProperty(
+            "voice",
+            voices[voice_index].id
+        )
 
     rate = engine.getProperty("rate")
 
