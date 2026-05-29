@@ -90,6 +90,93 @@ def _run_intent_handler(handler, query):
         handler(query, speak)
 
 
+def process_query(query, task_manager, source="voice"):
+    """Route one recognized/typed query through the pipeline.
+
+    `source` is "voice" or "text". Session/exit-word handling stays in the
+    voice loop; this function only does profile capture, reminders, intent
+    routing, the tool agent, and the LLM fallback.
+    """
+
+    from core.hud import events
+
+    personal_info = extract_personal_info(query)
+
+    if personal_info:
+
+        update_profile(
+            personal_info["key"],
+            personal_info["value"]
+        )
+
+        logger.info(f"Profile Updated: {personal_info}")
+
+    reminder = parse_reminder(query)
+
+    if reminder:
+
+        task_manager.add_reminder_in_minutes(
+            reminder["minutes"],
+            reminder["message"]
+        )
+
+        logger.info(f"Reminder Created: {reminder}")
+
+        speak(
+            f"Reminder set for "
+            f"{reminder['minutes']} minutes."
+        )
+
+        return
+
+    handler = route_intent(query)
+
+    if handler:
+
+        try:
+
+            logger.info(f"Intent Handler: {handler.__name__}")
+
+            _run_intent_handler(handler, query)
+
+        except Exception as e:
+
+            logger.exception(f"Intent Error: {e}")
+
+            speak(
+                "Something went wrong "
+                "while executing that command."
+            )
+
+        return
+
+    events.emit("state", state="thinking")
+
+    tool = decide_tool(query)
+
+    if tool != "none":
+
+        logger.info(f"Executed Tool: {tool}")
+
+        response = execute_tool(tool)
+
+        if response:
+
+            speak(response)
+
+        return
+
+    logger.info("Generating LLM response")
+
+    response = ask_llm(query)
+
+    logger.info("LLM response generated")
+
+    save_memory(query, response)
+
+    logger.info("Conversation saved to memory")
+
+
 def main():
 
     logger.info("Starting Jarvis...")
@@ -169,97 +256,7 @@ def main():
 
                 continue
 
-            personal_info = extract_personal_info(query)
-
-            if personal_info:
-
-                update_profile(
-                    personal_info["key"],
-                    personal_info["value"]
-                )
-
-                logger.info(
-                    f"Profile Updated: {personal_info}"
-                )
-
-            reminder = parse_reminder(query)
-
-            if reminder:
-
-                task_manager.add_reminder_in_minutes(
-                    reminder["minutes"],
-                    reminder["message"]
-                )
-
-                logger.info(
-                    f"Reminder Created: {reminder}"
-                )
-
-                speak(
-                    f"Reminder set for "
-                    f"{reminder['minutes']} minutes."
-                )
-
-                continue
-
-            # -------------------- #
-            # FAST PATH: keyword intent router
-            # -------------------- #
-
-            handler = route_intent(query)
-
-            if handler:
-
-                try:
-
-                    logger.info(
-                        f"Intent Handler: {handler.__name__}"
-                    )
-
-                    _run_intent_handler(handler, query)
-
-                except Exception as e:
-
-                    logger.exception(f"Intent Error: {e}")
-
-                    speak(
-                        "Something went wrong "
-                        "while executing that command."
-                    )
-
-                continue
-
-            # -------------------- #
-            # SLOW PATH: LLM tool agent
-            # -------------------- #
-
-            tool = decide_tool(query)
-
-            if tool != "none":
-
-                logger.info(f"Executed Tool: {tool}")
-
-                response = execute_tool(tool)
-
-                if response:
-
-                    speak(response)
-
-                continue
-
-            # -------------------- #
-            # FALLBACK: LLM chat
-            # -------------------- #
-
-            logger.info("Generating LLM response")
-
-            response = ask_llm(query)
-
-            logger.info("LLM response generated")
-
-            save_memory(query, response)
-
-            logger.info("Conversation saved to memory")
+            process_query(query, task_manager)
 
         except KeyboardInterrupt:
 
