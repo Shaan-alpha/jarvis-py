@@ -1,7 +1,10 @@
 // app.js — connect to the core, render events, send commands.
 (() => {
-  const params = new URLSearchParams(location.search);
-  const WS_URL = params.get("ws") || "ws://127.0.0.1:8765";
+  // The WS URL is passed as a fragment (#ws=...) under file://, or a query
+  // (?ws=...) if ever served over http; fall back to the default port.
+  const fromHash = new URLSearchParams(location.hash.replace(/^#/, "")).get("ws");
+  const fromQuery = new URLSearchParams(location.search).get("ws");
+  const WS_URL = fromHash || fromQuery || "ws://127.0.0.1:8765";
 
   const pill = document.getElementById("pill");
   const capUser = document.getElementById("cap-user");

@@ -18,7 +18,11 @@ def _web_path():
 def launch():
     ws_url = f"ws://{HUD_WS_HOST}:{HUD_WS_PORT}"
 
-    url = f"file:///{_web_path().replace(os.sep, '/')}?ws={ws_url}"
+    # Pass the WS URL as a fragment (#), not a query (?): the file:// scheme
+    # treats a query string as part of the filename (-> "File not found"),
+    # whereas a fragment is never part of the path and is still readable via
+    # location.hash in the page.
+    url = f"file:///{_web_path().replace(os.sep, '/')}#ws={ws_url}"
 
     webview.create_window(
         "Jarvis",
