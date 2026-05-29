@@ -21,8 +21,6 @@ _handlers = {}
 
 _clients = set()
 
-_loop = None
-
 
 def register_handlers(**handlers):
     """Register command handlers, e.g. register_handlers(text_query=fn, wake=fn, stop=fn)."""
@@ -66,7 +64,7 @@ async def _handle_client(connection):
         async for raw in connection:
             _dispatch_command(raw)
     except Exception:
-        pass
+        logger.debug("HUD client loop ended", exc_info=True)
     finally:
         _clients.discard(connection)
         logger.info("HUD client disconnected")
@@ -95,10 +93,9 @@ def start_in_thread():
     """Start the WebSocket server in a daemon thread with its own event loop."""
 
     def _run():
-        global _loop
-        _loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(_loop)
-        _loop.run_until_complete(_serve())
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(_serve())
 
     thread = threading.Thread(target=_run, daemon=True)
     thread.start()

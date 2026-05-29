@@ -19,8 +19,12 @@ def test_wake_calls_zero_arg_handler():
     assert calls == ["wake"]
 
 
+def _must_not_run():
+    raise AssertionError("handler should not be called for an unknown type")
+
+
 def test_unknown_type_is_ignored():
-    ws.register_handlers(stop=lambda: (_ for _ in ()).throw(AssertionError("should not run")))
+    ws.register_handlers(stop=_must_not_run)
     assert ws._dispatch_command('{"type": "foo"}') is None
 
 
