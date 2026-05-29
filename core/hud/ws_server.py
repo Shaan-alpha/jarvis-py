@@ -94,8 +94,6 @@ async def _serve():
 def start_in_thread():
     """Start the WebSocket server in a daemon thread with its own event loop."""
 
-    global _loop
-
     def _run():
         global _loop
         _loop = asyncio.new_event_loop()
