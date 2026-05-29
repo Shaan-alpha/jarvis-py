@@ -65,6 +65,7 @@ pyttsx3 speak                                    core/speech/engine.py
 | `core/automation/` | OS-level actions (open/close apps, system status) |
 | `core/commands/` | Browser/search helpers |
 | `core/utils/` | Structured logger, greeting/date helpers |
+| `core/hud/` + `hud/` | **Optional** desktop HUD — event bus, WebSocket server, stats/theme emitter (Python) + a pywebview-hosted vanilla-web panel. Active only with `python app.py --hud`; the core is untouched otherwise |
 | `config/` | Central `settings.py` — all tunables in one place |
 
 ---
