@@ -28,3 +28,13 @@ def test_drain_empties_the_bus():
     events.emit("b")
     assert len(events.drain()) == 2
     assert events.drain() == []
+
+
+def test_current_state_tracks_latest_state_event():
+    # current_state() feeds the WS `ready` handshake so a reconnecting HUD
+    # re-syncs; it must reflect the most recent "state" event.
+    events.enable()
+    events.emit("state", state="thinking")
+    assert events.current_state() == "thinking"
+    events.emit("state", state="speaking")
+    assert events.current_state() == "speaking"

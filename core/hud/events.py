@@ -6,6 +6,10 @@ _enabled = False
 
 _bus = queue.Queue(maxsize=1000)
 
+# Last known voice state, tracked even while disabled so a HUD that
+# (re)connects can be told the current state in the `ready` handshake.
+_current_state = "idle"
+
 
 def enable():
     global _enabled
@@ -21,8 +25,17 @@ def is_enabled():
     return _enabled
 
 
+def current_state():
+    return _current_state
+
+
 def emit(event_type, **payload):
     """Publish an event to the HUD bus. No-op (and zero cost) when disabled."""
+
+    global _current_state
+
+    if event_type == "state":
+        _current_state = payload.get("state", _current_state)
 
     if not _enabled:
         return

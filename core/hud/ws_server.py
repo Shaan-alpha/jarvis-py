@@ -1,6 +1,7 @@
 import asyncio
 import json
 import threading
+import time
 
 # pyrefly: ignore [missing-import]
 import websockets
@@ -11,6 +12,10 @@ from config.settings import (
 )
 
 from core.hud import events
+
+from core.hud.theming import (
+    theme_for_hour,
+)
 
 from core.utils.logger import (
     logger,
@@ -57,8 +62,14 @@ async def _handle_client(connection):
     _clients.add(connection)
     logger.info("HUD client connected")
 
-    # Send a ready handshake so the panel can sync immediately.
-    await connection.send(json.dumps({"type": "ready", "version": "1.0"}))
+    # Send a ready handshake carrying the current state + time-of-day theme
+    # so the panel re-syncs on every (re)connect, not just at process start.
+    await connection.send(json.dumps({
+        "type": "ready",
+        "version": "1.0",
+        "state": events.current_state(),
+        "theme": theme_for_hour(time.localtime().tm_hour),
+    }))
 
     try:
         async for raw in connection:
