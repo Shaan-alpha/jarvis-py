@@ -16,6 +16,8 @@ from config.settings import (
     WAKE_WORD
 )
 
+from core.hud import events
+
 from core.utils.logger import (
     logger
 )
@@ -154,6 +156,10 @@ def detect_wake_word(stop_event=None, verbose=True):
                 audio_data,
                 dtype=np.int16
             )
+
+            rms = float(np.sqrt(np.mean(audio_np.astype(np.float64) ** 2)))
+
+            events.emit("level", rms=min(1.0, rms / 3000.0))
 
             prediction = model.predict(audio_np)
 

@@ -1,3 +1,6 @@
+import argparse
+import os
+import subprocess
 import sys
 import time
 
@@ -69,6 +72,8 @@ from core.tasks.task_parser import (
     parse_reminder
 )
 
+from core.hud import events
+
 
 EXIT_WORDS = [
     "bye",
@@ -97,8 +102,6 @@ def process_query(query, task_manager, source="voice"):
     voice loop; this function only does profile capture, reminders, intent
     routing, the tool agent, and the LLM fallback.
     """
-
-    from core.hud import events
 
     personal_info = extract_personal_info(query)
 
@@ -177,9 +180,67 @@ def process_query(query, task_manager, source="voice"):
     logger.info("Conversation saved to memory")
 
 
+def _start_hud(session, task_manager):
+    """Enable the HUD event bus, wire commands, start servers, spawn the UI."""
+
+    from core.hud import ws_server, stats
+    from core.speech.tts_queue import clear_queue
+
+    events.enable()
+
+    def _on_text_query(text):
+
+        text = (text or "").lower().strip()
+
+        if text:
+
+            session.activate()
+
+            process_query(text, task_manager, source="text")
+
+    def _on_wake():
+
+        session.activate()
+
+        speak("Yes Boss?")
+
+    def _on_stop():
+
+        stop_speaking()
+
+        clear_queue()
+
+    ws_server.register_handlers(
+        text_query=_on_text_query,
+        wake=_on_wake,
+        stop=_on_stop,
+    )
+
+    ws_server.start_in_thread()
+
+    stats.start()
+
+    # Spawn the pywebview HUD as a separate process. Harmless if it is not
+    # yet present; the core keeps running regardless.
+    subprocess.Popen(
+        [sys.executable, "-m", "hud"],
+        cwd=os.path.dirname(os.path.abspath(__file__)),
+    )
+
+
 def main():
 
     logger.info("Starting Jarvis...")
+
+    parser = argparse.ArgumentParser(description="Jarvis voice assistant")
+
+    parser.add_argument(
+        "--hud",
+        action="store_true",
+        help="Launch the desktop HUD"
+    )
+
+    args = parser.parse_args()
 
     wishMe(speak)
 
@@ -197,6 +258,10 @@ def main():
 
     logger.info("Task Manager Started")
 
+    if args.hud:
+
+        _start_hud(session, task_manager)
+
     while True:
 
         try:
@@ -213,11 +278,15 @@ def main():
 
                 session.activate()
 
+                events.emit("wake")
+
                 continue
 
             if wait_until_done_or_barge_in():
 
                 logger.info("Barge-in: user interrupted")
+
+            events.emit("state", state="listening")
 
             query = command()
 
@@ -231,6 +300,8 @@ def main():
 
                     session.deactivate()
 
+                    events.emit("state", state="idle")
+
                 continue
 
             query = query.lower().strip()
@@ -238,6 +309,8 @@ def main():
             logger.info(f"User Query: {query}")
 
             print(f"\nUser: {query}")
+
+            events.emit("transcript", role="user", text=query)
 
             session.update_interaction()
 
@@ -253,6 +326,8 @@ def main():
                 speak("Going back to sleep.")
 
                 session.deactivate()
+
+                events.emit("state", state="idle")
 
                 continue
 
