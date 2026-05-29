@@ -24,3 +24,14 @@ def test_encode_passes_list_through(monkeypatch):
     out = emb.encode(["a", "b"])
     assert fake.calls == [["a", "b"]]
     assert len(out) == 2
+
+
+def test_lazy_init_happens_on_first_encode(monkeypatch):
+    # Exercises the actual _get_embedder() init branch: with the sentinel
+    # reset to None, the first encode() must lazily construct the embedder
+    # (here a fake, so no real model loads) and cache it.
+    monkeypatch.setattr(emb, "_text_embedder", None)
+    fake = _FakeEmbedder()
+    monkeypatch.setattr("fastembed.TextEmbedding", lambda **kwargs: fake)
+    emb.encode("warm up")
+    assert emb._text_embedder is fake
