@@ -1,0 +1,44 @@
+:root {
+  --bg1: #0a2238; --bg2: #06121f; --border: rgba(70,200,255,.28);
+  --glow: rgba(40,160,255,.20); --accent: #9af0ff; --accent2: #1aa0e6;
+  --user: #8fb3d6; --jar: #9af0ff; --pill: #bfe9ff; --pillbg: rgba(10,30,52,.7);
+  --font: ui-monospace, Menlo, Consolas, monospace;
+}
+:root[data-theme="gold"] {
+  --bg1: #0c0f0e; --bg2: #0a0805; --border: rgba(255,196,87,.38);
+  --glow: rgba(255,180,60,.16); --accent: #ffe6a8; --accent2: #ff9d2f;
+  --user: #7fb6a8; --jar: #ffd98a; --pill: #ffd98a; --pillbg: rgba(28,20,6,.7);
+}
+:root[data-theme="frost"] {
+  --bg1: rgba(26,36,51,.75); --bg2: rgba(13,16,24,.75); --border: rgba(255,255,255,.14);
+  --glow: rgba(106,168,255,.18); --accent: #eaf3ff; --accent2: #6aa8ff;
+  --user: #9fb0c8; --jar: #eaf1ff; --pill: #cfe0ff; --pillbg: rgba(255,255,255,.06);
+  --font: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: transparent; overflow: hidden;
+  font-family: var(--font); -webkit-user-select: none; user-select: none; }
+#panel {
+  height: 100%; padding: 12px; display: flex; flex-direction: column; gap: 9px;
+  border-radius: 16px; border: 1px solid var(--border);
+  background: radial-gradient(120% 120% at 20% 0%, var(--bg1), var(--bg2));
+  box-shadow: 0 0 26px var(--glow) inset, 0 8px 30px rgba(0,0,0,.4);
+  backdrop-filter: blur(14px);
+  transition: background .6s ease, border-color .6s ease, box-shadow .6s ease;
+}
+.top { display: flex; align-items: center; gap: 9px; }
+#wave { flex: 1; height: 26px; }
+.pill { font-size: 10px; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--pill); border: 1px solid var(--border); background: var(--pillbg);
+  border-radius: 20px; padding: 2px 8px; white-space: nowrap;
+  transition: color .6s ease, border-color .6s ease; }
+.caps { flex: 1; display: flex; flex-direction: column; gap: 4px; overflow: hidden; }
+.cap { font-size: 11px; line-height: 1.5; }
+.cap.u { color: var(--user); }
+.cap.j { color: var(--jar); text-shadow: 0 0 8px var(--glow); min-height: 16px; }
+.status { display: flex; gap: 6px; flex-wrap: wrap; }
+#form { margin: 0; }
+#input { width: 100%; font-family: var(--font); font-size: 11px; color: var(--accent);
+  background: var(--pillbg); border: 1px solid var(--border); border-radius: 10px;
+  padding: 7px 10px; outline: none; }
+#input::placeholder { color: var(--user); opacity: .7; }

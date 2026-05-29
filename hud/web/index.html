@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="cyan">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
+  <title>Jarvis</title>
+</head>
+<body>
+  <div id="panel">
+    <div class="top">
+      <canvas id="orb" width="44" height="44"></canvas>
+      <canvas id="wave" width="150" height="26"></canvas>
+      <span id="pill" class="pill">idle</span>
+    </div>
+    <div class="caps">
+      <div id="cap-user" class="cap u"></div>
+      <div id="cap-jarvis" class="cap j"></div>
+    </div>
+    <div class="status">
+      <span id="st-model" class="pill">&mdash;</span>
+      <span id="st-cpu" class="pill">CPU &mdash;</span>
+      <span id="st-batt" class="pill">&mdash; </span>
+      <span id="st-net" class="pill">offline</span>
+    </div>
+    <form id="form">
+      <input id="input" type="text" placeholder="Type to Jarvis&hellip;" autocomplete="off" />
+    </form>
+  </div>
+  <script src="theme.js"></script>
+  <script src="orb.js"></script>
+  <script src="waveform.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
