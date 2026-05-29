@@ -31,3 +31,20 @@ ONLINE_CHECK_PORT = 53
 ONLINE_CHECK_TIMEOUT = 1.0
 
 ONLINE_CACHE_TTL = 5.0
+
+# -------------------- #
+# HUD (desktop overlay)
+# -------------------- #
+
+HUD_WS_HOST = "127.0.0.1"
+
+HUD_WS_PORT = 8765
+
+HUD_STATS_INTERVAL = 3.0
+
+# Theme schedule (24h). Day -> cyan, evening -> gold, night -> frost.
+HUD_THEME_DAY_START = 5
+
+HUD_THEME_EVENING_START = 17
+
+HUD_THEME_NIGHT_START = 21
