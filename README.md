@@ -1,8 +1,9 @@
 # JARVIS-PY
 
-![Python](https://img.shields.io/badge/Python-3.13-blue)
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![Ollama](https://img.shields.io/badge/LLM-Ollama-black)
-![Status](https://img.shields.io/badge/status-active-success)
+![Platform](https://img.shields.io/badge/platform-Windows-0078D6)
+[![CI](https://github.com/Shaan-alpha/jarvis-py/actions/workflows/ci.yml/badge.svg)](https://github.com/Shaan-alpha/jarvis-py/actions/workflows/ci.yml)
 ![License](https://img.shields.io/badge/license-MIT-green)
 [![Sponsor](https://img.shields.io/badge/Sponsor-💖_Support-EC4899)](https://github.com/sponsors/Shaan-alpha)
 
@@ -18,6 +19,17 @@ JARVIS-PY is a Python voice assistant built for:
 - AI-driven tool routing
 - Fast keyword routing for known intents
 - Modular, easy-to-package architecture
+
+---
+
+## Platform support
+
+JARVIS-PY is **developed and tested on Windows**. The voice/LLM/memory core
+(wake word, STT, TTS, Ollama, semantic + document memory) is portable, but the
+built-in OS automation — app launch/close and system status — currently targets
+Windows (`os.startfile`, `taskkill`, SAPI5 voices). macOS/Linux parity is on the
+[roadmap](PLAN.md). TTS uses `pyttsx3.init()` and will pick the native driver per
+platform (SAPI5 / NSSpeechSynthesizer / espeak).
 
 ---
 
@@ -174,6 +186,20 @@ Speak the wake phrase **"hey jarvis"**, wait for *"Yes Boss?"*, then issue your 
 **Exit / sleep:** say *"bye"*, *"goodbye"*, *"exit"*, *"shutdown"*, or *"stop listening"*. Or wait 20 s in silence.
 
 **Diagnostics:** if the wake word never fires, run `python debug_wake.py` — it lists your input devices and prints live wake-word confidence scores.
+
+---
+
+## Desktop HUD (optional)
+
+Launch an always-on-top **HUD panel** — an animated orb, a live mic waveform, streaming captions (your speech *and* Jarvis's reply), a type-to-Jarvis text box, and a live status row (CPU / battery / model / online). The theme adapts to the time of day: **cyan** by day, **gold** in the evening, **frosted** at night.
+
+```bash
+python app.py --hud
+```
+
+The HUD is a separate [pywebview](https://pywebview.flowrl.com/) window that talks to the voice core over a local WebSocket — fully free and local. Without `--hud`, the assistant behaves exactly as above.
+
+> _Demo GIF coming soon — run it and watch the orb come alive._
 
 ---
 

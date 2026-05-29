@@ -1,14 +1,17 @@
 import os
 import webbrowser
 
-import pyautogui
-
 from core.utils.logger import (
     logger
 )
 
 
 def execute_tool(tool):
+
+    # Imported lazily: pyautogui needs a DISPLAY at import time, which
+    # breaks importing this module on headless CI. Only loaded when a
+    # tool actually runs.
+    import pyautogui
 
     try:
 

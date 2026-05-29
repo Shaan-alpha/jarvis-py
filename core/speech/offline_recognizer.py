@@ -48,11 +48,6 @@ def _get_model():
     return _model
 
 
-def warm_up():
-
-    _get_model()
-
-
 def recognize_offline(
     recognizer,
     audio

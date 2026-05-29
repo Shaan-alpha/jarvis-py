@@ -2,6 +2,8 @@ import queue
 import threading
 import time
 
+from core.hud import events
+
 from core.speech.engine import (
     speak_sync,
     stop_speaking
@@ -29,11 +31,17 @@ def tts_worker():
 
             if text:
 
+                events.emit("state", state="speaking")
+
                 speak_sync(text)
 
         finally:
 
             tts_queue.task_done()
+
+            if tts_queue.empty():
+
+                events.emit("state", state="listening")
 
 
 def start_tts_queue():

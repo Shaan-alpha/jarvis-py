@@ -15,19 +15,30 @@ logging.getLogger("huggingface_hub").setLevel(
     logging.WARNING
 )
 
-# pyrefly: ignore [missing-import]
-from fastembed import TextEmbedding
-
-
 MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 
 CACHE_DIR = "models/embeddings"
 
 
-_text_embedder = TextEmbedding(
-    model_name=MODEL_NAME,
-    cache_dir=CACHE_DIR
-)
+_text_embedder = None
+
+
+def _get_embedder():
+    global _text_embedder
+
+    if _text_embedder is None:
+
+        # Imported lazily so merely importing this module is cheap and does
+        # not trigger a model download (keeps the core importable in CI).
+        # pyrefly: ignore [missing-import]
+        from fastembed import TextEmbedding
+
+        _text_embedder = TextEmbedding(
+            model_name=MODEL_NAME,
+            cache_dir=CACHE_DIR,
+        )
+
+    return _text_embedder
 
 
 def encode(texts):
@@ -37,5 +48,5 @@ def encode(texts):
         texts = [texts]
 
     return list(
-        _text_embedder.embed(texts)
+        _get_embedder().embed(texts)
     )

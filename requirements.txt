@@ -23,3 +23,7 @@ numpy==2.4.4
 # System automation
 PyAutoGUI==0.9.54
 psutil==7.2.2
+
+# Desktop HUD (only used with `python app.py --hud`)
+websockets>=12.0
+pywebview>=5.0

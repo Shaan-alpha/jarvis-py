@@ -22,6 +22,8 @@ from core.memory.profile_memory import (
     get_profile_context
 )
 
+from core.hud import events
+
 from core.utils.logger import (
     logger
 )
@@ -147,6 +149,8 @@ Jarvis:"""
 
                     full_response += token
 
+                    events.emit("assistant_token", text=token)
+
                     sentence_buffer += token
 
                     # -------------------- #
@@ -187,6 +191,8 @@ Jarvis:"""
         logger.info(
             "LLM response completed"
         )
+
+        events.emit("assistant_done", full_text=full_response.strip())
 
         return full_response.strip()
 

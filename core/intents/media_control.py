@@ -1,7 +1,9 @@
-import pyautogui
-
-
 def handle_media_control(query, speak):
+
+    # Imported lazily: pyautogui needs a DISPLAY at import time, which
+    # breaks importing this module on headless CI. Only loaded when a
+    # media command actually runs.
+    import pyautogui
 
     # Volume Up
     if any(word in query for word in [

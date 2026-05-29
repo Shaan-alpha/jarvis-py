@@ -1,3 +1,12 @@
+## v3.2.0
+
+### Desktop HUD (headline feature)
+- **`python app.py --hud`** launches an optional always-on-top desktop HUD panel: an animated state orb (idle / listening / thinking / speaking), a live mic waveform, streaming captions for both you and Jarvis, a type-to-Jarvis text input, and a live status row (CPU / battery / model / online). The theme auto-switches by time of day — cyan (day), gold (evening), frosted (night) — with a manual override.
+- Built with **pywebview + vanilla HTML/CSS/JS**, connected to the Python core over a local **WebSocket** (`core/hud/` + `hud/`). The voice core is unchanged and fully functional without the flag — every HUD event is a no-op when `--hud` is off. Free and fully local; no new paid services.
+
+### Internal / quality
+- Repo audit hardening: real unit-test suite (1 → 42 tests), `pyproject.toml` pytest config, pinned dev tooling, lazy-loaded embedder (faster startup + CI-importable core), cross-platform TTS init, accurate docs, lint hygiene, and removal of dead code.
+
 ## v3.1.5
 
 ### Automated Testing & CI
