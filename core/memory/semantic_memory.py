@@ -57,6 +57,8 @@ def save_memory(user, assistant):
         "assistant": assistant
     })
 
+    os.makedirs(os.path.dirname(MEMORY_PATH), exist_ok=True)
+
     with open(
         MEMORY_PATH,
         "w"

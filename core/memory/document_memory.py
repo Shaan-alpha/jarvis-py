@@ -91,6 +91,8 @@ def build_index():
 
     index.add(matrix)
 
+    os.makedirs(os.path.dirname(INDEX_PATH), exist_ok=True)
+
     faiss.write_index(index, INDEX_PATH)
 
     with open(CHUNKS_PATH, "wb") as file:

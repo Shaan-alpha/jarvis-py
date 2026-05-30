@@ -30,6 +30,8 @@ def load_tasks():
 
 def save_tasks(tasks):
 
+    os.makedirs(os.path.dirname(TASKS_FILE), exist_ok=True)
+
     with open(
         TASKS_FILE,
         "w"

@@ -22,3 +22,11 @@ def test_profile_path_under_user_data():
 def test_tasks_file_under_user_data():
     import core.tasks.task_storage as ts
     assert str(paths.user_data_dir()) in ts.TASKS_FILE
+
+
+def test_save_profile_creates_parent(monkeypatch, tmp_path):
+    import core.memory.profile_memory as pm
+    target = tmp_path / "data" / "profile" / "user_profile.json"
+    monkeypatch.setattr(pm, "PROFILE_PATH", str(target))
+    pm.save_profile({"name": "Test"})
+    assert target.exists()

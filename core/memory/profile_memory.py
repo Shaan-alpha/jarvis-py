@@ -30,6 +30,8 @@ def load_profile():
 
 def save_profile(profile):
 
+    os.makedirs(os.path.dirname(PROFILE_PATH), exist_ok=True)
+
     with open(
         PROFILE_PATH,
         "w"
