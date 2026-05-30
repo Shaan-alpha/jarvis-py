@@ -222,6 +222,10 @@ launches are voice-only (`--hud` to show the HUD).
 model pulled (`ollama pull phi3`) and the Microsoft **WebView2 runtime** (for the
 HUD). User data lives in `%APPDATA%\JarvisAI`.
 
+To sanity-check a build, run `dist\JarvisAI\Jarvis.exe --check-paths` — it prints
+where the bundled models and HUD assets resolve and exits, without needing a mic
+or Ollama.
+
 ---
 
 ## Config

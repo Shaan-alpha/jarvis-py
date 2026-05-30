@@ -2,10 +2,12 @@
 
 ### Polish & Packaging
 - **Windows packaging**: `build.ps1` + `jarvis.spec` produce a one-folder
-  `dist/JarvisAI/` app via PyInstaller, bundling the Vosk + wake-word models and
-  the HUD UI. All paths now resolve via `core/paths.py` (`resource_dir()` for
-  bundled assets, `user_data_dir()` → `%APPDATA%\JarvisAI` when frozen), so a
-  packaged app reads/writes in the right places. Dev (`python app.py`) is unchanged.
+  `dist/JarvisAI/` app via PyInstaller, bundling the Vosk + wake-word models, the
+  HUD UI, and the native libraries for Vosk/openWakeWord/FAISS/fastembed
+  (`collect_all`). All paths resolve via `core/paths.py` (`resource_dir()` →
+  PyInstaller's `_internal/` when frozen for bundled assets; `user_data_dir()` →
+  `%APPDATA%\JarvisAI`), so a packaged app reads/writes in the right places. Dev
+  (`python app.py`) is unchanged. Run `Jarvis.exe --check-paths` to verify a build.
 - **First-run setup wizard** (HUD): checks Ollama, the model, the microphone, and
   the WebView2 runtime; offers a guided `ollama pull`; captures your name. The HUD
   auto-launches on first run regardless of `--hud`; later launches respect the flag.
