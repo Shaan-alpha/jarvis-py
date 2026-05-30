@@ -2,6 +2,7 @@ import argparse
 import os
 import subprocess
 import sys
+import threading
 import time
 
 from config.settings import (
@@ -10,6 +11,7 @@ from config.settings import (
 
 from core.speech.engine import (
     speak,
+    speak_sync,
     command,
     stop_speaking
 )
@@ -248,12 +250,19 @@ def _start_hud(session, task_manager, wizard=False):
 
     def _on_pull_model(model):
 
-        pull_model(
-            model,
-            on_progress=lambda line: events.emit("pull_progress", line=line)
-        )
+        # `ollama pull` runs for minutes; doing it inline would block the WS
+        # asyncio loop (and the broadcaster), so the queued pull_progress events
+        # would not stream live. Run it off-thread and signal completion.
+        def _pull():
 
-        events.emit("pull_done")
+            pull_model(
+                model,
+                on_progress=lambda line: events.emit("pull_progress", line=line)
+            )
+
+            events.emit("pull_done")
+
+        threading.Thread(target=_pull, daemon=True).start()
 
     def _on_save_name(name):
 
@@ -270,13 +279,14 @@ def _start_hud(session, task_manager, wizard=False):
         save_name=_on_save_name,
     )
 
+    # Carry the wizard flag in the WS `ready` handshake so a slow-starting HUD
+    # that connects after _start_hud runs still opens the wizard (a one-shot
+    # show_wizard broadcast would race the client connecting).
+    ws_server.set_wizard_mode(wizard)
+
     ws_server.start_in_thread()
 
     stats.start()
-
-    if wizard:
-
-        events.emit("show_wizard")
 
     if is_frozen():
 
@@ -324,7 +334,7 @@ def main():
 
     if not _select_mic():
 
-        speak("I can't find a microphone. Please connect one and relaunch.")
+        speak_sync("I can't find a microphone. Please connect one and relaunch.")
 
         stop_tts_queue()
 

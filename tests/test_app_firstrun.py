@@ -8,7 +8,7 @@ def test_select_mic_sets_index(monkeypatch):
         lambda: {"ok": True, "detail": "", "index": 3}
     )
     monkeypatch.setattr(settings, "INPUT_DEVICE_INDEX", None)
-    app._select_mic()
+    assert app._select_mic() is True
     assert settings.INPUT_DEVICE_INDEX == 3
 
 

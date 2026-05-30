@@ -26,10 +26,22 @@ _handlers = {}
 
 _clients = set()
 
+_wizard_mode = False
+
 
 def register_handlers(**handlers):
     """Register command handlers, e.g. register_handlers(text_query=fn, wake=fn, stop=fn)."""
     _handlers.update(handlers)
+
+
+def set_wizard_mode(enabled):
+    """Mark whether the first-run wizard should open when a client connects.
+
+    Carried in the `ready` handshake (rather than a one-shot broadcast) so a
+    slow-starting HUD that connects after the event is emitted still opens the
+    wizard."""
+    global _wizard_mode
+    _wizard_mode = bool(enabled)
 
 
 def _dispatch_command(raw):
@@ -83,6 +95,7 @@ async def _handle_client(connection):
         "version": "1.0",
         "state": events.current_state(),
         "theme": theme_for_hour(time.localtime().tm_hour),
+        "wizard": _wizard_mode,
     }))
 
     try:

@@ -29,6 +29,7 @@
       case "ready":
         if (evt.state) setState(evt.state);
         if (evt.theme) Theme.onServerTheme(evt.theme);
+        if (evt.wizard && window.Wizard) Wizard.showWizard(send);
         break;
       case "state": setState(evt.state); break;
       case "wake": if (window.Orb) Orb.flash(); break;

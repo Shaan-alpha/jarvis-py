@@ -3,6 +3,7 @@ import core.hud.ws_server as ws
 
 def setup_function():
     ws._handlers.clear()
+    ws.set_wizard_mode(False)
 
 
 def test_text_query_calls_handler_with_text():
@@ -30,3 +31,14 @@ def test_unknown_type_is_ignored():
 
 def test_bad_json_is_ignored():
     assert ws._dispatch_command("not json") is None
+
+
+def test_wizard_mode_defaults_false():
+    assert ws._wizard_mode is False
+
+
+def test_set_wizard_mode_toggles_flag():
+    ws.set_wizard_mode(True)
+    assert ws._wizard_mode is True
+    ws.set_wizard_mode(0)
+    assert ws._wizard_mode is False
