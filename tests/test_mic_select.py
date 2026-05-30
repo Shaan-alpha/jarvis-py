@@ -1,3 +1,4 @@
+import config.settings as settings
 import core.setup.checks as checks
 
 
@@ -63,3 +64,8 @@ def test_check_microphone_no_input_device():
 
     result = checks.check_microphone(pyaudio_module=_FakePyAudio())
     assert result["ok"] is False
+
+
+def test_input_device_index_setting_exists():
+    assert hasattr(settings, "INPUT_DEVICE_INDEX")
+    assert settings.INPUT_DEVICE_INDEX is None

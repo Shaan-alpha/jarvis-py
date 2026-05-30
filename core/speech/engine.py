@@ -11,6 +11,7 @@ import pyttsx3
 import speech_recognition as sr
 
 from config.settings import (
+    INPUT_DEVICE_INDEX,
     ONLINE_CACHE_TTL,
     ONLINE_CHECK_HOST,
     ONLINE_CHECK_PORT,
@@ -212,7 +213,7 @@ def command():
 
     recognizer = sr.Recognizer()
 
-    with sr.Microphone() as source:
+    with sr.Microphone(device_index=INPUT_DEVICE_INDEX) as source:
 
         print("Listening...")
 

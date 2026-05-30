@@ -45,6 +45,9 @@ ONLINE_CHECK_TIMEOUT = 1.0
 
 ONLINE_CACHE_TTL = 5.0
 
+# Chosen at startup by mic auto-detect; None = PyAudio default.
+INPUT_DEVICE_INDEX = None
+
 # -------------------- #
 # HUD (desktop overlay)
 # -------------------- #
