@@ -20,7 +20,7 @@
 | 3 — setup checks | 9–14 | ✅ done, both reviews passed |
 | 4 — recovery + mic | 15–18 | ✅ done, both reviews passed (caught a CRITICAL import-time-copy bug, fixed) |
 | 5 — wizard/launch | 19–22 | ✅ **done — 3 owed fixes applied (`672ce98`), code-quality reviewer re-run, follow-ups applied (`fb4018f`); reviewer verdict Ready-to-merge** |
-| 6 — build/docs | 23–28 | ⛔ **RESUME HERE — not started** |
+| 6 — build/docs | 23–28 | ✅ **agent tasks done (23–25 `2f75863 90143a3 309f80d`, 27 `51091d4`, 28 `d914be6`). RESUME HERE: Task 26 — the MANUAL Windows build + smoke test — is the only thing left and is USER-ONLY.** |
 
 ## Phase 5 resolution (history)
 
@@ -32,15 +32,21 @@ The 3 owed code-quality fixes were applied in `672ce98` and the reviewer was re-
 
 The minor non-blocking notes (`_dispatch_command` if-chain → dict; `wizard.js` hard-codes `"phi3"`) were left as-is — optional, skip unless trivial.
 
-## RESUME HERE: Phase 6 (Tasks 23–28) — not started
+## Phase 6 — agent tasks done; only the MANUAL Task 26 remains
 
-Follow the plan verbatim. Key points:
-- **Task 23:** add `pyinstaller>=6.0` to `requirements-dev.txt`.
-- **Task 24:** create `jarvis.spec` (one-folder; `datas` bundles `models/` + `hud/web`; excludes tkinter/matplotlib/PyQt5/PySide6; hiddenimports webview/vosk/openwakeword/faiss/fastembed).
-- **Task 25:** create `build.ps1`.
-- **Task 26 — MANUAL, USER-ONLY:** the Windows build + smoke test. The agent CANNOT run this (needs a real display, mic, Ollama, and the gitignored models present under `models/`). **Stop and hand this to the user** with the smoke-test checklist from the plan; do not attempt to build/run the HUD yourself.
-- **Task 27:** README build section + CHANGELOG entry + version bump. **Ships as `v3.3.0`** (the HUD already took v3.2.0) — the plan's Task 27 Step 3 explains this. Don't accidentally set 3.2.0.
-- **Task 28:** update `CLAUDE.md` (§2 state, §5 add `core/paths.py` + `core/setup/`, §6 gotcha: never hardcode CWD-relative paths — use `core.paths`) and `PLAN.md` (mark v3.2 milestone done + add v3.3.0 row).
+Done (committed on the branch): Task 23 `pyinstaller>=6.0` (`2f75863`), Task 24
+`jarvis.spec` + gitignore build/dist (`90143a3`), Task 25 `build.ps1` (`309f80d`),
+Task 27 README build section + CHANGELOG v3.3.0 + `pyproject.toml` bump to 3.3.0
+(`51091d4`), Task 28 CLAUDE.md §2/§5/§6 + PLAN.md (`d914be6`). Suite **91 passed**,
+build-breaking lint **0**, quality lint **10** (all pre-existing), tree clean.
+
+**RESUME HERE — Task 26 (MANUAL, USER-ONLY):** the Windows build + smoke test.
+The agent CANNOT run it (needs a real display, mic, Ollama, and the gitignored
+models under `models/`). The checklist (plan Task 26): ensure models present →
+`.\build.ps1` → first-run HUD opens/checks/pull/name/Start + `%APPDATA%\JarvisAI\
+data\profile\user_profile.json` written → second run voice-only, `--hud` shows HUD,
+"hey jarvis" responds → degradation: Ollama-down message + alive, no-mic message +
+clean exit. Record outcomes for the PR body.
 
 ## Final wrap (after Phase 6)
 - Full verification (plan's "Final verification" section): suite green, lint 0, dev `python app.py [--hud]` unchanged.
