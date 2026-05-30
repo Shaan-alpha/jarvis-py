@@ -50,11 +50,25 @@ def _dispatch_command(raw):
         return None
 
     try:
+
         if command == "text_query":
+
             return handler(message.get("text", ""))
+
+        if command == "save_name":
+
+            return handler(message.get("name", ""))
+
+        if command == "pull_model":
+
+            return handler(message.get("model", ""))
+
         return handler()
+
     except Exception as e:
+
         logger.exception(f"HUD command handler error: {e}")
+
         return None
 
 
