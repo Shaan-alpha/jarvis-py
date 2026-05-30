@@ -8,6 +8,10 @@ __pycache__/
 
 logs/
 
+# PyInstaller build artifacts (jarvis.spec is committed; its output is not)
+build/
+dist/
+
 # Models — bundled at runtime, never committed
 models/*
 !models/README.md
