@@ -57,6 +57,21 @@
       case "error":
         capJarvis.textContent = "⚠ " + evt.message;
         break;
+      case "show_wizard":
+        if (window.Wizard) Wizard.showWizard(send);
+        break;
+      case "check":
+        if (window.Wizard) Wizard.onCheck(evt);
+        break;
+      case "pull_progress":
+        if (window.Wizard) Wizard.onPullProgress(evt.line);
+        break;
+      case "pull_done":
+        if (window.Wizard) Wizard.onPullDone(send);
+        break;
+      case "setup_complete":
+        if (window.Wizard) Wizard.onSetupComplete();
+        break;
     }
   }
 
@@ -87,4 +102,5 @@
   });
 
   connect();
+  if (window.Wizard) Wizard.wireButtons(send);
 })();

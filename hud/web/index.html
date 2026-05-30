@@ -26,10 +26,19 @@
     <form id="form">
       <input id="input" type="text" placeholder="Type to Jarvis&hellip;" autocomplete="off" />
     </form>
+    <section id="wizard" class="wizard hidden">
+      <h2>Setup</h2>
+      <ul id="wizard-checks"></ul>
+      <button id="wizard-pull" class="hidden">Pull phi3 (2.3 GB)</button>
+      <pre id="wizard-pull-log" class="hidden"></pre>
+      <input id="wizard-name" type="text" placeholder="What should I call you?" />
+      <button id="wizard-start" disabled>Start Jarvis</button>
+    </section>
   </div>
   <script src="theme.js"></script>
   <script src="orb.js"></script>
   <script src="waveform.js"></script>
+  <script src="wizard.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
