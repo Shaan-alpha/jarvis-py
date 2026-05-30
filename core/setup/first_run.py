@@ -53,4 +53,6 @@ def pull_model(name, on_progress=lambda line: None):
 
         on_progress(line.rstrip("\n"))
 
+    proc.stdout.close()
+
     return proc.wait()

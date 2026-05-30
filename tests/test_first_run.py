@@ -26,9 +26,19 @@ def test_run_checks_returns_named_results(monkeypatch):
 def test_pull_model_builds_command_and_streams(monkeypatch):
     seen = {}
 
+    class _FakeStdout:
+        def __init__(self, lines):
+            self._it = iter(lines)
+
+        def __iter__(self):
+            return self._it
+
+        def close(self):
+            pass
+
     class _FakeProc:
         def __init__(self):
-            self.stdout = iter(["pulling 10%\n", "success\n"])
+            self.stdout = _FakeStdout(["pulling 10%\n", "success\n"])
             self.returncode = 0
 
         def wait(self):

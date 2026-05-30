@@ -119,6 +119,10 @@ def check_microphone(pyaudio_module=None):
 
             default_index = -1
 
+    except Exception:
+
+        return _result(False, "Microphone enumeration failed.", fixable=False)
+
     finally:
 
         pa.terminate()
