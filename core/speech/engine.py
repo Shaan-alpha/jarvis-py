@@ -116,6 +116,8 @@ def _speak_thread(text):
 
     global current_engine
 
+    engine = None
+
     try:
 
         engine = create_engine()
@@ -130,7 +132,7 @@ def _speak_thread(text):
 
     except Exception as e:
 
-        print(f"TTS Error: {e}")
+        logger.exception(f"TTS error, will re-init next call: {e}")
 
     finally:
 
