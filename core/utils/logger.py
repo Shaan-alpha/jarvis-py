@@ -1,8 +1,13 @@
 import logging
 import os
 
+from core.paths import user_data_dir
 
-LOG_DIR = "logs"
+
+LOG_DIR = os.path.join(
+    str(user_data_dir()),
+    "logs"
+)
 
 LOG_FILE = os.path.join(
     LOG_DIR,
