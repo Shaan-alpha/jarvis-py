@@ -5,7 +5,7 @@
 - Built with **pywebview + vanilla HTML/CSS/JS**, connected to the Python core over a local **WebSocket** (`core/hud/` + `hud/`). The voice core is unchanged and fully functional without the flag — every HUD event is a no-op when `--hud` is off. Free and fully local; no new paid services.
 
 ### Internal / quality
-- Repo audit hardening: real unit-test suite (1 → 42 tests), `pyproject.toml` pytest config, pinned dev tooling, lazy-loaded embedder (faster startup + CI-importable core), cross-platform TTS init, accurate docs, lint hygiene, and removal of dead code.
+- Repo audit hardening: real unit-test suite (1 → 43 tests), `pyproject.toml` pytest config, pinned dev tooling, lazy-loaded embedder (faster startup + CI-importable core), cross-platform TTS init, accurate docs, lint hygiene, and removal of dead code.
 
 ## v3.1.5
 

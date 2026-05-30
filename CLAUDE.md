@@ -17,7 +17,7 @@ barge-in.
 - **Entry point:** [`app.py`](app.py) — the main voice loop.
 - **Architecture reference:** [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (module map + request lifecycle). Read it before changing core flow.
 - **Roadmap:** [`PLAN.md`](PLAN.md).
-- **Repo:** `Shaan-alpha/jarvis-py`. Default branch: `main`. Latest release: `v3.1.5`.
+- **Repo:** `Shaan-alpha/jarvis-py`. Default branch: `main`. Latest release: `v3.2.0`.
 
 Tech: Ollama (phi3), fastembed (ONNX embeddings), FAISS, Vosk (offline STT),
 Google STT (online, free endpoint), openWakeWord (ONNX), pyttsx3 (TTS), PyAudio,
@@ -27,21 +27,23 @@ psutil, PyAutoGUI.
 
 ## 2. Where we are right now (2026-05-30)
 
-A full audit was completed and the repo was hardened. **Current work happens on
-branch `feature/jarvis-hud`** (not `main`).
+A full audit was completed, the repo was hardened, and the **Jarvis HUD shipped**.
+Work is on `main`; the `feature/jarvis-hud` branch was merged (PR #2) and the
+release was tagged **`v3.2.0`**. There is **no active feature task** right now —
+the next thing to pick up comes from [`PLAN.md`](PLAN.md).
 
-**Done & committed on `feature/jarvis-hud`:**
-- Audit hardening: real unit tests (1 → 23), `pyproject.toml` (pytest config),
+**Done & released in `v3.2.0` (on `main`):**
+- Audit hardening: real unit tests (1 → 43), `pyproject.toml` (pytest config),
   pinned dev tooling, cross-platform TTS init + voice-index guard,
   `docs/ARCHITECTURE.md` rewrite, README badge/platform fixes, lint hygiene.
 - Dead-code removal: `social_media()`, `schedule()` (fake placeholder timetable),
   `warm_up()` — all had no call sites.
-- **Headline feature designed but NOT yet implemented:** the **Jarvis HUD**, an
-  optional desktop overlay panel.
+- Lazy-init embedder so `core`/`app` import cheaply (no model download in CI).
+- **Headline feature — the Jarvis HUD — is implemented and shipped.**
 
-**The active task — implement the HUD. Both documents are the source of truth:**
+**The shipped HUD (design docs kept for reference, not as a TODO):**
 - Spec: [`docs/superpowers/specs/2026-05-30-jarvis-hud-design.md`](docs/superpowers/specs/2026-05-30-jarvis-hud-design.md)
-- Plan (bite-sized TDD tasks): [`docs/superpowers/plans/2026-05-30-jarvis-hud.md`](docs/superpowers/plans/2026-05-30-jarvis-hud.md)
+- Plan (all tasks complete): [`docs/superpowers/plans/2026-05-30-jarvis-hud.md`](docs/superpowers/plans/2026-05-30-jarvis-hud.md)
 
 **HUD in one line:** a Tauri-style desktop panel — but built with **pywebview +
 vanilla HTML/CSS/JS** (we deliberately chose pywebview over Tauri to avoid Rust+Node
@@ -49,12 +51,9 @@ toolchains) — that connects to the Python core over a **local WebSocket**. It 
 an animated orb (idle/listening/thinking/speaking), a live waveform, streaming
 captions, a type-to-Jarvis input, and a status row, with a **time-adaptive theme**
 (cyan day / gold evening / frosted night). Launched with `python app.py --hud`; the
-core is byte-for-byte unchanged without the flag.
-
-### How to resume the HUD work
-Execute the plan task-by-task with the superpowers **subagent-driven-development**
-(preferred) or **executing-plans** skill. Start at Task 1 (lazy-init the embedder)
-and follow the checkboxes. Do not skip the TDD steps.
+core is byte-for-byte unchanged without the flag. Code lives in
+[`core/hud/`](core/hud/) (event bus, WS server, stats/theme) and [`hud/`](hud/)
+(pywebview window + `web/` UI).
 
 ---
 
@@ -66,7 +65,7 @@ pip install -r requirements.txt          # runtime
 pip install -r requirements-dev.txt      # + pytest, flake8
 
 python app.py                            # run the assistant (needs Ollama: `ollama pull phi3`)
-python app.py --hud                      # (after HUD is implemented) run with the desktop HUD
+python app.py --hud                      # run with the desktop HUD (shipped in v3.2.0)
 
 python -m pytest                         # tests (no PYTHONPATH needed; configured in pyproject.toml)
 python -m flake8 . --select=E9,F63,F7,F82,F401 --exclude=venv,__pycache__ --count   # build-breaking lint (must be 0)
@@ -110,8 +109,8 @@ Ubuntu/Python 3.11. **Keep CI green** — it's a public adoption signal.
   can be imported in CI without downloading the ONNX model.)
 
 ### Git
-- **Branch off `main`; never commit directly to `main`.** Current branch:
-  `feature/jarvis-hud`.
+- **Branch off `main`; never commit directly to `main`.** No long-lived feature
+  branch is active right now — cut a fresh one per task.
 - **Commit/push only when the user asks.** Prefer small, focused commits.
 - End every commit message with:
   `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`
@@ -135,24 +134,24 @@ Ubuntu/Python 3.11. **Keep CI green** — it's a public adoption signal.
 
 | Path | Purpose |
 |---|---|
-| [`app.py`](app.py) | Main voice loop; routing; (soon) `--hud` flag + `process_query()` |
-| [`config/settings.py`](config/settings.py) | All tunables (thresholds, paths, soon HUD config) |
+| [`app.py`](app.py) | Main voice loop; routing; `--hud` flag + `process_query()` |
+| [`config/settings.py`](config/settings.py) | All tunables (thresholds, paths, HUD config) |
 | [`core/speech/`](core/speech/) | Wake word, online/offline STT, TTS engine + queue |
 | [`core/ai/ollama_engine.py`](core/ai/ollama_engine.py) | Streaming LLM client + prompt assembly |
 | [`core/agent/`](core/agent/) | Tool agent, registry, executor |
 | [`core/router/intent_router.py`](core/router/intent_router.py) | Fast keyword → intent handler routing |
 | [`core/memory/`](core/memory/) | Embedder (lazy), semantic memory, document RAG, profile |
 | [`core/tasks/`](core/tasks/) | Reminder parsing + scheduling + persistence |
-| [`core/hud/`](core/hud/) | **(planned)** event bus, WebSocket server, stats/theme emitter |
-| [`hud/`](hud/) | **(planned)** pywebview window + `web/` vanilla UI |
+| [`core/hud/`](core/hud/) | Event bus, WebSocket server, stats/theme emitter (HUD core) |
+| [`hud/`](hud/) | pywebview window + `web/` vanilla UI |
 | [`tests/`](tests/) | Pure-logic unit tests (CI-safe) |
 
 ---
 
 ## 6. Gotchas
 - Importing `core.memory.*` historically instantiated the embedding model at
-  import time (slow / downloads). The HUD plan's Task 1 makes it lazy — until that
-  lands, avoid importing those modules in tests.
+  import time (slow / downloads). It is now **lazy** (the embedder loads on first
+  use), so `core`/`app` import cheaply in CI. Don't reintroduce eager init.
 - `import pyaudio` needs PortAudio (CI installs `portaudio19-dev`).
 - The visual-companion server may still be running from a brainstorming session at
   a local port; stop it with the superpowers stop-server script if needed. Its
