@@ -189,9 +189,13 @@ def process_query(query, task_manager, source="voice"):
 
     logger.info("LLM response generated")
 
-    save_memory(query, response)
+    # ask_llm returns "" when it was superseded by a newer query (barge-in) or
+    # could not reach Ollama; don't persist an empty turn.
+    if response:
 
-    logger.info("Conversation saved to memory")
+        save_memory(query, response)
+
+        logger.info("Conversation saved to memory")
 
 
 def _select_mic():
@@ -224,11 +228,28 @@ def _start_hud(session, task_manager, wizard=False):
 
         text = (text or "").lower().strip()
 
-        if text:
+        if not text:
 
-            session.activate()
+            return
 
-            process_query(text, task_manager, source="text")
+        # Barge-in: a new typed query interrupts whatever Jarvis is currently
+        # saying. Stop the current utterance and drop anything still queued so
+        # the new answer doesn't play behind the old one.
+        stop_speaking()
+
+        clear_queue()
+
+        session.activate()
+
+        # Run off the WS thread so a slow generation doesn't block the socket
+        # (and so the next typed query can interrupt this one). ask_llm's
+        # generation token ensures a superseded stream abandons itself.
+        threading.Thread(
+            target=process_query,
+            args=(text, task_manager),
+            kwargs={"source": "text"},
+            daemon=True,
+        ).start()
 
     def _on_wake():
 

@@ -1,4 +1,6 @@
 import json
+import threading
+
 import requests
 
 from config.settings import (
@@ -41,6 +43,31 @@ _CHITCHAT = {
 }
 
 
+# Generation token for barge-in. Each ask_llm() call bumps the counter; an
+# in-flight stream that finds a newer generation has started aborts itself, so
+# a new query (typed or spoken) interrupts the previous answer instead of
+# queueing behind it.
+_generation_lock = threading.Lock()
+
+_generation = 0
+
+
+def _start_generation():
+
+    global _generation
+
+    with _generation_lock:
+
+        _generation += 1
+
+        return _generation
+
+
+def _is_current(generation):
+
+    return generation == _generation
+
+
 def _should_retrieve(prompt):
     """True when the query is substantial enough to warrant document/memory
     retrieval. Skips greetings and very short utterances so RAG doesn't fire
@@ -61,6 +88,9 @@ def _should_retrieve(prompt):
 
 
 def ask_llm(prompt):
+
+    # Claim a generation; a later query bumps this and supersedes us.
+    my_generation = _start_generation()
 
     # -------------------- #
     # PROFILE CONTEXT
@@ -159,6 +189,16 @@ Jarvis:"""
 
         for line in response.iter_lines():
 
+            # Barge-in: a newer query started — abandon this stream so its
+            # leftover sentences don't talk over the new answer.
+            if not _is_current(my_generation):
+
+                logger.info("LLM stream superseded by a newer query")
+
+                response.close()
+
+                return ""
+
             if line:
 
                 try:
@@ -206,6 +246,12 @@ Jarvis:"""
                 except json.JSONDecodeError:
 
                     continue
+
+        # Superseded right as the stream ended — don't queue the tail or
+        # emit a done event that would clobber the newer answer.
+        if not _is_current(my_generation):
+
+            return ""
 
         # -------------------- #
         # LEFTOVER BUFFER

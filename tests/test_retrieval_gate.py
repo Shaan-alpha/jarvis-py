@@ -19,3 +19,13 @@ def test_substantial_questions_retrieve():
 def test_gate_is_case_and_punctuation_insensitive():
     assert engine._should_retrieve("  HELLO!! ") is False
     assert engine._should_retrieve("How Are You?") is False
+
+
+def test_new_generation_supersedes_previous():
+    first = engine._start_generation()
+    assert engine._is_current(first) is True
+
+    second = engine._start_generation()
+    # The newer generation is current; the older one is now superseded.
+    assert engine._is_current(second) is True
+    assert engine._is_current(first) is False
