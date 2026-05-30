@@ -1,6 +1,8 @@
 import logging
 import os
 
+from core.paths import resource_dir
+
 # Silence noisy upstream loggers before fastembed imports them.
 os.environ.setdefault(
     "HF_HUB_DISABLE_SYMLINKS_WARNING",
@@ -17,7 +19,11 @@ logging.getLogger("huggingface_hub").setLevel(
 
 MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 
-CACHE_DIR = "models/embeddings"
+CACHE_DIR = os.path.join(
+    str(resource_dir()),
+    "models",
+    "embeddings"
+)
 
 
 _text_embedder = None

@@ -35,3 +35,9 @@ def test_lazy_init_happens_on_first_encode(monkeypatch):
     monkeypatch.setattr("fastembed.TextEmbedding", lambda **kwargs: fake)
     emb.encode("warm up")
     assert emb._text_embedder is fake
+
+
+def test_cache_dir_under_resource_dir():
+    import core.paths as paths
+    import core.memory.embedder as emb
+    assert str(paths.resource_dir()) in emb.CACHE_DIR
