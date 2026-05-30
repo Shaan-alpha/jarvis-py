@@ -1,7 +1,5 @@
 import sys
 
-from pathlib import Path
-
 import core.paths as paths
 
 
@@ -17,8 +15,9 @@ def test_is_frozen_true_when_sys_frozen_set(monkeypatch):
 
 def test_resource_dir_source_is_repo_root(monkeypatch):
     monkeypatch.setattr(paths, "is_frozen", lambda: False)
-    expected = Path(paths.__file__).resolve().parent.parent
-    assert paths.resource_dir() == expected
+    result = paths.resource_dir()
+    assert (result / "core").is_dir()
+    assert (result / "app.py").is_file()
 
 
 def test_resource_dir_frozen_is_exe_dir(monkeypatch, tmp_path):
@@ -30,8 +29,17 @@ def test_resource_dir_frozen_is_exe_dir(monkeypatch, tmp_path):
 
 def test_user_data_dir_source_is_repo_root(monkeypatch):
     monkeypatch.setattr(paths, "is_frozen", lambda: False)
-    expected = Path(paths.__file__).resolve().parent.parent
-    assert paths.user_data_dir() == expected
+    result = paths.user_data_dir()
+    assert (result / "core").is_dir()
+    assert (result / "app.py").is_file()
+
+
+def test_user_data_dir_frozen_raises_without_appdata(monkeypatch):
+    monkeypatch.setattr(paths, "is_frozen", lambda: True)
+    monkeypatch.delenv("APPDATA", raising=False)
+    import pytest
+    with pytest.raises(RuntimeError):
+        paths.user_data_dir()
 
 
 def test_user_data_dir_frozen_is_appdata(monkeypatch, tmp_path):

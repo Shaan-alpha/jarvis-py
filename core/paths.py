@@ -33,7 +33,16 @@ def user_data_dir():
 
     if is_frozen():
 
-        base = Path(os.environ["APPDATA"]) / "JarvisAI"
+        appdata = os.environ.get("APPDATA")
+
+        if not appdata:
+
+            raise RuntimeError(
+                "APPDATA environment variable is not set; "
+                "cannot locate the user data directory."
+            )
+
+        base = Path(appdata) / "JarvisAI"
 
     else:
 
