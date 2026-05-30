@@ -20,11 +20,17 @@ def test_resource_dir_source_is_repo_root(monkeypatch):
     assert (result / "app.py").is_file()
 
 
-def test_resource_dir_frozen_is_exe_dir(monkeypatch, tmp_path):
+def test_resource_dir_frozen_is_meipass(monkeypatch, tmp_path):
+    # In a PyInstaller one-folder build, bundled data lives in sys._MEIPASS
+    # (the _internal/ folder), NOT alongside the executable. resource_dir()
+    # must follow _MEIPASS or it resolves one level too high and misses the
+    # bundled models/ and hud/web.
     monkeypatch.setattr(paths, "is_frozen", lambda: True)
-    fake_exe = tmp_path / "Jarvis.exe"
-    monkeypatch.setattr(sys, "executable", str(fake_exe))
-    assert paths.resource_dir() == tmp_path
+    meipass = tmp_path / "_internal"
+    meipass.mkdir()
+    monkeypatch.setattr(sys, "_MEIPASS", str(meipass), raising=False)
+    monkeypatch.setattr(sys, "executable", str(tmp_path / "Jarvis.exe"))
+    assert paths.resource_dir() == meipass
 
 
 def test_user_data_dir_source_is_repo_root(monkeypatch):

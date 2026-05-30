@@ -13,11 +13,20 @@ def is_frozen():
 def resource_dir():
     """Base dir for read-only bundled assets (models, hud/web).
 
-    Frozen (one-folder): the folder containing the executable.
+    Frozen: ``sys._MEIPASS`` — for a PyInstaller one-folder build this is the
+    ``_internal/`` folder where bundled ``datas`` land (PyInstaller >= 6 moves
+    everything except the executable there), so it is NOT the same as the
+    executable's folder. Falls back to the exe folder if ``_MEIPASS`` is absent.
     Source: the repo root (parent of the core/ package).
     """
 
     if is_frozen():
+
+        meipass = getattr(sys, "_MEIPASS", None)
+
+        if meipass:
+
+            return Path(meipass)
 
         return Path(sys.executable).parent
 

@@ -308,6 +308,39 @@ def _start_hud(session, task_manager, wizard=False):
         )
 
 
+def _print_paths_report():
+    """Print where bundled assets and writable data resolve, and whether the
+    asset paths exist. A build diagnostic for verifying a frozen one-folder
+    package finds its models + HUD UI. Prints; never raises for missing paths."""
+
+    from core.paths import resource_dir, user_data_dir
+
+    checks = [
+        ("VOSK_MODEL_PATH", settings.VOSK_MODEL_PATH),
+        ("WAKE_MODEL_PATH", settings.WAKE_MODEL_PATH),
+        ("hud/web", os.path.join(str(resource_dir()), "hud", "web")),
+    ]
+
+    print(f"frozen:        {is_frozen()}")
+
+    print(f"resource_dir:  {resource_dir()}")
+
+    print(f"user_data_dir: {user_data_dir()}")
+
+    all_ok = True
+
+    for name, path in checks:
+
+        exists = os.path.exists(path)
+
+        all_ok = all_ok and exists
+
+        print(f"  [{'OK' if exists else 'MISSING'}] {name}: {path}")
+
+    print("RESULT: all bundled asset paths exist" if all_ok
+          else "RESULT: MISSING bundled asset paths")
+
+
 def main():
 
     logger.info("Starting Jarvis...")
@@ -320,7 +353,19 @@ def main():
         help="Launch the desktop HUD"
     )
 
+    parser.add_argument(
+        "--check-paths",
+        action="store_true",
+        help="Print resolved asset/data paths and exit (build diagnostic)"
+    )
+
     args = parser.parse_args()
+
+    if args.check_paths:
+
+        _print_paths_report()
+
+        return
 
     wishMe(speak)
 

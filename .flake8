@@ -1,0 +1,7 @@
+[flake8]
+# Never lint third-party code or build artifacts. `build/` and `dist/` hold the
+# PyInstaller bundle (includes vendored packages like faiss) and must be skipped,
+# or a local build pollutes the lint gate with thousands of upstream warnings.
+exclude = venv,__pycache__,build,dist,.git
+max-line-length = 127
+max-complexity = 10
