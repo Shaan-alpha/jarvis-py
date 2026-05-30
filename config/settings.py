@@ -1,6 +1,13 @@
+import os
+
+from core.paths import resource_dir
+
 MODEL_NAME = "phi3"
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
+
+# Ollama model-list endpoint (used by setup checks)
+OLLAMA_TAGS_URL = "http://localhost:11434/api/tags"
 
 WAKE_THRESHOLD = 0.4
 
@@ -14,14 +21,20 @@ MEMORY_SIMILARITY_THRESHOLD = 0.45
 
 DOCUMENT_SIMILARITY_THRESHOLD = 0.45
 
-VOSK_MODEL_PATH = (
-    "models/vosk/vosk-model-small-en-us-0.15"
+VOSK_MODEL_PATH = os.path.join(
+    str(resource_dir()),
+    "models",
+    "vosk",
+    "vosk-model-small-en-us-0.15"
 )
 
 WAKE_WORD = "hey_jarvis"
 
-WAKE_MODEL_PATH = (
-    "models/wake/hey_jarvis_v0.1.onnx"
+WAKE_MODEL_PATH = os.path.join(
+    str(resource_dir()),
+    "models",
+    "wake",
+    "hey_jarvis_v0.1.onnx"
 )
 
 ONLINE_CHECK_HOST = "8.8.8.8"
