@@ -1,5 +1,6 @@
 # hud/window.py
 import os
+import threading
 
 # pyrefly: ignore [missing-import]
 import webview
@@ -39,3 +40,13 @@ def launch():
     )
 
     webview.start()
+
+
+def start_in_thread():
+    """Run the pywebview window on a daemon thread (used in frozen builds)."""
+
+    thread = threading.Thread(target=launch, daemon=True)
+
+    thread.start()
+
+    return thread
