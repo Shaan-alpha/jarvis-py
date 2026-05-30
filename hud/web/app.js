@@ -58,9 +58,6 @@
       case "error":
         capJarvis.textContent = "⚠ " + evt.message;
         break;
-      case "show_wizard":
-        if (window.Wizard) Wizard.showWizard(send);
-        break;
       case "check":
         if (window.Wizard) Wizard.onCheck(evt);
         break;

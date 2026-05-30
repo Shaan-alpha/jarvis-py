@@ -255,12 +255,18 @@ def _start_hud(session, task_manager, wizard=False):
         # would not stream live. Run it off-thread and signal completion.
         def _pull():
 
-            pull_model(
-                model,
-                on_progress=lambda line: events.emit("pull_progress", line=line)
-            )
+            try:
 
-            events.emit("pull_done")
+                pull_model(
+                    model,
+                    on_progress=lambda line: events.emit("pull_progress", line=line)
+                )
+
+            finally:
+
+                # Always signal completion, even if the pull raised — otherwise
+                # the wizard's pull log strands with no "done" transition.
+                events.emit("pull_done")
 
         threading.Thread(target=_pull, daemon=True).start()
 
