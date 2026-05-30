@@ -37,6 +37,20 @@ Architecture first. No giant single files.
 
 ## Current Status
 
+> Latest release: **v3.2.0** (Desktop HUD). Next up: **v3.2 Polish & Packaging**
+> (below) — note the HUD shipped ahead of the packaging milestone.
+
+### v3.2.0 — Desktop HUD (shipped)
+
+The "Iron Man Interface" arrived early and with a different stack than v4.0
+originally sketched: an optional always-on-top desktop panel (`python app.py
+--hud`) built with **pywebview + vanilla HTML/CSS/JS** (not Tauri/React),
+talking to the Python core over a local WebSocket. Animated state orb, live
+mic waveform, streaming captions (user + Jarvis), type-to-Jarvis input, live
+status row, and a time-adaptive theme (cyan/gold/frost). Core is byte-for-byte
+unchanged without the flag. This delivers much of v4.0's orb/waveform/subtitles
+goals — see v4.0 below for what remains.
+
 ### v3.1.0 — Interactive UX (shipped)
 
 | Area | Status |
@@ -67,6 +81,7 @@ Architecture first. No giant single files.
 | v2.4.0 | Lean install + faster routing + accurate reminders |
 | v3.0.0 | fastembed swap, lazy wake-word, production-ready |
 | v3.1.0 | Wake-word barge-in, doc-RAG threshold, repo privacy |
+| v3.2.0 | Desktop HUD (pywebview + local WebSocket); audit hardening |
 
 ---
 
@@ -115,21 +130,29 @@ Goal: memory that gets better over time.
 
 Goal: a real UI, not a terminal.
 
-| Surface | Stack candidate |
+> **Partly shipped in v3.2.0.** The HUD chose **pywebview + vanilla JS over a
+> local WebSocket** instead of the Tauri/React/FastAPI stack originally sketched
+> here — no Rust+Node toolchain. The orb, live waveform, and dual subtitles are
+> done. What remains is the data-management UI below.
+
+Stack (as built):
+
+| Surface | Stack (shipped) |
 |---|---|
-| Desktop shell | Tauri + React + Tailwind |
-| Voice orb + waveform | Canvas / Lottie |
-| Real-time channel | WebSockets to a local FastAPI |
-| Subtitles / streaming | Server-sent events |
+| Desktop shell | pywebview window |
+| Voice orb + waveform | Canvas |
+| Real-time channel | WebSocket to the Python core |
+| Subtitles / streaming | WebSocket events |
 
 Features:
-- Animated wake-word orb
-- Live subtitles for both user and Jarvis
-- Memory dashboard (search + edit memories)
-- Document drop zone (PDFs → auto-index)
-- Reminder list + edit
-- Conversation history panel
-- Floating overlay / command palette
+- [x] Animated wake-word orb
+- [x] Live subtitles for both user and Jarvis
+- [x] Floating overlay (always-on-top panel) + type-to-Jarvis input
+- [ ] Memory dashboard (search + edit memories)
+- [ ] Document drop zone (PDFs → auto-index)
+- [ ] Reminder list + edit
+- [ ] Conversation history panel
+- [ ] Command palette
 
 ---
 
