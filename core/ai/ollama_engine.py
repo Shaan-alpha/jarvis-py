@@ -202,6 +202,8 @@ Jarvis:"""
             f"Ollama Error: {e}"
         )
 
-        return (
-            "I couldn't connect to the Ollama service."
-        )
+        message = "I can't reach Ollama right now. Is it running?"
+
+        add_to_queue(message)
+
+        return message
