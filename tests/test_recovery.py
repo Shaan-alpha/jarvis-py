@@ -1,5 +1,6 @@
 import core.ai.ollama_engine as oe
 import core.speech.engine as se
+import core.speech.offline_recognizer as off
 
 
 def test_ask_llm_handles_connection_error(monkeypatch):
@@ -43,3 +44,12 @@ def test_speak_sync_survives_engine_failure(monkeypatch):
 
     assert calls["n"] == 2
     assert se.current_engine is None
+
+
+def test_offline_returns_none_when_model_load_fails(monkeypatch):
+    def boom():
+        raise RuntimeError("vosk model missing")
+
+    monkeypatch.setattr(off, "_get_model", boom)
+    result = off.recognize_offline(recognizer=None, audio=None)
+    assert result == "none"

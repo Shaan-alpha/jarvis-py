@@ -84,7 +84,7 @@ def recognize_offline(
     except Exception as e:
 
         logger.exception(
-            f"Offline STT error: {e}"
+            f"Offline STT unavailable (model load/transcribe failed): {e}"
         )
 
         return "none"
