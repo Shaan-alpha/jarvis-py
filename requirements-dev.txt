@@ -3,3 +3,6 @@
 # Dev-only tooling (testing + linting).
 pytest==9.0.3
 flake8==7.3.0
+
+# Packaging (Windows build only; not used in CI)
+pyinstaller>=6.0
