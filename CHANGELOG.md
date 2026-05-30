@@ -1,3 +1,19 @@
+## v3.3.0
+
+### Polish & Packaging
+- **Windows packaging**: `build.ps1` + `jarvis.spec` produce a one-folder
+  `dist/JarvisAI/` app via PyInstaller, bundling the Vosk + wake-word models and
+  the HUD UI. All paths now resolve via `core/paths.py` (`resource_dir()` for
+  bundled assets, `user_data_dir()` → `%APPDATA%\JarvisAI` when frozen), so a
+  packaged app reads/writes in the right places. Dev (`python app.py`) is unchanged.
+- **First-run setup wizard** (HUD): checks Ollama, the model, the microphone, and
+  the WebView2 runtime; offers a guided `ollama pull`; captures your name. The HUD
+  auto-launches on first run regardless of `--hud`; later launches respect the flag.
+- **Crash-recovery / graceful degradation**: friendly message when Ollama is
+  unreachable; clean exit with guidance when no microphone is present; online-only
+  fallback when the Vosk model can't load; TTS engine re-initialises after a
+  failure instead of going silent. Microphone auto-detect picks a working device.
+
 ## v3.2.0
 
 ### Desktop HUD (headline feature)

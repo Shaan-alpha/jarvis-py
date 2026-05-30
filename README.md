@@ -203,6 +203,27 @@ The HUD is a separate [pywebview](https://pywebview.flowrl.com/) window that tal
 
 ---
 
+## Build a Windows binary (optional)
+
+Produce a standalone one-folder app with [PyInstaller](https://pyinstaller.org/):
+
+**Prerequisites on the build machine:** the Vosk + wake-word models under
+`models/` (see `models/*/README.md`), and `pip install -r requirements-dev.txt`.
+
+```powershell
+.\build.ps1
+```
+
+Output: `dist\JarvisAI\Jarvis.exe`. On **first launch** it opens a setup HUD that
+checks prerequisites, offers to pull the model, and captures your name; later
+launches are voice-only (`--hud` to show the HUD).
+
+**The target machine still needs** [Ollama](https://ollama.com) installed with a
+model pulled (`ollama pull phi3`) and the Microsoft **WebView2 runtime** (for the
+HUD). User data lives in `%APPDATA%\JarvisAI`.
+
+---
+
 ## Config
 
 All config in [config/settings.py](config/settings.py):
