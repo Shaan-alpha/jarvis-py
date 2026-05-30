@@ -1,16 +1,27 @@
 import hud.window as win
 
 
-def test_start_in_thread_runs_launch_off_main(monkeypatch):
-    started = {}
+def test_launch_builds_file_url_with_ws_fragment(monkeypatch):
+    captured = {}
 
-    def fake_launch():
-        started["launched"] = True
+    def fake_create_window(title, url=None, **kwargs):
+        captured["title"] = title
+        captured["url"] = url
 
-    monkeypatch.setattr(win, "launch", fake_launch)
+    def fake_start(*args, **kwargs):
+        captured["started"] = True
 
-    t = win.start_in_thread()
-    t.join(timeout=2)
+    monkeypatch.setattr(win.webview, "create_window", fake_create_window)
+    monkeypatch.setattr(win.webview, "start", fake_start)
 
-    assert started.get("launched") is True
-    assert t.daemon is True
+    win.launch()
+
+    # webview.start() must be called (on whatever thread the caller used).
+    assert captured.get("started") is True
+    assert captured["title"] == "Jarvis"
+    # The WS URL rides on the fragment (#), not a query (?), so the file://
+    # path stays a valid filename. The page reads it via location.hash.
+    assert captured["url"].startswith("file:///")
+    assert "index.html" in captured["url"]
+    assert "#ws=ws://" in captured["url"]
+    assert "?" not in captured["url"]

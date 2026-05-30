@@ -1,6 +1,5 @@
 # hud/window.py
 import os
-import threading
 
 # pyrefly: ignore [missing-import]
 import webview
@@ -39,14 +38,8 @@ def launch():
         background_color="#05080f",
     )
 
+    # Blocking GUI loop. pywebview requires this to run on the main thread, so
+    # the caller (app.main when frozen) puts the voice loop on a background
+    # thread and calls launch() on the main thread. Closing the window returns
+    # from here and the process exits.
     webview.start()
-
-
-def start_in_thread():
-    """Run the pywebview window on a daemon thread (used in frozen builds)."""
-
-    thread = threading.Thread(target=launch, daemon=True)
-
-    thread.start()
-
-    return thread

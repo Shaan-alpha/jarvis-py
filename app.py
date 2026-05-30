@@ -296,16 +296,18 @@ def _start_hud(session, task_manager, wizard=False):
 
     if is_frozen():
 
-        from hud import window
+        # Frozen = single process. pywebview's GUI loop MUST own the main
+        # thread, so we cannot launch the window here (we're already past
+        # main()'s setup). Signal main() to run the voice loop on a background
+        # thread and call window.launch() itself on the main thread.
+        return True
 
-        window.start_in_thread()
+    subprocess.Popen(
+        [sys.executable, "-m", "hud"],
+        cwd=os.path.dirname(os.path.abspath(__file__)),
+    )
 
-    else:
-
-        subprocess.Popen(
-            [sys.executable, "-m", "hud"],
-            cwd=os.path.dirname(os.path.abspath(__file__)),
-        )
+    return False
 
 
 def _print_paths_report():
@@ -367,11 +369,14 @@ def main():
 
         return
 
-    wishMe(speak)
-
     start_tts_queue()
 
     time.sleep(1)
+
+    # Greet synchronously so the startup banner finishes before the wake-word
+    # loop (or HUD launch) can call stop_speaking() and cut it off. wishMe
+    # previously used async speak() and got truncated, especially when frozen.
+    wishMe(speak_sync)
 
     session = SessionManager(
         timeout=SESSION_TIMEOUT
@@ -393,9 +398,36 @@ def main():
 
     first_run = is_first_run()
 
+    hud_on_main_thread = False
+
     if args.hud or first_run:
 
-        _start_hud(session, task_manager, wizard=first_run)
+        hud_on_main_thread = _start_hud(session, task_manager, wizard=first_run)
+
+    if hud_on_main_thread:
+
+        # Frozen + HUD: the voice loop runs on a daemon thread so the main
+        # thread is free for pywebview's GUI loop (which it requires). Closing
+        # the HUD window ends webview.start() and the process exits, taking the
+        # daemon voice thread with it.
+        from hud import window
+
+        threading.Thread(
+            target=_voice_loop,
+            args=(session, task_manager),
+            daemon=True,
+        ).start()
+
+        window.launch()
+
+        stop_tts_queue()
+
+        return
+
+    _voice_loop(session, task_manager)
+
+
+def _voice_loop(session, task_manager):
 
     while True:
 
