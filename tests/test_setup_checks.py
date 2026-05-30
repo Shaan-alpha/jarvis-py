@@ -22,3 +22,25 @@ def test_ollama_not_running():
     result = checks.check_ollama_running(get=get)
     assert result["ok"] is False
     assert result["fixable"] is True
+
+
+def test_model_present_true():
+    payload = {"models": [{"name": "phi3:latest"}]}
+    get = lambda url, timeout=0: _Resp(200, payload)
+    result = checks.check_model_present("phi3", get=get)
+    assert result["ok"] is True
+
+
+def test_model_present_false():
+    payload = {"models": [{"name": "llama3:latest"}]}
+    get = lambda url, timeout=0: _Resp(200, payload)
+    result = checks.check_model_present("phi3", get=get)
+    assert result["ok"] is False
+    assert result["fixable"] is True
+
+
+def test_model_present_handles_unreachable():
+    def get(url, timeout=0):
+        raise OSError("down")
+    result = checks.check_model_present("phi3", get=get)
+    assert result["ok"] is False
