@@ -134,3 +134,58 @@ def check_microphone(pyaudio_module=None):
     out["index"] = chosen
 
     return out
+
+
+def _read_webview2_version():
+    """Best-effort read of the installed WebView2 runtime version (Windows)."""
+
+    try:
+
+        import winreg
+
+    except ImportError:
+
+        return None
+
+    key_path = (
+        r"SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients"
+        r"\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
+    )
+
+    for hive in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
+
+        try:
+
+            with winreg.OpenKey(hive, key_path) as key:
+
+                value, _ = winreg.QueryValueEx(key, "pv")
+
+                if value:
+
+                    return value
+
+        except OSError:
+
+            continue
+
+    return None
+
+
+def check_webview2(platform=sys.platform, reader=_read_webview2_version):
+    """On Windows, confirm the WebView2 runtime is installed. No-op elsewhere."""
+
+    if platform != "win32":
+
+        return _result(True, "WebView2 not required on this platform.")
+
+    version = reader()
+
+    if version:
+
+        return _result(True, f"WebView2 runtime {version} installed.")
+
+    return _result(
+        False,
+        "WebView2 runtime missing. Install it from Microsoft's Evergreen page.",
+        fixable=True
+    )

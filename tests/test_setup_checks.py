@@ -44,3 +44,21 @@ def test_model_present_handles_unreachable():
         raise OSError("down")
     result = checks.check_model_present("phi3", get=get)
     assert result["ok"] is False
+
+
+def test_webview2_noop_off_windows():
+    result = checks.check_webview2(platform="linux")
+    assert result["ok"] is True
+
+
+def test_webview2_present_when_reader_finds_version():
+    reader = lambda: "1.0.2210.55"
+    result = checks.check_webview2(platform="win32", reader=reader)
+    assert result["ok"] is True
+
+
+def test_webview2_missing_when_reader_returns_none():
+    reader = lambda: None
+    result = checks.check_webview2(platform="win32", reader=reader)
+    assert result["ok"] is False
+    assert result["fixable"] is True
