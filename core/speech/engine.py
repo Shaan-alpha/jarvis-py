@@ -220,9 +220,14 @@ def command():
 
         recognizer.dynamic_energy_threshold = True
 
-        recognizer.pause_threshold = 0.8
+        # Phrase-end detection. The previous 0.8s pause cut short multi-word
+        # phrases ("how are you" -> "how") because the natural gap between
+        # spoken words exceeded it. 1.2s tolerates inter-word pauses so the
+        # whole utterance is captured; non_speaking_duration must stay <=
+        # pause_threshold (it's the trailing silence kept with the phrase).
+        recognizer.pause_threshold = 1.2
 
-        recognizer.non_speaking_duration = 0.4
+        recognizer.non_speaking_duration = 0.6
 
         recognizer.phrase_threshold = 0.2
 

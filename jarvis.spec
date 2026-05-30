@@ -51,7 +51,11 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name="Jarvis",
-    console=True,        # keep a console for logs during early adoption
+    # console=True shows a terminal with live logs — keep it for debug builds.
+    # For real (HUD-only) deployment, set this to False so the app runs
+    # windowed with no console; the HUD is then the only visible surface.
+    # (Logs still go to %APPDATA%\JarvisAI\logs\jarvis.log either way.)
+    console=True,
     icon=None,
 )
 

@@ -17,9 +17,13 @@ VOICE_RATE = -25
 
 VOICE_VOLUME = 1.0
 
-MEMORY_SIMILARITY_THRESHOLD = 0.45
+MEMORY_SIMILARITY_THRESHOLD = 0.55
 
-DOCUMENT_SIMILARITY_THRESHOLD = 0.45
+# Raised from 0.45: a weak match (e.g. a resume chunk scoring ~0.45 against a
+# vague query like "how are you") was being injected into the prompt and the
+# small model would confabulate around it. 0.6 keeps genuine document Q&A while
+# rejecting tangential matches.
+DOCUMENT_SIMILARITY_THRESHOLD = 0.6
 
 VOSK_MODEL_PATH = os.path.join(
     str(resource_dir()),

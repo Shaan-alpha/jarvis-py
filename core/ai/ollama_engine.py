@@ -29,6 +29,37 @@ from core.utils.logger import (
 )
 
 
+# Short greetings / chitchat should never trigger document or memory
+# retrieval — a vague utterance can weakly match an indexed chunk (e.g. a
+# resume) and a small model then confabulates around it.
+_CHITCHAT = {
+    "hi", "hello", "hey", "yo", "sup",
+    "how are you", "how are you doing", "how's it going",
+    "what's up", "whats up", "good morning", "good afternoon",
+    "good evening", "thanks", "thank you", "ok", "okay",
+    "cool", "nice", "bye", "goodbye", "who are you",
+}
+
+
+def _should_retrieve(prompt):
+    """True when the query is substantial enough to warrant document/memory
+    retrieval. Skips greetings and very short utterances so RAG doesn't fire
+    on chitchat like 'how are you'."""
+
+    cleaned = prompt.lower().strip().strip("?.!,")
+
+    if cleaned in _CHITCHAT:
+
+        return False
+
+    # Single- or two-word utterances are almost never document questions.
+    if len(cleaned.split()) < 3:
+
+        return False
+
+    return True
+
+
 def ask_llm(prompt):
 
     # -------------------- #
@@ -39,11 +70,13 @@ def ask_llm(prompt):
         get_profile_context()
     )
 
+    retrieve = _should_retrieve(prompt)
+
     # -------------------- #
     # SEMANTIC MEMORY
     # -------------------- #
 
-    memory = search_memory(prompt)
+    memory = search_memory(prompt) if retrieve else None
 
     memory_context = ""
 
@@ -59,9 +92,7 @@ Assistant: {memory['assistant']}
     # DOCUMENT MEMORY
     # -------------------- #
 
-    document_context = search_documents(
-        prompt
-    )
+    document_context = search_documents(prompt) if retrieve else []
 
     document_block = ""
 
