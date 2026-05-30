@@ -34,16 +34,17 @@ and graceful degradation. The voice/LLM/memory core is unchanged for dev runs
 
 ## Verification
 
-- **Tests:** `91 passed` (`.\venv\Scripts\python.exe -m pytest`). All new logic is
+- **Tests:** `96 passed` (`.\venv\Scripts\python.exe -m pytest`). All new logic is
   unit-tested CI-safe (no real mic/display/Ollama/network — deps injected).
 - **Build-breaking lint:** `0` (`flake8 --select=E9,F63,F7,F82,F401`).
-- **Quality lint:** `10` warnings, all pre-existing (complexity on `_start_hud`/`main`/
-  `execute_tool`/`ask_llm`; E731/F841 in tests) — none introduced here.
+- **Quality lint:** `8` warnings, all pre-existing (complexity on `_start_hud`/
+  `execute_tool`; E731/F841 in tests) — none introduced here.
 - **PyInstaller build:** `.\build.ps1` produces `dist\JarvisAI\` successfully.
   Verified against the real frozen exe: `Jarvis.exe --check-paths` reports
   `frozen=True`, `resource_dir=...\_internal`, and all bundled asset paths `[OK]`;
-  the full import chain (incl. the `vosk`/`faiss` native libs) loads. _Two
-  frozen-only bugs were found and fixed during this — see "Frozen-build fixes" below._
+  the full import chain (incl. the `vosk`/`faiss` native libs) loads, reaches
+  "Listening for wake word", and the HUD window opens + connects over WS. _Three
+  frozen-only bugs were found and fixed during this — see below._
 
 ### Frozen-build fixes (found by running the exe, not by tests)
 
@@ -55,8 +56,22 @@ and graceful degradation. The voice/LLM/memory core is unchanged for dev runs
   A bare `hiddenimport` collects only Python modules; `vosk` loads `libvosk.dll` at
   import, so the native DLLs + bundled ONNX models must be collected too (otherwise
   `import vosk` crashes in the frozen exe).
+- `app.py` + `hud/window.py`: the frozen HUD must run on the main thread (pywebview
+  requirement). The voice loop was extracted to `_voice_loop()` and runs on a
+  background daemon thread while `webview.start()` owns the main thread; closing the
+  HUD window exits the app. (Dev mode is unaffected — it launches the HUD as a
+  subprocess.)
 - `.flake8`: excludes `build,dist` so a local build doesn't pollute the lint gate.
 - New `app.py --check-paths` build diagnostic.
+
+### Voice quality fixes (found by voice-testing the build)
+
+- Document/memory retrieval is gated off greetings & short queries and the
+  similarity thresholds were raised — stops a small model confabulating around a
+  weakly-matched chunk (e.g. "how are you" pulling in an indexed résumé).
+- Speech pause threshold raised so multi-word phrases aren't cut to the first word.
+- Typed queries barge in (stop current speech, cancel any in-flight LLM stream).
+- Startup greeting spoken synchronously so it isn't truncated.
 
 ## Manual smoke test (Task 26 — no CI build job; results recorded here)
 

@@ -16,6 +16,20 @@
   fallback when the Vosk model can't load; TTS engine re-initialises after a
   failure instead of going silent. Microphone auto-detect picks a working device.
 
+### Voice quality & interaction
+- **Barge-in for typed queries**: typing a new question in the HUD now interrupts
+  whatever Jarvis is saying (stops the current utterance, clears the queue) and a
+  newer query cancels an in-flight LLM stream instead of queueing behind it.
+- **No more context bleed / rambling**: document & memory retrieval is gated off
+  short/greeting queries (e.g. "how are you" no longer pulls in unrelated indexed
+  content), and the similarity thresholds were raised so only clearly-relevant
+  matches are used. Fixes a class of hallucination where a small model would
+  confabulate around a weakly-matched chunk.
+- **Full-phrase capture**: raised the speech pause threshold so multi-word
+  utterances ("how are you") are no longer cut off after the first word.
+- **Startup greeting** is spoken synchronously after the TTS queue starts, so it
+  is no longer truncated.
+
 ## v3.2.0
 
 ### Desktop HUD (headline feature)
