@@ -238,6 +238,20 @@ def command():
             duration=0.5
         )
 
+        # Ambient calibration can over-raise the threshold (noisy room / TTS
+        # tail), making Jarvis ignore normal speech. Cap it so quiet speech is
+        # still heard; dynamic_energy_threshold keeps adapting from here.
+        calibrated = recognizer.energy_threshold
+
+        if calibrated > settings.MAX_ENERGY_THRESHOLD:
+
+            recognizer.energy_threshold = settings.MAX_ENERGY_THRESHOLD
+
+        logger.info(
+            f"STT energy_threshold: calibrated={calibrated:.0f} "
+            f"using={recognizer.energy_threshold:.0f}"
+        )
+
         try:
 
             audio = recognizer.listen(
@@ -247,6 +261,8 @@ def command():
             )
 
         except sr.WaitTimeoutError:
+
+            logger.info("STT: no speech detected (listen timed out)")
 
             return "none"
 
@@ -281,6 +297,8 @@ def command():
             recognizer,
             audio
         )
+
+    logger.info(f"STT ({mode}) heard: {result!r}")
 
     if not result or result == "none":
 

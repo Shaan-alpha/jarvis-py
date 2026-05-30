@@ -98,6 +98,7 @@ def test_engine_reads_live_input_device_index(monkeypatch):
     class _FakeRec:
         def __init__(self): pass
         dynamic_energy_threshold = True
+        energy_threshold = 300
         pause_threshold = 0
         non_speaking_duration = 0
         phrase_threshold = 0

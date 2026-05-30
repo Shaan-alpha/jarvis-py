@@ -17,6 +17,13 @@ VOICE_RATE = -25
 
 VOICE_VOLUME = 1.0
 
+# Speech capture (speech_recognition). adjust_for_ambient_noise can push the
+# energy threshold very high in a noisy room (or right after TTS), forcing the
+# user to almost shout. Cap it here so normal-volume speech is still picked up;
+# dynamic_energy_threshold still adapts from this ceiling. Lower if Jarvis
+# ignores you; raise if it triggers on background noise. (sr default is 300.)
+MAX_ENERGY_THRESHOLD = 400
+
 MEMORY_SIMILARITY_THRESHOLD = 0.55
 
 # Raised from 0.45: a weak match (e.g. a resume chunk scoring ~0.45 against a
