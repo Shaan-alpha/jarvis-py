@@ -69,3 +69,68 @@ def check_model_present(name=MODEL_NAME, get=requests.get):
         f"Model '{name}' isn't pulled yet.",
         fixable=True
     )
+
+
+def select_input_device(devices, default_index):
+    """Return the index of a usable input device, or None.
+
+    Prefer the OS default if it can capture; else the first input-capable
+    device; else None.
+    """
+
+    by_index = {d["index"]: d for d in devices}
+
+    default = by_index.get(default_index)
+
+    if default and default.get("maxInputChannels", 0) > 0:
+
+        return default_index
+
+    for device in devices:
+
+        if device.get("maxInputChannels", 0) > 0:
+
+            return device["index"]
+
+    return None
+
+
+def check_microphone(pyaudio_module=None):
+    """Probe for a usable input device. Returns a result with the chosen index."""
+
+    if pyaudio_module is None:
+
+        import pyaudio as pyaudio_module
+
+    pa = pyaudio_module.PyAudio()
+
+    try:
+
+        devices = [
+            pa.get_device_info_by_index(i)
+            for i in range(pa.get_device_count())
+        ]
+
+        try:
+
+            default_index = pa.get_default_input_device_info()["index"]
+
+        except Exception:
+
+            default_index = -1
+
+    finally:
+
+        pa.terminate()
+
+    chosen = select_input_device(devices, default_index)
+
+    if chosen is None:
+
+        return _result(False, "No microphone found.", fixable=False)
+
+    out = _result(True, "Microphone detected.")
+
+    out["index"] = chosen
+
+    return out
