@@ -87,6 +87,75 @@ def _should_retrieve(prompt):
     return True
 
 
+def _ends_sentence(text):
+
+    return "." in text or "!" in text or "?" in text
+
+
+def _stream_response(response, my_generation):
+    """Consume the streamed Ollama response: print + emit each token and queue
+    complete sentences for TTS. Returns the full text, or None if a newer query
+    superseded this stream (barge-in)."""
+
+    full_response = ""
+
+    sentence_buffer = ""
+
+    print("Jarvis: ", end="", flush=True)
+
+    for line in response.iter_lines():
+
+        # Barge-in: a newer query started — abandon this stream.
+        if not _is_current(my_generation):
+
+            logger.info("LLM stream superseded by a newer query")
+
+            response.close()
+
+            return None
+
+        if not line:
+
+            continue
+
+        try:
+
+            data = json.loads(line.decode("utf-8"))
+
+        except json.JSONDecodeError:
+
+            continue
+
+        token = data.get("response", "")
+
+        print(token, end="", flush=True)
+
+        full_response += token
+
+        events.emit("assistant_token", text=token)
+
+        sentence_buffer += token
+
+        if _ends_sentence(sentence_buffer):
+
+            add_to_queue(sentence_buffer.strip())
+
+            sentence_buffer = ""
+
+    # Superseded right as the stream ended.
+    if not _is_current(my_generation):
+
+        return None
+
+    if sentence_buffer.strip():
+
+        add_to_queue(sentence_buffer.strip())
+
+    print()
+
+    return full_response
+
+
 def ask_llm(prompt):
 
     # Claim a generation; a later query bumps this and supersedes us.
@@ -177,93 +246,13 @@ Jarvis:"""
             timeout=60
         )
 
-        full_response = ""
+        full_response = _stream_response(response, my_generation)
 
-        sentence_buffer = ""
-
-        print(
-            "Jarvis: ",
-            end="",
-            flush=True
-        )
-
-        for line in response.iter_lines():
-
-            # Barge-in: a newer query started — abandon this stream so its
-            # leftover sentences don't talk over the new answer.
-            if not _is_current(my_generation):
-
-                logger.info("LLM stream superseded by a newer query")
-
-                response.close()
-
-                return ""
-
-            if line:
-
-                try:
-
-                    data = json.loads(
-                        line.decode("utf-8")
-                    )
-
-                    token = data.get(
-                        "response",
-                        ""
-                    )
-
-                    print(
-                        token,
-                        end="",
-                        flush=True
-                    )
-
-                    full_response += token
-
-                    events.emit("assistant_token", text=token)
-
-                    sentence_buffer += token
-
-                    # -------------------- #
-                    # STREAMING TTS
-                    # -------------------- #
-
-                    if any(
-                        punctuation in sentence_buffer
-                        for punctuation in [
-                            ".",
-                            "!",
-                            "?"
-                        ]
-                    ):
-
-                        add_to_queue(
-                            sentence_buffer.strip()
-                        )
-
-                        sentence_buffer = ""
-
-                except json.JSONDecodeError:
-
-                    continue
-
-        # Superseded right as the stream ended — don't queue the tail or
-        # emit a done event that would clobber the newer answer.
-        if not _is_current(my_generation):
+        # None = a newer query superseded this stream (barge-in); don't queue
+        # the tail or emit a done event that would clobber the new answer.
+        if full_response is None:
 
             return ""
-
-        # -------------------- #
-        # LEFTOVER BUFFER
-        # -------------------- #
-
-        if sentence_buffer.strip():
-
-            add_to_queue(
-                sentence_buffer.strip()
-            )
-
-        print()
 
         logger.info(
             "LLM response completed"
