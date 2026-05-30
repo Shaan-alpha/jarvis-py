@@ -37,8 +37,10 @@ Architecture first. No giant single files.
 
 ## Current Status
 
-> Latest release: **v3.2.0** (Desktop HUD). Next up: **v3.2 Polish & Packaging**
-> (below) — note the HUD shipped ahead of the packaging milestone.
+> Latest release: **v3.2.0** (Desktop HUD). **v3.3.0 Polish & Packaging** is
+> code-complete on `feature/v3.2-packaging`, pending the manual Windows smoke test
+> + merge/tag (see the milestone below) — note the HUD shipped ahead of the
+> packaging milestone, so packaging ships as v3.3.0.
 
 ### v3.2.0 — Desktop HUD (shipped)
 
@@ -82,24 +84,29 @@ goals — see v4.0 below for what remains.
 | v3.0.0 | fastembed swap, lazy wake-word, production-ready |
 | v3.1.0 | Wake-word barge-in, doc-RAG threshold, repo privacy |
 | v3.2.0 | Desktop HUD (pywebview + local WebSocket); audit hardening |
+| v3.3.0 | Polish & Packaging — Windows one-folder build, setup wizard, crash-recovery |
 
 ---
 
-## v3.2 — Polish & Packaging
+## v3.3 — Polish & Packaging (code-complete; ships as v3.3.0)
 
 Goal: ship-ready binary you can hand someone.
 
-- [ ] `pyproject.toml` + `__init__.py` files for clean packaging
-- [ ] PyInstaller spec for a single-file Windows build
-- [ ] Bundle Vosk + wake-word ONNX into the package
-- [ ] Smoke-test workflow in CI (GitHub Actions, Windows runner)
-- [ ] First-run setup wizard (profile, Ollama model pull)
-- [ ] Auto-detect microphone + permissions
-- [ ] Crash-recovery: re-launch on TTS/STT exceptions
+- [x] `pyproject.toml` + `__init__.py` files for clean packaging
+- [x] PyInstaller spec for a Windows build (`jarvis.spec`, one-folder — not single-file)
+- [x] Bundle Vosk + wake-word ONNX into the package (`datas` in `jarvis.spec`)
+- [x] Smoke test (manual, documented in README/PR — **not** CI; no Windows runner)
+- [x] First-run setup wizard (profile, Ollama model pull, prerequisite checks)
+- [x] Auto-detect microphone
+- [x] Crash-recovery: TTS re-init + graceful degradation (Ollama down, no mic, model-load fail)
+- All paths resolve via `core/paths.py` (`resource_dir()` / `user_data_dir()`)
+
+> Pending before tag: the manual Windows build + smoke test (USER-only), then
+> PR → `main` and tag **v3.3.0**.
 
 ---
 
-## v3.3 — Agent Capabilities
+## v3.4 — Agent Capabilities
 
 Goal: make the tool-agent useful for real tasks, not just demos.
 
@@ -113,7 +120,7 @@ Goal: make the tool-agent useful for real tasks, not just demos.
 
 ---
 
-## v3.4 — Smarter Memory
+## v3.5 — Smarter Memory
 
 Goal: memory that gets better over time.
 

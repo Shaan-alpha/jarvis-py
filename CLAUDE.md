@@ -27,10 +27,15 @@ psutil, PyAutoGUI.
 
 ## 2. Where we are right now (2026-05-30)
 
-A full audit was completed, the repo was hardened, and the **Jarvis HUD shipped**.
-Work is on `main`; the `feature/jarvis-hud` branch was merged (PR #2) and the
-release was tagged **`v3.2.0`**. There is **no active feature task** right now —
-the next thing to pick up comes from [`PLAN.md`](PLAN.md).
+A full audit was completed, the repo was hardened, and the **Jarvis HUD shipped**
+as **`v3.2.0`** (on `main`, PR #2). The **v3.3.0 "Polish & Packaging"** milestone
+is now **code-complete** on branch `feature/v3.2-packaging` (off `main`, not yet
+merged): Windows one-folder packaging (`build.ps1` + `jarvis.spec`), a `core/paths.py`
+resolver + path migration, a HUD **first-run setup wizard**, mic auto-detect, and
+crash-recovery / graceful degradation. **Pending:** the manual Windows build +
+smoke test (Task 26 — USER-only; needs a real display/mic/Ollama + the gitignored
+models), then PR → `main`, tag **`v3.3.0`**, cut a Release. After that there is
+**no active feature task** — the next thing comes from [`PLAN.md`](PLAN.md).
 
 **Done & released in `v3.2.0` (on `main`):**
 - Audit hardening: real unit tests (1 → 43), `pyproject.toml` (pytest config),
@@ -136,6 +141,8 @@ Ubuntu/Python 3.11. **Keep CI green** — it's a public adoption signal.
 |---|---|
 | [`app.py`](app.py) | Main voice loop; routing; `--hud` flag + `process_query()` |
 | [`config/settings.py`](config/settings.py) | All tunables (thresholds, paths, HUD config) |
+| [`core/paths.py`](core/paths.py) | Path resolver — `resource_dir()` (bundled assets) / `user_data_dir()` (writable). Stdlib-only |
+| [`core/setup/`](core/setup/) | First-run checks (Ollama/model/mic/WebView2), mic auto-detect, `pull_model`, wizard helpers |
 | [`core/speech/`](core/speech/) | Wake word, online/offline STT, TTS engine + queue |
 | [`core/ai/ollama_engine.py`](core/ai/ollama_engine.py) | Streaming LLM client + prompt assembly |
 | [`core/agent/`](core/agent/) | Tool agent, registry, executor |
@@ -149,6 +156,12 @@ Ubuntu/Python 3.11. **Keep CI green** — it's a public adoption signal.
 ---
 
 ## 6. Gotchas
+- **Paths:** never hardcode CWD-relative paths — use `core.paths.resource_dir()`
+  for bundled/read-only assets (models, `hud/web`) and `core.paths.user_data_dir()`
+  for writable data (profile, tasks, memory, logs). When frozen (PyInstaller), CWD
+  is unreliable; `resource_dir()` is the exe folder and `user_data_dir()` is
+  `%APPDATA%\JarvisAI`. `core/paths.py` is **stdlib-only** — never add a project
+  import there (circular-import risk via the logger).
 - Importing `core.memory.*` historically instantiated the embedding model at
   import time (slow / downloads). It is now **lazy** (the embedder loads on first
   use), so `core`/`app` import cheaply in CI. Don't reintroduce eager init.
