@@ -16,12 +16,14 @@ from core.memory.embedder import (
     encode
 )
 
+from core.paths import user_data_dir
 
-DOCS_PATH = "data/documents"
 
-INDEX_PATH = "data/vector.index"
+DOCS_PATH = os.path.join(str(user_data_dir()), "data", "documents")
 
-CHUNKS_PATH = "data/chunks.pkl"
+INDEX_PATH = os.path.join(str(user_data_dir()), "data", "vector.index")
+
+CHUNKS_PATH = os.path.join(str(user_data_dir()), "data", "chunks.pkl")
 
 
 _cache = {

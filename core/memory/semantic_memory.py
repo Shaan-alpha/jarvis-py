@@ -11,9 +11,14 @@ from core.memory.embedder import (
     encode
 )
 
+from core.paths import user_data_dir
 
-MEMORY_PATH = (
-    "core/memory/semantic_memory.json"
+
+MEMORY_PATH = os.path.join(
+    str(user_data_dir()),
+    "core",
+    "memory",
+    "semantic_memory.json"
 )
 
 

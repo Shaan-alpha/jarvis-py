@@ -1,9 +1,14 @@
 import json
 import os
 
+from core.paths import user_data_dir
 
-PROFILE_PATH = (
-    "data/profile/user_profile.json"
+
+PROFILE_PATH = os.path.join(
+    str(user_data_dir()),
+    "data",
+    "profile",
+    "user_profile.json"
 )
 
 

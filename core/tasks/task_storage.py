@@ -1,9 +1,14 @@
 import json
 import os
 
+from core.paths import user_data_dir
 
-TASKS_FILE = (
-    "data/tasks/tasks.json"
+
+TASKS_FILE = os.path.join(
+    str(user_data_dir()),
+    "data",
+    "tasks",
+    "tasks.json"
 )
 
 
