@@ -74,6 +74,18 @@ from core.tasks.task_parser import (
 
 from core.hud import events
 
+import config.settings as settings
+
+from core.paths import is_frozen
+
+from core.setup.checks import check_microphone
+
+from core.setup.first_run import (
+    is_first_run,
+    run_checks,
+    pull_model,
+)
+
 
 EXIT_WORDS = [
     "bye",
@@ -180,7 +192,25 @@ def process_query(query, task_manager, source="voice"):
     logger.info("Conversation saved to memory")
 
 
-def _start_hud(session, task_manager):
+def _select_mic():
+    """Pick an input device for the session. Returns False if none found."""
+
+    result = check_microphone()
+
+    if not result["ok"]:
+
+        logger.error(result["detail"])
+
+        print(result["detail"])
+
+        return False
+
+    settings.INPUT_DEVICE_INDEX = result["index"]
+
+    return True
+
+
+def _start_hud(session, task_manager, wizard=False):
     """Enable the HUD event bus, wire commands, start servers, spawn the UI."""
 
     from core.hud import ws_server, stats
@@ -210,22 +240,56 @@ def _start_hud(session, task_manager):
 
         clear_queue()
 
+    def _on_run_checks():
+
+        for result in run_checks():
+
+            events.emit("check", **result)
+
+    def _on_pull_model(model):
+
+        pull_model(
+            model,
+            on_progress=lambda line: events.emit("pull_progress", line=line)
+        )
+
+        events.emit("pull_done")
+
+    def _on_save_name(name):
+
+        update_profile("name", name or "Boss")
+
+        events.emit("setup_complete")
+
     ws_server.register_handlers(
         text_query=_on_text_query,
         wake=_on_wake,
         stop=_on_stop,
+        run_checks=_on_run_checks,
+        pull_model=_on_pull_model,
+        save_name=_on_save_name,
     )
 
     ws_server.start_in_thread()
 
     stats.start()
 
-    # Spawn the pywebview HUD as a separate process. Harmless if it is not
-    # yet present; the core keeps running regardless.
-    subprocess.Popen(
-        [sys.executable, "-m", "hud"],
-        cwd=os.path.dirname(os.path.abspath(__file__)),
-    )
+    if wizard:
+
+        events.emit("show_wizard")
+
+    if is_frozen():
+
+        from hud import window
+
+        window.start_in_thread()
+
+    else:
+
+        subprocess.Popen(
+            [sys.executable, "-m", "hud"],
+            cwd=os.path.dirname(os.path.abspath(__file__)),
+        )
 
 
 def main():
@@ -258,9 +322,19 @@ def main():
 
     logger.info("Task Manager Started")
 
-    if args.hud:
+    if not _select_mic():
 
-        _start_hud(session, task_manager)
+        speak("I can't find a microphone. Please connect one and relaunch.")
+
+        stop_tts_queue()
+
+        return
+
+    first_run = is_first_run()
+
+    if args.hud or first_run:
+
+        _start_hud(session, task_manager, wizard=first_run)
 
     while True:
 
