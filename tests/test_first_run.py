@@ -21,3 +21,41 @@ def test_run_checks_returns_named_results(monkeypatch):
     results = fr.run_checks()
     names = [r["name"] for r in results]
     assert names == ["ollama", "model", "microphone", "webview2"]
+
+
+def test_pull_model_builds_command_and_streams(monkeypatch):
+    seen = {}
+
+    class _FakeProc:
+        def __init__(self):
+            self.stdout = iter(["pulling 10%\n", "success\n"])
+            self.returncode = 0
+
+        def wait(self):
+            return 0
+
+    def fake_popen(cmd, **kwargs):
+        seen["cmd"] = cmd
+        return _FakeProc()
+
+    monkeypatch.setattr(fr.subprocess, "Popen", fake_popen)
+
+    lines = []
+    code = fr.pull_model("phi3", on_progress=lines.append)
+
+    assert seen["cmd"] == ["ollama", "pull", "phi3"]
+    assert lines == ["pulling 10%", "success"]
+    assert code == 0
+
+
+def test_pull_model_handles_missing_binary(monkeypatch):
+    def fake_popen(cmd, **kwargs):
+        raise FileNotFoundError("ollama not found")
+
+    monkeypatch.setattr(fr.subprocess, "Popen", fake_popen)
+
+    msgs = []
+    code = fr.pull_model("phi3", on_progress=msgs.append)
+
+    assert code != 0
+    assert any("ollama" in m.lower() for m in msgs)
