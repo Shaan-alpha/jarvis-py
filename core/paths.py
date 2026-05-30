@@ -22,3 +22,23 @@ def resource_dir():
         return Path(sys.executable).parent
 
     return Path(__file__).resolve().parent.parent
+
+
+def user_data_dir():
+    """Base dir for writable user data (profile, memory, tasks, logs).
+
+    Frozen: %APPDATA%\\JarvisAI.  Source: the repo root (so dev is
+    unchanged). The directory is created if it does not yet exist.
+    """
+
+    if is_frozen():
+
+        base = Path(os.environ["APPDATA"]) / "JarvisAI"
+
+    else:
+
+        base = Path(__file__).resolve().parent.parent
+
+    base.mkdir(parents=True, exist_ok=True)
+
+    return base

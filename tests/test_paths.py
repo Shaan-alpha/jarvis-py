@@ -26,3 +26,17 @@ def test_resource_dir_frozen_is_exe_dir(monkeypatch, tmp_path):
     fake_exe = tmp_path / "Jarvis.exe"
     monkeypatch.setattr(sys, "executable", str(fake_exe))
     assert paths.resource_dir() == tmp_path
+
+
+def test_user_data_dir_source_is_repo_root(monkeypatch):
+    monkeypatch.setattr(paths, "is_frozen", lambda: False)
+    expected = Path(paths.__file__).resolve().parent.parent
+    assert paths.user_data_dir() == expected
+
+
+def test_user_data_dir_frozen_is_appdata(monkeypatch, tmp_path):
+    monkeypatch.setattr(paths, "is_frozen", lambda: True)
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+    result = paths.user_data_dir()
+    assert result == tmp_path / "JarvisAI"
+    assert result.is_dir()
