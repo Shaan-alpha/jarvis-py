@@ -204,6 +204,8 @@ Jarvis:"""
 
         message = "I can't reach Ollama right now. Is it running?"
 
+        # Already queued for speech above; return empty so the caller
+        # does not speak it a second time.
         add_to_queue(message)
 
-        return message
+        return ""

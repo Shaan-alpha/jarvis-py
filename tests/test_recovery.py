@@ -19,6 +19,7 @@ def test_ask_llm_handles_connection_error(monkeypatch):
 
 def test_speak_sync_survives_engine_failure(monkeypatch):
     calls = {"n": 0}
+    said = []
 
     def flaky_engine():
         calls["n"] += 1
@@ -27,7 +28,7 @@ def test_speak_sync_survives_engine_failure(monkeypatch):
 
         class _Eng:
             def say(self, t):
-                pass
+                said.append(t)
 
             def runAndWait(self):
                 pass
@@ -43,6 +44,7 @@ def test_speak_sync_survives_engine_failure(monkeypatch):
     se.speak_sync("world")  # second call recreates engine, succeeds
 
     assert calls["n"] == 2
+    assert said == ["world"]   # second call re-inited and actually spoke
     assert se.current_engine is None
 
 

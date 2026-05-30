@@ -10,8 +10,9 @@ import pyttsx3
 # pyrefly: ignore [missing-import]
 import speech_recognition as sr
 
+import config.settings as settings
+
 from config.settings import (
-    INPUT_DEVICE_INDEX,
     ONLINE_CACHE_TTL,
     ONLINE_CHECK_HOST,
     ONLINE_CHECK_PORT,
@@ -213,7 +214,7 @@ def command():
 
     recognizer = sr.Recognizer()
 
-    with sr.Microphone(device_index=INPUT_DEVICE_INDEX) as source:
+    with sr.Microphone(device_index=settings.INPUT_DEVICE_INDEX) as source:
 
         print("Listening...")
 

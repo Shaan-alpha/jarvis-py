@@ -69,3 +69,47 @@ def test_check_microphone_no_input_device():
 def test_input_device_index_setting_exists():
     assert hasattr(settings, "INPUT_DEVICE_INDEX")
     assert settings.INPUT_DEVICE_INDEX is None
+
+
+def test_engine_reads_live_input_device_index(monkeypatch):
+    import config.settings as settings
+    import core.speech.engine as se
+
+    # simulate app startup choosing device 7 AFTER import
+    monkeypatch.setattr(settings, "INPUT_DEVICE_INDEX", 7)
+
+    captured = {}
+
+    class _FakeSource:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    def fake_mic(device_index=None):
+        captured["idx"] = device_index
+        return _FakeSource()
+
+    # Patch sr.Microphone where engine.py looks it up
+    monkeypatch.setattr(se.sr, "Microphone", fake_mic)
+
+    # Patch the recognizer so command() returns quickly without real audio
+    class _FakeRec:
+        def __init__(self): pass
+        dynamic_energy_threshold = True
+        pause_threshold = 0
+        non_speaking_duration = 0
+        phrase_threshold = 0
+        operation_timeout = 0
+
+        def adjust_for_ambient_noise(self, source, duration=0): pass
+
+        def listen(self, source, timeout=0, phrase_time_limit=0):
+            raise se.sr.WaitTimeoutError()
+
+    monkeypatch.setattr(se.sr, "Recognizer", _FakeRec)
+
+    result = se.command()
+    assert captured["idx"] == 7   # live value, not the import-time None
+    assert result == "none"       # WaitTimeoutError path returns "none"

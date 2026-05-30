@@ -10,8 +10,9 @@ from openwakeword.model import Model
 # pyrefly: ignore [missing-import]
 from openwakeword.utils import download_models
 
+import config.settings as settings
+
 from config.settings import (
-    INPUT_DEVICE_INDEX,
     WAKE_MODEL_PATH,
     WAKE_THRESHOLD,
     WAKE_WORD
@@ -104,7 +105,7 @@ def detect_wake_word(stop_event=None, verbose=True):
         channels=CHANNELS,
         rate=RATE,
         input=True,
-        input_device_index=INPUT_DEVICE_INDEX,
+        input_device_index=settings.INPUT_DEVICE_INDEX,
         frames_per_buffer=CHUNK
     )
 
