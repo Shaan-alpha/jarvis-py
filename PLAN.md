@@ -37,10 +37,12 @@ Architecture first. No giant single files.
 
 ## Current Status
 
-> Latest release: **v3.2.0** (Desktop HUD). **v3.3.0 Polish & Packaging** is
-> code-complete on `feature/v3.2-packaging`, pending the manual Windows smoke test
-> + merge/tag (see the milestone below) — note the HUD shipped ahead of the
-> packaging milestone, so packaging ships as v3.3.0.
+> Latest tagged release: **v3.2.0** (Desktop HUD). **v3.3.0 "Polish & Packaging"**
+> (+ a HUD overhaul: fluid-blob orb, Stop/Esc interrupt, wake-word + STT fixes) is
+> **merged to `main` and pushed** (96 tests green) but **not yet tagged/released** —
+> `pyproject`/`CHANGELOG` say 3.3.0; the `v3.3.0` git tag + GitHub Release are still
+> to be cut. The HUD shipped ahead of the packaging milestone, so packaging ships as
+> v3.3.0.
 
 ### v3.2.0 — Desktop HUD (shipped)
 

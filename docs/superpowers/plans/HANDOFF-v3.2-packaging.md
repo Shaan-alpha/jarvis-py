@@ -1,11 +1,15 @@
-# HANDOFF — v3.2 Polish & Packaging (in progress)
+# HANDOFF — v3.2/v3.3 Polish & Packaging (DONE — merged to main)
 
-> Cold-agent catch-up for resuming the v3.2 packaging milestone. Read this, then
-> the plan, then continue. Written 2026-05-30 at a clean pause point.
+> **Status (2026-06-01): COMPLETE and merged to `main`** (fast-forward, tip
+> `bfe0bb9`, pushed to origin). This doc is now historical — kept for the
+> record of how the milestone was built. The only thing left is the **`v3.3.0`
+> git tag + GitHub Release** (deferred; pyproject/CHANGELOG already say 3.3.0).
+> Beyond the original plan, a HUD overhaul also landed: fluid-blob orb, Stop/Esc
+> interrupt + typed barge-in, wake-word false-trigger fix, and STT tuning.
 
 ## TL;DR
 
-- **Branch:** `feature/v3.2-packaging` (off `main`). Working tree **clean**, all work committed, **not pushed**.
+- **Merged:** all work is on `main` and pushed. (Branch `feature/v3.2-packaging` still exists locally, == main.)
 - **Baseline:** `96 passed`, build-breaking flake8 `0`, quality flake8 `8` (all pre-existing). (`.\venv\Scripts\python.exe -m pytest` / `... -m flake8 . --select=E9,F63,F7,F82,F401 --count` — a `.flake8` now sets the excludes incl. `build,dist`.)
 - **Build is verified working** (PyInstaller one-folder). `.\build.ps1` → `dist\JarvisAI\`; `Jarvis.exe --check-paths` reports all assets `[OK]` and the HUD opens. Three frozen-only bugs + voice-quality issues were found by running the exe and fixed — see "Post-Phase-6" below. **Still owed: the USER's full interactive smoke-test sign-off (Task 26) before the PR/merge/tag.**
 - **Plan:** [`docs/superpowers/plans/2026-05-30-v3.2-packaging.md`](2026-05-30-v3.2-packaging.md) — 28 tasks, 6 phases.

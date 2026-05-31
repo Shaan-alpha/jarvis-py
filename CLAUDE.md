@@ -25,17 +25,36 @@ psutil, PyAutoGUI.
 
 ---
 
-## 2. Where we are right now (2026-05-30)
+## 2. Where we are right now (2026-06-01)
 
-A full audit was completed, the repo was hardened, and the **Jarvis HUD shipped**
-as **`v3.2.0`** (on `main`, PR #2). The **v3.3.0 "Polish & Packaging"** milestone
-is now **code-complete** on branch `feature/v3.2-packaging` (off `main`, not yet
-merged): Windows one-folder packaging (`build.ps1` + `jarvis.spec`), a `core/paths.py`
-resolver + path migration, a HUD **first-run setup wizard**, mic auto-detect, and
-crash-recovery / graceful degradation. **Pending:** the manual Windows build +
-smoke test (Task 26 — USER-only; needs a real display/mic/Ollama + the gitignored
-models), then PR → `main`, tag **`v3.3.0`**, cut a Release. After that there is
-**no active feature task** — the next thing comes from [`PLAN.md`](PLAN.md).
+The **v3.3.0 "Polish & Packaging" milestone — plus a HUD overhaul — is merged to
+`main` and pushed** (fast-forward, tip `bfe0bb9`; 96 tests pass, build-breaking
+lint 0). It is **not yet tagged / released**: `pyproject.toml` + `CHANGELOG.md`
+say `3.3.0`, but no `v3.3.0` git tag or GitHub Release has been cut yet (deferred
+by the user). See [`always-tag-and-release`] convention — offer to tag + cut the
+Release when the user is ready.
+
+**Shipped in this milestone (on `main`):**
+- **Packaging:** Windows one-folder build (`build.ps1` + `jarvis.spec`), a
+  `core/paths.py` resolver + full path migration, `core/setup/` first-run wizard
+  (Ollama/model/mic/WebView2 checks + guided `ollama pull` + name capture), mic
+  auto-detect, crash-recovery / graceful degradation.
+- **Frozen-build fixes (found by running the .exe, not tests):** `resource_dir()`
+  uses `sys._MEIPASS`; `jarvis.spec` uses `collect_all()` for vosk/openwakeword/
+  faiss/fastembed native libs; the HUD runs on the **main thread** when frozen
+  (voice loop moved to a daemon thread). `app.py --check-paths` is a build diagnostic.
+- **Voice quality:** RAG/memory retrieval gated off chitchat + raised thresholds
+  (stops hallucination from weak matches); STT full-phrase capture + an
+  `MAX_ENERGY_THRESHOLD` cap; typed-query **barge-in** (Stop button + Esc +
+  an `ask_llm` generation token that cancels superseded streams); **wake-word
+  false-trigger fix** (`WAKE_THRESHOLD` 0.4→0.6 + `WAKE_CONSECUTIVE` 2-frame debounce).
+- **HUD redesign:** the orb is now a **pure-CSS fluid "Siri/ChatGPT" blob**
+  (Three.js was tried then removed); empty caption box hidden; Stop button.
+
+**Known limitation:** interrupting by *speaking* mid-reply isn't supported (the
+mic hears Jarvis's own TTS — no echo cancellation). Stop button / Esc / typing
+are the reliable interrupts. Model stays on `phi3` (user's call; `llama3` pulled
+locally if a swap is wanted — change `MODEL_NAME`).
 
 **Done & released in `v3.2.0` (on `main`):**
 - Audit hardening: real unit tests (1 → 43), `pyproject.toml` (pytest config),
@@ -50,15 +69,16 @@ models), then PR → `main`, tag **`v3.3.0`**, cut a Release. After that there i
 - Spec: [`docs/superpowers/specs/2026-05-30-jarvis-hud-design.md`](docs/superpowers/specs/2026-05-30-jarvis-hud-design.md)
 - Plan (all tasks complete): [`docs/superpowers/plans/2026-05-30-jarvis-hud.md`](docs/superpowers/plans/2026-05-30-jarvis-hud.md)
 
-**HUD in one line:** a Tauri-style desktop panel — but built with **pywebview +
-vanilla HTML/CSS/JS** (we deliberately chose pywebview over Tauri to avoid Rust+Node
-toolchains) — that connects to the Python core over a **local WebSocket**. It shows
-an animated orb (idle/listening/thinking/speaking), a live waveform, streaming
-captions, a type-to-Jarvis input, and a status row, with a **time-adaptive theme**
-(cyan day / gold evening / frosted night). Launched with `python app.py --hud`; the
-core is byte-for-byte unchanged without the flag. Code lives in
-[`core/hud/`](core/hud/) (event bus, WS server, stats/theme) and [`hud/`](hud/)
-(pywebview window + `web/` UI).
+**HUD in one line:** a frameless desktop panel built with **pywebview + vanilla
+HTML/CSS/JS** (chosen over Tauri to avoid Rust+Node toolchains), connected to the
+Python core over a **local WebSocket**. It shows a **fluid glassmorphism orb**
+(a pure-CSS Siri/ChatGPT-style blob that's audio- and state-reactive — it doubles
+as the mic visualizer), streaming captions, a type-to-Jarvis input, a **Stop**
+button (+ Esc) to interrupt speech, and a status row, with a **time-adaptive theme**
+(cyan day / gold evening / frosted night). Launched with `python app.py --hud`; on
+first run it auto-opens regardless of the flag. The core is byte-for-byte unchanged
+without the flag. Code: [`core/hud/`](core/hud/) (event bus, WS server, stats/theme)
+and [`hud/`](hud/) (pywebview window + `web/` UI — `orb.js` drives the CSS blob).
 
 ---
 
@@ -159,9 +179,22 @@ Ubuntu/Python 3.11. **Keep CI green** — it's a public adoption signal.
 - **Paths:** never hardcode CWD-relative paths — use `core.paths.resource_dir()`
   for bundled/read-only assets (models, `hud/web`) and `core.paths.user_data_dir()`
   for writable data (profile, tasks, memory, logs). When frozen (PyInstaller), CWD
-  is unreliable; `resource_dir()` is the exe folder and `user_data_dir()` is
-  `%APPDATA%\JarvisAI`. `core/paths.py` is **stdlib-only** — never add a project
-  import there (circular-import risk via the logger).
+  is unreliable; `resource_dir()` returns **`sys._MEIPASS`** (the `_internal/`
+  folder where datas land in PyInstaller ≥ 6 — NOT the exe folder), and
+  `user_data_dir()` is `%APPDATA%\JarvisAI`. `core/paths.py` is **stdlib-only** —
+  never add a project import there (circular-import risk via the logger).
+- **Frozen build (`jarvis.spec`):** native-lib / bundled-model packages
+  (`vosk`, `openwakeword`, `faiss`, `fastembed`) need `collect_all()`, NOT a bare
+  `hiddenimports` — vosk loads `libvosk.dll` at import, so a bare hidden-import
+  crashes the frozen app. The **HUD must run on the main thread when frozen**
+  (pywebview requirement): `app.main()` puts the voice loop on a daemon thread and
+  calls `window.launch()` on the main thread. Verify a build with
+  `Jarvis.exe --check-paths`. Build/run details: `dist/`+`build/` are gitignored.
+- **Voice tunables (`config/settings.py`):** `WAKE_THRESHOLD` (0.6) +
+  `WAKE_CONSECUTIVE` (2-frame debounce) gate false wake-ups; `MAX_ENERGY_THRESHOLD`
+  caps STT sensitivity so quiet speech is still heard. Lower/raise to taste.
+  Interrupting by *speaking* mid-reply is unsupported (mic hears Jarvis's TTS —
+  no echo cancellation); the Stop button / Esc / typed query are the interrupts.
 - Importing `core.memory.*` historically instantiated the embedding model at
   import time (slow / downloads). It is now **lazy** (the embedder loads on first
   use), so `core`/`app` import cheaply in CI. Don't reintroduce eager init.

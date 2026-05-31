@@ -191,13 +191,22 @@ Speak the wake phrase **"hey jarvis"**, wait for *"Yes Boss?"*, then issue your 
 
 ## Desktop HUD (optional)
 
-Launch an always-on-top **HUD panel** — an animated orb, a live mic waveform, streaming captions (your speech *and* Jarvis's reply), a type-to-Jarvis text box, and a live status row (CPU / battery / model / online). The theme adapts to the time of day: **cyan** by day, **gold** in the evening, **frosted** at night.
+Launch an always-on-top **HUD panel** — a **fluid glassmorphism orb** (a flowing,
+audio-reactive blob that pulses with your voice and shifts by state), streaming
+captions (your speech *and* Jarvis's reply), a type-to-Jarvis text box, a **Stop**
+button (or `Esc`) to cut Jarvis off mid-sentence, and a live status row (CPU /
+battery / model / online). The theme adapts to the time of day: **cyan** by day,
+**gold** in the evening, **frosted** at night.
 
 ```bash
 python app.py --hud
 ```
 
-The HUD is a separate [pywebview](https://pywebview.flowrl.com/) window that talks to the voice core over a local WebSocket — fully free and local. Without `--hud`, the assistant behaves exactly as above.
+The HUD is a separate [pywebview](https://pywebview.flowrl.com/) window that talks
+to the voice core over a local WebSocket — fully free and local. Without `--hud`,
+the assistant behaves exactly as above. (Note: interrupting by *speaking* while
+Jarvis talks isn't supported — the mic would hear its own voice — so use the Stop
+button, `Esc`, or just type the next question to interrupt.)
 
 > _Demo GIF coming soon — run it and watch the orb come alive._
 

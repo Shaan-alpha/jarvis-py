@@ -16,19 +16,40 @@
   fallback when the Vosk model can't load; TTS engine re-initialises after a
   failure instead of going silent. Microphone auto-detect picks a working device.
 
+### Frozen build (found by running the packaged .exe)
+- `resource_dir()` resolves bundled assets via `sys._MEIPASS` (PyInstaller 6
+  one-folder builds put data under `_internal/`, not beside the exe).
+- `jarvis.spec` collects the **native libraries** for Vosk/openWakeWord/FAISS/
+  fastembed (`collect_all`) — a bare hidden-import doesn't, so `import vosk`
+  crashed in the frozen app.
+- The HUD runs on the **main thread** when frozen (pywebview requires it); the
+  voice loop moves to a background thread. Closing the HUD window quits the app.
+
 ### Voice quality & interaction
-- **Barge-in for typed queries**: typing a new question in the HUD now interrupts
-  whatever Jarvis is saying (stops the current utterance, clears the queue) and a
-  newer query cancels an in-flight LLM stream instead of queueing behind it.
+- **Interrupt controls**: a **Stop** button (and `Esc`) in the HUD instantly cut
+  Jarvis off; typing a new question also interrupts (stops the current utterance,
+  clears the queue), and a newer query cancels an in-flight LLM stream instead of
+  queueing behind it. (Interrupting by *speaking* isn't supported — the mic hears
+  Jarvis's own voice — so use Stop / Esc / typing.)
 - **No more context bleed / rambling**: document & memory retrieval is gated off
   short/greeting queries (e.g. "how are you" no longer pulls in unrelated indexed
   content), and the similarity thresholds were raised so only clearly-relevant
   matches are used. Fixes a class of hallucination where a small model would
   confabulate around a weakly-matched chunk.
 - **Full-phrase capture**: raised the speech pause threshold so multi-word
-  utterances ("how are you") are no longer cut off after the first word.
+  utterances ("how are you") aren't cut off after the first word, plus a
+  `MAX_ENERGY_THRESHOLD` cap so quiet speech is still heard in noisier rooms.
+- **No more spurious wake-ups**: `WAKE_THRESHOLD` 0.4 → 0.6 and a 2-frame debounce
+  (`WAKE_CONSECUTIVE`) so ambient noise no longer wakes Jarvis on its own.
 - **Startup greeting** is spoken synchronously after the TTS queue starts, so it
   is no longer truncated.
+
+### Desktop HUD redesign
+- The orb is now a **fluid, glassmorphism "Siri/ChatGPT" blob** (pure CSS — no
+  WebGL/Three.js dependency): flowing multi-colour gradient layers that morph and
+  blend, audio-reactive (it doubles as the mic visualizer) and state-reactive, over
+  an ambient aurora background with frosted-glass cards. The empty caption box is
+  hidden until there's a transcript/reply. Themed cyan/gold/frost by time of day.
 
 ## v3.2.0
 

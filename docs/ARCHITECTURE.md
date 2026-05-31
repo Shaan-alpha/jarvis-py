@@ -44,8 +44,10 @@ Streaming sentence-level TTS queue (serialized)  core/speech/tts_queue.py
     ▼
 pyttsx3 speak                                    core/speech/engine.py
     ▲
-    │  barge-in: "hey jarvis" while speaking cancels the current
-    └─ utterance and listens for a new command  tts_queue.wait_until_done_or_barge_in()
+    │  barge-in: a HUD Stop button / Esc / a newly typed query cancels the
+    │  current utterance + clears the queue (ask_llm carries a generation token
+    │  so a superseded stream aborts). "hey jarvis" mid-speech also works but is
+    └─ unreliable over the speakers (no echo cancellation).  tts_queue / app.py
 ```
 
 ---
@@ -65,7 +67,9 @@ pyttsx3 speak                                    core/speech/engine.py
 | `core/automation/` | OS-level actions (open/close apps, system status) |
 | `core/commands/` | Browser/search helpers |
 | `core/utils/` | Structured logger, greeting/date helpers |
-| `core/hud/` + `hud/` | **Optional** desktop HUD — event bus, WebSocket server, stats/theme emitter (Python) + a pywebview-hosted vanilla-web panel. Active only with `python app.py --hud`; the core is untouched otherwise |
+| `core/paths.py` | Path resolver: `resource_dir()` (bundled assets, → `sys._MEIPASS` when frozen) / `user_data_dir()` (writable, → `%APPDATA%\JarvisAI` when frozen). Stdlib-only |
+| `core/setup/` | First-run checks (Ollama/model/mic/WebView2), mic auto-detect, streamed `pull_model`, `is_first_run()` — backs the HUD setup wizard |
+| `core/hud/` + `hud/` | **Optional** desktop HUD — event bus, WebSocket server, stats/theme emitter (Python) + a pywebview-hosted vanilla-web panel (fluid-blob orb, captions, Stop button). Auto-opens on first run; otherwise active only with `python app.py --hud`. The core is untouched without it |
 | `config/` | Central `settings.py` — all tunables in one place |
 
 ---
