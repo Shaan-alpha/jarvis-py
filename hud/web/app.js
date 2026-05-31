@@ -55,7 +55,7 @@
         popIn(capJarvis);
         break;
       case "theme": Theme.onServerTheme(evt.theme); break;
-      case "level": if (window.Waveform) Waveform.push(evt.rms); break;
+      case "level": if (window.Orb && Orb.audio) Orb.audio(evt.rms); break;
       case "stats":
         stModel.textContent = evt.model || "—";
         stCpu.textContent = "CPU " + Math.round(evt.cpu) + "%";
