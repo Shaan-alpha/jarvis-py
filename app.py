@@ -226,6 +226,8 @@ def _start_hud(session, task_manager, wizard=False):
 
     def _on_text_query(text):
 
+        logger.info(f"HUD text query received: {text!r}")
+
         text = (text or "").lower().strip()
 
         if not text:
@@ -235,6 +237,8 @@ def _start_hud(session, task_manager, wizard=False):
         # Barge-in: a new typed query interrupts whatever Jarvis is currently
         # saying. Stop the current utterance and drop anything still queued so
         # the new answer doesn't play behind the old one.
+        logger.info("Barge-in: stop_speaking + clear_queue")
+
         stop_speaking()
 
         clear_queue()

@@ -182,13 +182,19 @@ def stop_speaking():
 
         if current_engine:
 
+            logger.info("stop_speaking: stopping current engine")
+
             current_engine.stop()
 
             current_engine = None
 
+        else:
+
+            logger.info("stop_speaking: no active engine")
+
     except Exception as e:
 
-        print(f"Stop Speech Error: {e}")
+        logger.warning(f"stop_speaking failed (cross-thread?): {e}")
 
 
 def clean_query(query):
