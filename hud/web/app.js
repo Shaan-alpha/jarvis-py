@@ -16,6 +16,13 @@
   const form = document.getElementById("form");
   const input = document.getElementById("input");
   const stopBtn = document.getElementById("stop");
+  const caps = document.querySelector(".caps");
+
+  // Show the caption card only when it actually holds text (no hollow box).
+  function refreshCaps() {
+    if (caps) caps.classList.toggle("filled",
+      !!(capUser.textContent || capJarvis.textContent));
+  }
 
   let ws = null;
   let backoff = 500;
@@ -82,6 +89,7 @@
         if (window.Wizard) Wizard.onSetupComplete();
         break;
     }
+    refreshCaps();
   }
 
   function send(obj) {
@@ -107,6 +115,7 @@
     capUser.textContent = "You: " + text;
     capJarvis.textContent = "";
     popIn(capUser);
+    refreshCaps();
     send({ type: "text_query", text });
     input.value = "";
   });

@@ -12,7 +12,13 @@
 
   <main id="panel">
     <header class="stage">
-      <div id="orb"></div>
+      <div id="orb" data-state="idle">
+        <div class="orb-glow"></div>
+        <div class="blob b1"></div>
+        <div class="blob b2"></div>
+        <div class="blob b3"></div>
+        <div class="orb-sheen"></div>
+      </div>
       <span id="pill" class="pill state">idle</span>
       <button id="stop" class="stop" type="button" title="Stop (Esc)" aria-label="Stop speaking">
         <span class="stop-ico"></span>
@@ -46,9 +52,8 @@
     </section>
   </main>
 
-  <script src="vendor/three.min.js"></script>
   <script src="theme.js"></script>
-  <script src="orb3d.js"></script>
+  <script src="orb.js"></script>
   <script src="wizard.js"></script>
   <script src="app.js"></script>
 </body>
