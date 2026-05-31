@@ -9,7 +9,13 @@ OLLAMA_URL = "http://localhost:11434/api/generate"
 # Ollama model-list endpoint (used by setup checks)
 OLLAMA_TAGS_URL = "http://localhost:11434/api/tags"
 
-WAKE_THRESHOLD = 0.4
+# Wake-word sensitivity. 0.4 was too low — ambient speech/noise scored ~0.43
+# and woke Jarvis spuriously. 0.6 is the recommended low-false-positive range;
+# WAKE_CONSECUTIVE additionally requires the score to clear the threshold on
+# back-to-back frames so a single noisy blip doesn't trigger.
+WAKE_THRESHOLD = 0.6
+
+WAKE_CONSECUTIVE = 2
 
 SESSION_TIMEOUT = 20
 

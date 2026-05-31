@@ -15,6 +15,7 @@ import config.settings as settings
 from config.settings import (
     WAKE_MODEL_PATH,
     WAKE_THRESHOLD,
+    WAKE_CONSECUTIVE,
     WAKE_WORD
 )
 
@@ -144,6 +145,9 @@ def detect_wake_word(stop_event=None, verbose=True):
 
             model.predict(audio_np)
 
+        # Consecutive frames above threshold required to fire (debounce).
+        streak = 0
+
         while True:
 
             if stop_event is not None and stop_event.is_set():
@@ -166,9 +170,15 @@ def detect_wake_word(stop_event=None, verbose=True):
 
             prediction = model.predict(audio_np)
 
-            for wakeword, score in prediction.items():
+            best = max(prediction.items(), key=lambda kv: kv[1], default=(None, 0.0))
 
-                if score > WAKE_THRESHOLD:
+            wakeword, score = best
+
+            if score > WAKE_THRESHOLD:
+
+                streak += 1
+
+                if streak >= WAKE_CONSECUTIVE:
 
                     logger.info(
                         f"Wake word detected: "
@@ -176,6 +186,10 @@ def detect_wake_word(stop_event=None, verbose=True):
                     )
 
                     return True
+
+            else:
+
+                streak = 0
 
     finally:
 
