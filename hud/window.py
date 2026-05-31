@@ -27,8 +27,8 @@ def launch():
     webview.create_window(
         "Jarvis",
         url=url,
-        width=380,
-        height=240,
+        width=440,
+        height=380,
         x=40,
         y=40,
         frameless=True,

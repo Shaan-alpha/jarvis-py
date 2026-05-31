@@ -15,13 +15,22 @@
   const stNet = document.getElementById("st-net");
   const form = document.getElementById("form");
   const input = document.getElementById("input");
+  const stopBtn = document.getElementById("stop");
 
   let ws = null;
   let backoff = 500;
 
   function setState(state) {
     pill.textContent = state;
+    document.body.dataset.state = state;   // drives halo, stop button, dot
     if (window.Orb) Orb.setState(state);
+  }
+
+  // Restart the entrance animation so new caption text fades in.
+  function popIn(el) {
+    el.classList.remove("pop");
+    void el.offsetWidth;
+    el.classList.add("pop");
   }
 
   function handle(evt) {
@@ -36,12 +45,14 @@
       case "transcript":
         capUser.textContent = "You: " + evt.text;
         capJarvis.textContent = "";
+        popIn(capUser);
         break;
       case "assistant_token":
         capJarvis.textContent += evt.text;
         break;
       case "assistant_done":
         if (evt.full_text) capJarvis.textContent = "Jarvis: " + evt.full_text;
+        popIn(capJarvis);
         break;
       case "theme": Theme.onServerTheme(evt.theme); break;
       case "level": if (window.Waveform) Waveform.push(evt.rms); break;
@@ -95,8 +106,15 @@
     if (!text) return;
     capUser.textContent = "You: " + text;
     capJarvis.textContent = "";
+    popIn(capUser);
     send({ type: "text_query", text });
     input.value = "";
+  });
+
+  // Stop button + Esc: instantly cut off whatever Jarvis is saying.
+  stopBtn.addEventListener("click", () => send({ type: "stop" }));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") send({ type: "stop" });
   });
 
   connect();

@@ -7,25 +7,38 @@
   <title>Jarvis</title>
 </head>
 <body>
-  <div id="panel">
-    <div class="top">
-      <canvas id="orb" width="44" height="44"></canvas>
-      <canvas id="wave" width="150" height="26"></canvas>
-      <span id="pill" class="pill">idle</span>
-    </div>
-    <div class="caps">
+  <div id="ambient"></div>
+  <div id="grain"></div>
+
+  <main id="panel">
+    <header class="top">
+      <div class="orb-wrap">
+        <canvas id="orb" width="52" height="52"></canvas>
+      </div>
+      <canvas id="wave" width="220" height="30"></canvas>
+      <span id="pill" class="pill state">idle</span>
+      <button id="stop" class="stop" type="button" title="Stop (Esc)" aria-label="Stop speaking">
+        <span class="stop-ico"></span>
+      </button>
+    </header>
+
+    <section class="caps">
       <div id="cap-user" class="cap u"></div>
       <div id="cap-jarvis" class="cap j"></div>
-    </div>
+    </section>
+
     <div class="status">
-      <span id="st-model" class="pill">&mdash;</span>
-      <span id="st-cpu" class="pill">CPU &mdash;</span>
-      <span id="st-batt" class="pill">&mdash; </span>
-      <span id="st-net" class="pill">offline</span>
+      <span id="st-model" class="pill mono">&mdash;</span>
+      <span id="st-cpu" class="pill mono">CPU &mdash;</span>
+      <span id="st-batt" class="pill mono">&mdash;</span>
+      <span id="st-net" class="pill mono">offline</span>
     </div>
+
     <form id="form">
-      <input id="input" type="text" placeholder="Type to Jarvis&hellip;" autocomplete="off" />
+      <input id="input" type="text" placeholder="Ask Jarvis&hellip;" autocomplete="off" />
+      <button type="submit" class="send" aria-label="Send">&#8629;</button>
     </form>
+
     <section id="wizard" class="wizard hidden">
       <h2>Setup</h2>
       <ul id="wizard-checks"></ul>
@@ -34,7 +47,8 @@
       <input id="wizard-name" type="text" placeholder="What should I call you?" />
       <button id="wizard-start" disabled>Start Jarvis</button>
     </section>
-  </div>
+  </main>
+
   <script src="theme.js"></script>
   <script src="orb.js"></script>
   <script src="waveform.js"></script>
