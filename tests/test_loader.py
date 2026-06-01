@@ -55,3 +55,12 @@ def test_init_tools_loads_builtins():
     registry.clear()
     loader.init_tools()
     assert registry.get("open_app") is not None
+
+
+def test_example_plugin_loads_from_repo():
+    from core.paths import resource_dir
+    loader.load_plugins([resource_dir() / "plugins"])
+    spec = registry.get("roll_dice")
+    assert spec is not None
+    out = spec.handler(sides=6)
+    assert "rolled" in out.lower()
