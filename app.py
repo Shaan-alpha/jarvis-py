@@ -66,6 +66,10 @@ from core.agent.tool_executor import (
     execute_tool
 )
 
+from core.agent.loader import (
+    init_tools
+)
+
 from core.tasks.task_manager import (
     TaskManager
 )
@@ -169,13 +173,13 @@ def process_query(query, task_manager, source="voice"):
 
     events.emit("state", state="thinking")
 
-    tool = decide_tool(query)
+    call = decide_tool(query)
 
-    if tool != "none":
+    if call is not None:
 
-        logger.info(f"Executed Tool: {tool}")
+        logger.info(f"Executed Tool: {call.name} args={call.args}")
 
-        response = execute_tool(tool)
+        response = execute_tool(call)
 
         if response:
 
@@ -371,6 +375,8 @@ def _print_paths_report():
 def main():
 
     logger.info("Starting Jarvis...")
+
+    init_tools()
 
     parser = argparse.ArgumentParser(description="Jarvis voice assistant")
 
