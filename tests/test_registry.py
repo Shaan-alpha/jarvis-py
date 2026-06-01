@@ -1,4 +1,5 @@
 from core.agent import registry
+from core.agent.registry import ParamSpec, ToolSpec, coerce_and_validate
 
 
 def test_tool_decorator_registers():
@@ -61,9 +62,6 @@ def test_duplicate_name_last_wins():
     assert registry.get("dup").handler() == "second"
 
 
-from core.agent.registry import ParamSpec, ToolSpec, coerce_and_validate
-
-
 def _spec(params):
     return ToolSpec("t", "d", params, lambda **k: None)
 
@@ -100,3 +98,17 @@ def test_unknown_keys_dropped():
     args, err = coerce_and_validate(spec, {"n": 1, "bogus": "x"})
     assert err is None
     assert args == {"n": 1}
+
+
+def test_none_raw_args_treated_as_empty():
+    spec = _spec({"sides": ParamSpec(type="int", required=False, default=6)})
+    args, err = coerce_and_validate(spec, None)
+    assert err is None
+    assert args == {"sides": 6}
+
+
+def test_null_optional_uses_default():
+    spec = _spec({"sides": ParamSpec(type="int", required=False, default=6)})
+    args, err = coerce_and_validate(spec, {"sides": None})
+    assert err is None
+    assert args == {"sides": 6}

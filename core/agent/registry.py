@@ -103,7 +103,9 @@ _COERCERS = {
 
 def coerce_and_validate(spec, raw_args):
 
-    raw_args = raw_args or {}
+    if raw_args is None:
+
+        raw_args = {}
 
     result = {}
 
