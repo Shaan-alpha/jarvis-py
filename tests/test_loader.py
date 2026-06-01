@@ -52,5 +52,6 @@ def test_duplicate_dirs_loaded_once(tmp_path):
 
 
 def test_init_tools_loads_builtins():
+    registry.clear()
     loader.init_tools()
     assert registry.get("open_app") is not None

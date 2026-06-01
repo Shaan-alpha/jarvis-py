@@ -20,6 +20,12 @@ def _plugin_dirs():
 
 def _import_file(path):
 
+    """Import a plugin file for its side effects (tool registration).
+
+    The module is intentionally NOT inserted into sys.modules, so importing
+    the same file again re-executes it and re-runs its @tool decorators.
+    """
+
     spec = importlib.util.spec_from_file_location(path.stem, str(path))
 
     module = importlib.util.module_from_spec(spec)
@@ -28,6 +34,11 @@ def _import_file(path):
 
 
 def load_builtins():
+
+    import sys
+
+    # Remove from sys.modules so re-import always re-executes @tool decorators.
+    sys.modules.pop("core.agent.builtins", None)
 
     import core.agent.builtins  # noqa: F401  (decorators register on import)
 
