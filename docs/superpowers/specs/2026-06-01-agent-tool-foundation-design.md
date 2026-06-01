@@ -138,8 +138,13 @@ lazy-imported inside the handler body.
 
 (was `-> str`, returning a name or the `"none"` sentinel)
 
-1. **Gate unchanged:** `_looks_like_action(query)` still short-circuits non-commands
-   to `None` (avoids an LLM round-trip for chit-chat).
+1. **Registry-aware gate:** `_looks_like_action(query)` short-circuits non-commands
+   to `None` (avoids an LLM round-trip for chit-chat). A query passes if it starts
+   with a built-in `ACTION_VERB` **or shares a word with any registered tool's name**
+   (e.g. `roll_dice` → `{roll, dice}`, so "roll a dice" passes). A dropped plugin thus
+   gates itself via its name — **no core edit needed**, satisfying §10. Trade-off: a
+   few extra chit-chat queries may reach the LLM selector, which safely returns
+   `none`; over-triggering the gate never causes a wrong action.
 2. **Prompt built from the registry:** each tool is rendered with its name,
    description, **and its params** (name / type / required / desc). Output contract:
    ```json
