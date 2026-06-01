@@ -11,6 +11,7 @@ block_cipher = None
 datas = [
     ("models", "models"),
     ("hud/web", "hud/web"),
+    ("plugins", "plugins"),
 ]
 
 binaries = []
