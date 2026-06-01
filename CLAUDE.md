@@ -27,12 +27,13 @@ psutil, PyAutoGUI.
 
 ## 2. Where we are right now (2026-06-01)
 
-The **v3.3.0 "Polish & Packaging" milestone — plus a HUD overhaul — is merged to
-`main` and pushed** (fast-forward, tip `bfe0bb9`; 96 tests pass, build-breaking
-lint 0). It is **not yet tagged / released**: `pyproject.toml` + `CHANGELOG.md`
-say `3.3.0`, but no `v3.3.0` git tag or GitHub Release has been cut yet (deferred
-by the user). See [`always-tag-and-release`] convention — offer to tag + cut the
-Release when the user is ready.
+The **v3.3.0 "Polish & Packaging" milestone — plus a HUD overhaul — is shipped**:
+merged to `main` (tip `5c27a76`), **tagged `v3.3.0`**, and a **GitHub Release is
+published** (2026-05-31, marked *Latest*). 96 tests pass; source-level
+build-breaking lint is 0. `pyproject.toml` + `CHANGELOG.md` are at `3.3.0` and now
+match the published version. See [`always-tag-and-release`] — this milestone
+followed it. **Next roadmap milestone is `v3.4 — Agent Capabilities`** (see
+[`PLAN.md`](PLAN.md)).
 
 **Shipped in this milestone (on `main`):**
 - **Packaging:** Windows one-folder build (`build.ps1` + `jarvis.spec`), a
@@ -93,8 +94,8 @@ python app.py                            # run the assistant (needs Ollama: `oll
 python app.py --hud                      # run with the desktop HUD (shipped in v3.2.0)
 
 python -m pytest                         # tests (no PYTHONPATH needed; configured in pyproject.toml)
-python -m flake8 . --select=E9,F63,F7,F82,F401 --exclude=venv,__pycache__ --count   # build-breaking lint (must be 0)
-python -m flake8 . --exit-zero --max-complexity=10 --max-line-length=127 --exclude=venv,__pycache__   # quality warnings
+python -m flake8 . --select=E9,F63,F7,F82,F401 --exclude=venv,__pycache__,dist,build --count   # build-breaking lint (must be 0)
+python -m flake8 . --exit-zero --max-complexity=10 --max-line-length=127 --exclude=venv,__pycache__,dist,build   # quality warnings
 ```
 
 CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs flake8 + pytest on

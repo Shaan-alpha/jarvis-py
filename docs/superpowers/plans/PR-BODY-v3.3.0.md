@@ -1,10 +1,10 @@
 # v3.3.0 — Polish & Packaging
 
-> **Status (2026-06-01):** merged to `main` directly (fast-forward, no PR was
-> opened). This draft is kept as the change summary; a `v3.3.0` tag + GitHub
-> Release are still to be cut. A HUD overhaul also landed after this was drafted
-> (fluid-blob orb, Stop/Esc + typed barge-in, wake-word + STT fixes) — see
-> `CHANGELOG.md` for the complete list.
+> **Status (2026-06-01):** shipped — merged to `main` directly (fast-forward, no
+> PR was opened), tagged `v3.3.0`, GitHub Release published (2026-05-31, *Latest*).
+> This draft is kept as the change summary. A HUD overhaul also landed after this
+> was drafted (fluid-blob orb, Stop/Esc + typed barge-in, wake-word + STT fixes) —
+> see `CHANGELOG.md` for the complete list.
 
 Makes jarvis-py a ship-ready app you can hand to someone: a Windows one-folder
 build, a first-run setup wizard, robust path resolution, microphone auto-detect,

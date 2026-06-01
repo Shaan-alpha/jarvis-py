@@ -37,12 +37,12 @@ Architecture first. No giant single files.
 
 ## Current Status
 
-> Latest tagged release: **v3.2.0** (Desktop HUD). **v3.3.0 "Polish & Packaging"**
-> (+ a HUD overhaul: fluid-blob orb, Stop/Esc interrupt, wake-word + STT fixes) is
-> **merged to `main` and pushed** (96 tests green) but **not yet tagged/released** —
-> `pyproject`/`CHANGELOG` say 3.3.0; the `v3.3.0` git tag + GitHub Release are still
-> to be cut. The HUD shipped ahead of the packaging milestone, so packaging ships as
-> v3.3.0.
+> Latest release: **v3.3.0 "Polish & Packaging"** (+ a HUD overhaul: fluid-blob
+> orb, Stop/Esc interrupt, wake-word + STT fixes) — **shipped**: merged to `main`,
+> tagged `v3.3.0`, GitHub Release published (2026-05-31, *Latest*). 96 tests green;
+> `pyproject`/`CHANGELOG` at 3.3.0 match the published version. The HUD shipped
+> ahead of the packaging milestone, so packaging shipped as v3.3.0. **Next up:
+> v3.4 — Agent Capabilities** (below).
 
 ### v3.2.0 — Desktop HUD (shipped)
 
@@ -90,7 +90,7 @@ goals — see v4.0 below for what remains.
 
 ---
 
-## v3.3 — Polish & Packaging (code-complete; ships as v3.3.0)
+## v3.3 — Polish & Packaging (shipped as v3.3.0)
 
 Goal: ship-ready binary you can hand someone.
 
@@ -103,8 +103,8 @@ Goal: ship-ready binary you can hand someone.
 - [x] Crash-recovery: TTS re-init + graceful degradation (Ollama down, no mic, model-load fail)
 - All paths resolve via `core/paths.py` (`resource_dir()` / `user_data_dir()`)
 
-> Pending before tag: the manual Windows build + smoke test (USER-only), then
-> PR → `main` and tag **v3.3.0**.
+> Done: manual Windows build + smoke test, merged to `main`, tagged **v3.3.0**,
+> GitHub Release published (2026-05-31).
 
 ---
 
