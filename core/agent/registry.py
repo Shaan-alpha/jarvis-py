@@ -93,3 +93,40 @@ def tool(name, description, params=None):
         return func
 
     return decorator
+
+
+_COERCERS = {
+    "str": str,
+    "int": int,
+}
+
+
+def coerce_and_validate(spec, raw_args):
+
+    raw_args = raw_args or {}
+
+    result = {}
+
+    for pname, pspec in spec.params.items():
+
+        if pname in raw_args and raw_args[pname] is not None:
+
+            coercer = _COERCERS.get(pspec.type, str)
+
+            try:
+
+                result[pname] = coercer(raw_args[pname])
+
+            except (TypeError, ValueError):
+
+                return {}, f"param {pname!r} not coercible to {pspec.type}"
+
+        elif pspec.required:
+
+            return {}, f"missing required param {pname!r}"
+
+        else:
+
+            result[pname] = pspec.default
+
+    return result, None

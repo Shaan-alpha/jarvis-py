@@ -59,3 +59,44 @@ def test_duplicate_name_last_wins():
         return "second"
 
     assert registry.get("dup").handler() == "second"
+
+
+from core.agent.registry import ParamSpec, ToolSpec, coerce_and_validate
+
+
+def _spec(params):
+    return ToolSpec("t", "d", params, lambda **k: None)
+
+
+def test_coerce_int_and_str():
+    spec = _spec({"n": ParamSpec(type="int"), "s": ParamSpec(type="str")})
+    args, err = coerce_and_validate(spec, {"n": "5", "s": 7})
+    assert err is None
+    assert args == {"n": 5, "s": "7"}
+
+
+def test_default_filled_for_missing_optional():
+    spec = _spec({"sides": ParamSpec(type="int", required=False, default=6)})
+    args, err = coerce_and_validate(spec, {})
+    assert err is None
+    assert args == {"sides": 6}
+
+
+def test_missing_required_is_error():
+    spec = _spec({"name": ParamSpec(type="str", required=True)})
+    args, err = coerce_and_validate(spec, {})
+    assert err is not None
+    assert "name" in err
+
+
+def test_uncoercible_is_error():
+    spec = _spec({"n": ParamSpec(type="int", required=True)})
+    args, err = coerce_and_validate(spec, {"n": "not-a-number"})
+    assert err is not None
+
+
+def test_unknown_keys_dropped():
+    spec = _spec({"n": ParamSpec(type="int", required=False, default=0)})
+    args, err = coerce_and_validate(spec, {"n": 1, "bogus": "x"})
+    assert err is None
+    assert args == {"n": 1}
