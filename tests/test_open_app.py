@@ -7,7 +7,7 @@ def test_resolve_app_alias():
 
 
 def test_resolve_app_passthrough():
-    assert agent_builtins.resolve_app("notepad") == "notepad"
+    assert agent_builtins.resolve_app("vlc") == "vlc"
 
 
 def test_open_app_calls_startfile(monkeypatch):
@@ -17,6 +17,19 @@ def test_open_app_calls_startfile(monkeypatch):
     out = agent_builtins.open_app("calculator")
     assert calls == ["calc"]
     assert out == "Opening calculator."
+
+
+def test_open_app_falls_back_to_subprocess(monkeypatch):
+    def _raise(target):
+        raise OSError("not a file")
+
+    popen_calls = []
+    monkeypatch.setattr(agent_builtins.os, "startfile", _raise, raising=False)
+    monkeypatch.setattr(agent_builtins.subprocess, "Popen",
+                        lambda args: popen_calls.append(args))
+    out = agent_builtins.open_app("notepad")
+    assert popen_calls == [["cmd", "/c", "start", "", "notepad"]]
+    assert out == "Opening notepad."
 
 
 def test_builtins_registered():

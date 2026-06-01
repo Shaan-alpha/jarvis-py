@@ -1,5 +1,7 @@
 import os
 
+import subprocess
+
 import webbrowser
 
 from core.agent.registry import (
@@ -19,8 +21,8 @@ _APP_ALIASES = {
     "terminal": "cmd",
     "spotify": "spotify:",
     "chrome": "chrome",
-    "edge": "msedge",
-    "browser": "msedge",
+    "edge": "microsoft-edge:",
+    "browser": "microsoft-edge:",
 }
 
 
@@ -52,8 +54,10 @@ def open_app(name):
 
     except OSError:
 
-        import subprocess
-
+        # Bare app names / URI schemes (e.g. "calc", "microsoft-edge:") aren't
+        # file paths, so os.startfile raises OSError; launch them via the shell
+        # instead. target is derived from a user/LLM phrase and is not sanitized
+        # here -- acceptable for a local single-user assistant.
         subprocess.Popen(["cmd", "/c", "start", "", target])
 
     return f"Opening {name}."
