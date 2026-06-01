@@ -94,8 +94,12 @@ pyttsx3 speak                                    core/speech/engine.py
 - **Add a deterministic command:** add keywords to
   [`core/router/intent_router.py`](../core/router/intent_router.py) and a handler
   under `core/intents/`.
-- **Add an LLM-selectable tool:** register it in
-  [`core/agent/tool_registry.py`](../core/agent/tool_registry.py) and implement
-  the action in [`core/agent/tool_executor.py`](../core/agent/tool_executor.py).
+- **Add an LLM-selectable tool:** decorate a function with `@tool(...)` in
+  [`core/agent/builtins.py`](../core/agent/builtins.py), or drop a `*.py` plugin in
+  [`plugins/`](../plugins/). The decorator registers it via
+  [`core/agent/registry.py`](../core/agent/registry.py); `decide_tool`
+  ([`core/agent/tool_agent.py`](../core/agent/tool_agent.py)) then offers it to the
+  model and `execute_tool()`
+  ([`core/agent/tool_executor.py`](../core/agent/tool_executor.py)) dispatches the call.
 - **Tune behavior:** every threshold and path lives in
   [`config/settings.py`](../config/settings.py).

@@ -10,9 +10,9 @@ Codex, Gemini CLI, Copilot, etc.), not just Claude.
 
 **TL;DR:**
 - Local-first Python voice assistant, **Windows-first**, **free/local/zero-money only**.
-- Active work is on branch `feature/jarvis-hud`: implementing the **desktop HUD**
-  (pywebview + vanilla web + local WebSocket). Source of truth:
-  - Spec: `docs/superpowers/specs/2026-05-30-jarvis-hud-design.md`
-  - Plan: `docs/superpowers/plans/2026-05-30-jarvis-hud.md`
-- Run: `python app.py` · Test: `python -m pytest` · Branch off `main`, never commit to it directly.
+- Latest release: **v3.3.0** (Polish & Packaging + HUD), shipped to `main`. The
+  **v3.4 Agent Capabilities** foundation (tool registry + `@tool` decorator +
+  plugin loader) is merged (PR #4); next up are capability tools + orchestration.
+  See [PLAN.md](PLAN.md) for the roadmap.
+- Run: `python app.py` (or `--hud`) · Test: `python -m pytest` · Branch off `main`, never commit to it directly.
 - Use Context7 MCP for library/framework docs.

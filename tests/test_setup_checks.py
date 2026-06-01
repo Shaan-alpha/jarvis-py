@@ -11,7 +11,8 @@ class _Resp:
 
 
 def test_ollama_running_ok():
-    get = lambda url, timeout=0: _Resp(200, {"models": []})
+    def get(url, timeout=0):
+        return _Resp(200, {"models": []})
     result = checks.check_ollama_running(get=get)
     assert result["ok"] is True
 
@@ -26,14 +27,16 @@ def test_ollama_not_running():
 
 def test_model_present_true():
     payload = {"models": [{"name": "phi3:latest"}]}
-    get = lambda url, timeout=0: _Resp(200, payload)
+    def get(url, timeout=0):
+        return _Resp(200, payload)
     result = checks.check_model_present("phi3", get=get)
     assert result["ok"] is True
 
 
 def test_model_present_false():
     payload = {"models": [{"name": "llama3:latest"}]}
-    get = lambda url, timeout=0: _Resp(200, payload)
+    def get(url, timeout=0):
+        return _Resp(200, payload)
     result = checks.check_model_present("phi3", get=get)
     assert result["ok"] is False
     assert result["fixable"] is True
@@ -52,13 +55,15 @@ def test_webview2_noop_off_windows():
 
 
 def test_webview2_present_when_reader_finds_version():
-    reader = lambda: "1.0.2210.55"
+    def reader():
+        return "1.0.2210.55"
     result = checks.check_webview2(platform="win32", reader=reader)
     assert result["ok"] is True
 
 
 def test_webview2_missing_when_reader_returns_none():
-    reader = lambda: None
+    def reader():
+        return None
     result = checks.check_webview2(platform="win32", reader=reader)
     assert result["ok"] is False
     assert result["fixable"] is True
