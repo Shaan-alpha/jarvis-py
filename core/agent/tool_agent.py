@@ -1,4 +1,5 @@
 import json
+
 import re
 
 import requests
@@ -8,8 +9,8 @@ from config.settings import (
     OLLAMA_URL
 )
 
-from core.agent.tool_registry import (
-    TOOLS
+from core.agent import (
+    registry
 )
 
 from core.utils.logger import (
@@ -43,20 +44,47 @@ def _looks_like_action(query):
 
     q = query.strip().lower()
 
-    return any(q.startswith(v) or f" {v}" in f" {q}" for v in ACTION_VERBS)
+    if any(q.startswith(v) or f" {v}" in f" {q}" for v in ACTION_VERBS):
+
+        return True
+
+    words = set(re.findall(r"[a-z0-9]+", q))
+
+    for spec in registry.all_tools():
+
+        if words & set(spec.name.lower().split("_")):
+
+            return True
+
+    return False
 
 
 def _tool_list_text():
 
     lines = []
 
-    for index, (name, meta) in enumerate(
-        TOOLS.items(),
-        start=1
-    ):
+    for index, spec in enumerate(registry.all_tools(), start=1):
+
+        if spec.params:
+
+            param_lines = []
+
+            for pname, pspec in spec.params.items():
+
+                req = "required" if pspec.required else "optional"
+
+                param_lines.append(
+                    f"     - {pname} ({pspec.type}, {req}): {pspec.desc}"
+                )
+
+            params_text = "\n   params:\n" + "\n".join(param_lines)
+
+        else:
+
+            params_text = "\n   params: none"
 
         lines.append(
-            f"{index}. {name}\n- {meta['description']}"
+            f"{index}. {spec.name}\n   - {spec.description}{params_text}"
         )
 
     return "\n\n".join(lines)
@@ -64,21 +92,19 @@ def _tool_list_text():
 
 def _extract_first_json(text):
 
-    text = text.strip()
+    text = text.replace("```json", "").replace("```", "")
 
-    text = text.replace("```json", "")
+    start = text.find("{")
 
-    text = text.replace("```", "")
-
-    match = re.search(r"\{[^{}]*\}", text, re.DOTALL)
-
-    if not match:
+    if start == -1:
 
         return None
 
     try:
 
-        return json.loads(match.group(0))
+        obj, _ = json.JSONDecoder().raw_decode(text[start:])
+
+        return obj
 
     except json.JSONDecodeError:
 
@@ -89,31 +115,28 @@ def decide_tool(query):
 
     if not _looks_like_action(query):
 
-        return "none"
+        return None
 
-    prompt = f"""You are a strict tool selector. Map the user's request
-to exactly one of the available tool names, OR return "none" if the
-request is not an explicit command to perform one of these actions.
+    prompt = f"""You are a strict tool selector. Map the user's request to
+exactly one of the available tools, OR return "none" if the request is not an
+explicit command to perform one of these actions.
 
 Available tools:
 {_tool_list_text()}
 
 Strict rules:
-- Output ONE JSON object only. No prose, no markdown, no extra text.
-- Only return a tool name if the user is explicitly asking to perform
-  that action right now.
-- Questions, explanations, conversation, vague requests, anything
-  containing "what", "why", "how", "explain", "tell me", "describe"
-  -> return {{"tool": "none"}}.
+- Output ONE JSON object only. No prose, no markdown.
+- Shape: {{"tool": "<name>", "args": {{...}}}}  OR  {{"tool": "none"}}.
+- Fill "args" using the tool's declared params; take values from the user's words.
+- Only choose a tool if the user is explicitly asking to perform it now.
+- Questions, explanations, conversation, anything with "what"/"why"/"how"/
+  "explain"/"tell me"/"describe" -> {{"tool": "none"}}.
 - If unsure, return {{"tool": "none"}}.
 
 Examples:
-- "open the calculator" -> {{"tool": "open_calculator"}}
-- "increase the volume please" -> {{"tool": "increase_volume"}}
-- "mute the system" -> {{"tool": "mute_volume"}}
+- "open notepad" -> {{"tool": "open_app", "args": {{"name": "notepad"}}}}
+- "increase the volume please" -> {{"tool": "increase_volume", "args": {{}}}}
 - "what is python" -> {{"tool": "none"}}
-- "explain transformers in two lines" -> {{"tool": "none"}}
-- "how is the weather" -> {{"tool": "none"}}
 
 User Request:
 {query}
@@ -143,39 +166,51 @@ JSON:"""
         if parsed is None:
 
             logger.warning(
-                f"Tool agent returned unparseable text: "
-                f"{text[:120]!r}"
+                f"Tool agent returned unparseable text: {text[:120]!r}"
             )
 
-            return "none"
+            return None
 
-        tool = parsed.get("tool", "none")
+        name = parsed.get("tool", "none")
 
-        if not isinstance(tool, str):
+        if not isinstance(name, str):
 
-            return "none"
+            return None
 
-        tool = tool.strip().lower()
+        name = name.strip().lower()
 
-        if tool in ("", "none", "null"):
+        if name in ("", "none", "null"):
 
-            return "none"
+            return None
 
-        if tool not in TOOLS:
+        spec = registry.get(name)
+
+        if spec is None:
 
             logger.info(
-                f"Tool agent picked unknown tool {tool!r}, "
-                f"falling back to LLM chat"
+                f"Tool agent picked unknown tool {name!r}; falling back to chat"
             )
 
-            return "none"
+            return None
 
-        return tool
+        raw_args = parsed.get("args", {})
+
+        if not isinstance(raw_args, dict):
+
+            raw_args = {}
+
+        args, error = registry.coerce_and_validate(spec, raw_args)
+
+        if error:
+
+            logger.info(f"Tool {name!r} arg error: {error}; falling back to chat")
+
+            return None
+
+        return registry.ToolCall(name=name, args=args)
 
     except Exception as e:
 
-        logger.exception(
-            f"Tool Agent Error: {e}"
-        )
+        logger.exception(f"Tool Agent Error: {e}")
 
-        return "none"
+        return None

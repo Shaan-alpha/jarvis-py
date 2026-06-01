@@ -1,41 +1,76 @@
-from core.agent.tool_agent import (
-    _extract_first_json,
-    _looks_like_action,
-)
-from core.agent.tool_registry import TOOLS
+from core.agent import tool_agent
+from core.agent import registry
 
 
-def test_action_verb_at_start_passes_gate():
-    assert _looks_like_action("open the calculator") is True
-    assert _looks_like_action("increase the volume please") is True
+class _Resp:
+    def __init__(self, payload):
+        self._payload = payload
+
+    def json(self):
+        return self._payload
 
 
-def test_question_does_not_look_like_action():
-    assert _looks_like_action("what is python") is False
-    assert _looks_like_action("explain transformers in two lines") is False
+def _register_open_app():
+    @registry.tool("open_app", "Open an app",
+                   params={"name": {"type": "str", "required": True}})
+    def _open(name):
+        return f"Opening {name}."
 
 
-def test_extracts_clean_json_object():
-    assert _extract_first_json('{"tool": "open_calculator"}') == {
-        "tool": "open_calculator"
-    }
+def test_gate_passes_builtin_verb():
+    assert tool_agent._looks_like_action("open notepad") is True
 
 
-def test_extracts_json_from_markdown_fence():
-    text = '```json\n{"tool": "mute_volume"}\n```'
-    assert _extract_first_json(text) == {"tool": "mute_volume"}
+def test_gate_passes_tool_name_token():
+    registry.clear()
+
+    @registry.tool("roll_dice", "Roll a die")
+    def _r():
+        return "rolled"
+
+    assert tool_agent._looks_like_action("roll a dice") is True
 
 
-def test_extracts_json_surrounded_by_prose():
-    text = 'Sure! Here you go: {"tool": "open_google"} hope that helps'
-    assert _extract_first_json(text) == {"tool": "open_google"}
+def test_gate_blocks_chitchat():
+    registry.clear()
+    assert tool_agent._looks_like_action("what is python") is False
 
 
-def test_returns_none_for_unparseable_text():
-    assert _extract_first_json("no json here at all") is None
+def test_decide_tool_parameterized(monkeypatch):
+    _register_open_app()
+    monkeypatch.setattr(
+        tool_agent.requests, "post",
+        lambda *a, **k: _Resp({"response": '{"tool": "open_app", "args": {"name": "notepad"}}'}),
+    )
+    call = tool_agent.decide_tool("open notepad")
+    assert call == registry.ToolCall("open_app", {"name": "notepad"})
 
 
-def test_registered_tools_present():
-    # Guards against accidental registry edits breaking the executor.
-    for tool in ("open_calculator", "increase_volume", "mute_volume"):
-        assert tool in TOOLS
+def test_decide_tool_question_is_gated_to_none():
+    registry.clear()
+    assert tool_agent.decide_tool("what is python") is None
+
+
+def test_decide_tool_unknown_tool_is_none(monkeypatch):
+    registry.clear()
+    _register_open_app()
+    monkeypatch.setattr(
+        tool_agent.requests, "post",
+        lambda *a, **k: _Resp({"response": '{"tool": "fly_to_moon", "args": {}}'}),
+    )
+    assert tool_agent.decide_tool("open notepad") is None
+
+
+def test_decide_tool_missing_required_arg_is_none(monkeypatch):
+    registry.clear()
+    _register_open_app()
+    monkeypatch.setattr(
+        tool_agent.requests, "post",
+        lambda *a, **k: _Resp({"response": '{"tool": "open_app", "args": {}}'}),
+    )
+    assert tool_agent.decide_tool("open something") is None
+
+
+def test_extract_first_json_handles_nested():
+    obj = tool_agent._extract_first_json('noise {"tool": "x", "args": {"a": 1}} trailing')
+    assert obj == {"tool": "x", "args": {"a": 1}}

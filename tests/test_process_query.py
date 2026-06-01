@@ -38,7 +38,7 @@ def test_llm_fallback_saves_memory(monkeypatch):
     monkeypatch.setattr(app, "extract_personal_info", lambda q: None)
     monkeypatch.setattr(app, "parse_reminder", lambda q: None)
     monkeypatch.setattr(app, "route_intent", lambda q: None)
-    monkeypatch.setattr(app, "decide_tool", lambda q: "none")
+    monkeypatch.setattr(app, "decide_tool", lambda q: None)
     monkeypatch.setattr(app, "ask_llm", lambda q: "an answer")
     saved = {}
     monkeypatch.setattr(app, "save_memory", lambda q, r: saved.setdefault("v", (q, r)))
