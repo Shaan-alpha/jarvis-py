@@ -1,3 +1,4 @@
+import copy
 import pytest
 
 from core.agent import registry
@@ -12,7 +13,7 @@ except ImportError:
 def _isolate_registry():
     if loader is not None:
         loader.load_builtins()
-    snapshot = dict(registry._REGISTRY)
+    snapshot = copy.deepcopy(registry._REGISTRY)
     yield
     registry._REGISTRY.clear()
     registry._REGISTRY.update(snapshot)
