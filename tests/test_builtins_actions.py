@@ -18,12 +18,12 @@ def test_resolve_close_image_passthrough():
 def test_close_app_runs_taskkill(monkeypatch):
     calls = []
 
-    def _fake_run(cmd, check=True):
-        calls.append((cmd, check))
+    def _fake_run(cmd, check=True, **kwargs):
+        calls.append((cmd, check, kwargs.get("capture_output")))
 
     monkeypatch.setattr(agent_builtins.subprocess, "run", _fake_run)
     out = agent_builtins.close_app("notepad")
-    assert calls == [(["taskkill", "/f", "/im", "notepad.exe"], False)]
+    assert calls == [(["taskkill", "/f", "/im", "notepad.exe"], False, True)]
     assert out == "Closing notepad."
 
 

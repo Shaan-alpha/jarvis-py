@@ -162,7 +162,11 @@ def close_app(name):
 
     # subprocess.run (not os.system) per the audit's hardening note; check=False
     # so "no such process" never raises (target may already be closed).
-    subprocess.run(["taskkill", "/f", "/im", image], check=False)
+    subprocess.run(
+        ["taskkill", "/f", "/im", image],
+        check=False,
+        capture_output=True,
+    )
 
     return f"Closing {name}."
 
