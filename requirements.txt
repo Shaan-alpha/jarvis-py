@@ -24,6 +24,9 @@ numpy==2.4.4
 PyAutoGUI==0.9.54
 psutil==7.2.2
 
+# Clipboard
+pyperclip==1.11.0
+
 # Desktop HUD (only used with `python app.py --hud`)
 websockets>=12.0
 pywebview>=5.0

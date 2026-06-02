@@ -8,6 +8,8 @@ import webbrowser
 
 import psutil
 
+import pyperclip
+
 from core.agent.registry import (
     tool
 )
@@ -213,3 +215,43 @@ def search_web(query):
     webbrowser.open(url)
 
     return f"Searching the web for {query}."
+
+
+CLIPBOARD_PREVIEW_LIMIT = 200
+
+
+@tool("read_clipboard", "Read the current text contents of the system clipboard")
+def read_clipboard():
+
+    text = pyperclip.paste()
+
+    if not text or not text.strip():
+
+        return "The clipboard is empty."
+
+    if len(text) <= CLIPBOARD_PREVIEW_LIMIT:
+
+        return text
+
+    return (
+        f"Your clipboard has {len(text)} characters. "
+        f'It starts: "{text[:CLIPBOARD_PREVIEW_LIMIT]}..." (truncated).'
+    )
+
+
+@tool(
+    "write_clipboard",
+    "Copy the given text to the system clipboard",
+    params={
+        "text": {
+            "type": "str",
+            "required": True,
+            "desc": "the text to copy to the clipboard",
+        }
+    },
+)
+def write_clipboard(text):
+
+    pyperclip.copy(text)
+
+    return "Copied to clipboard."
