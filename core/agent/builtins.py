@@ -2,7 +2,11 @@ import os
 
 import subprocess
 
+import urllib.parse
+
 import webbrowser
+
+import psutil
 
 from core.agent.registry import (
     tool
@@ -119,3 +123,93 @@ def mute_volume():
     pyautogui.press("volumemute")
 
     return "Volume muted."
+
+
+_CLOSE_IMAGES = {
+    "calculator": "calc.exe",
+    "calc": "calc.exe",
+    "notepad": "notepad.exe",
+    "paint": "mspaint.exe",
+    "mspaint": "mspaint.exe",
+}
+
+
+def resolve_close_image(name):
+
+    key = name.strip().lower()
+
+    if key in _CLOSE_IMAGES:
+
+        return _CLOSE_IMAGES[key]
+
+    return key if key.endswith(".exe") else f"{key}.exe"
+
+
+@tool(
+    "close_app",
+    "Close a running Windows application by name (e.g. notepad, calculator, paint)",
+    params={
+        "name": {
+            "type": "str",
+            "required": True,
+            "desc": "the app to close, e.g. notepad",
+        }
+    },
+)
+def close_app(name):
+
+    image = resolve_close_image(name)
+
+    # subprocess.run (not os.system) per the audit's hardening note; check=False
+    # so "no such process" never raises (target may already be closed).
+    subprocess.run(
+        ["taskkill", "/f", "/im", image],
+        check=False,
+        capture_output=True,
+    )
+
+    return f"Closing {name}."
+
+
+@tool("system_status", "Report CPU usage and battery status")
+def system_status():
+
+    cpu = psutil.cpu_percent(interval=0.3)
+
+    battery = psutil.sensors_battery()
+
+    if battery is None:
+
+        return f"CPU at {cpu:.0f} percent."
+
+    pct = battery.percent
+
+    charging = "charging" if battery.power_plugged else "on battery"
+
+    return (
+        f"CPU at {cpu:.0f} percent, "
+        f"battery {pct:.0f} percent, {charging}."
+    )
+
+
+@tool(
+    "search_web",
+    "Search the web for a query in the browser",
+    params={
+        "query": {
+            "type": "str",
+            "required": True,
+            "desc": "what to search for, e.g. weather today",
+        }
+    },
+)
+def search_web(query):
+
+    url = (
+        "https://www.google.com/search?q="
+        + urllib.parse.quote_plus(query)
+    )
+
+    webbrowser.open(url)
+
+    return f"Searching the web for {query}."

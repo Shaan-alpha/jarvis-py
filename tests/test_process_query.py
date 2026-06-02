@@ -1,5 +1,7 @@
 import app
 
+from core.agent.registry import ToolCall
+
 
 class _FakeTaskManager:
     def __init__(self):
@@ -19,25 +21,57 @@ def test_sets_reminder(monkeypatch):
     assert any("Reminder set" in s for s in spoken)
 
 
-def test_routes_to_intent_handler(monkeypatch):
+def test_fast_path_resolves_and_executes_tool(monkeypatch):
     monkeypatch.setattr(app, "extract_personal_info", lambda q: None)
     monkeypatch.setattr(app, "parse_reminder", lambda q: None)
-    called = {}
+    monkeypatch.setattr(app, "resolve_keyword_tool",
+                        lambda q: ToolCall("increase_volume", {}))
 
-    def fake_handler(query, speak):
-        called["q"] = query
+    # The LLM path must NOT run on a keyword hit.
+    def _boom(q):
+        raise AssertionError("decide_tool should not run on a keyword hit")
 
-    fake_handler.__name__ = "handle_media_control"
-    monkeypatch.setattr(app, "route_intent", lambda q: fake_handler)
-    monkeypatch.setattr(app, "speak", lambda t: None)
+    monkeypatch.setattr(app, "decide_tool", _boom)
+
+    ran = {}
+
+    def _fake_execute(call):
+        ran["call"] = call
+        return "Increasing volume."
+
+    monkeypatch.setattr(app, "execute_tool", _fake_execute)
+    spoken = []
+    monkeypatch.setattr(app, "speak", lambda t: spoken.append(t))
+
     app.process_query("volume up", _FakeTaskManager())
-    assert called["q"] == "volume up"
+    assert ran["call"] == ToolCall("increase_volume", {})
+    assert spoken == ["Increasing volume."]
+
+
+def test_keyword_miss_falls_through_to_llm_tool_agent(monkeypatch):
+    monkeypatch.setattr(app, "extract_personal_info", lambda q: None)
+    monkeypatch.setattr(app, "parse_reminder", lambda q: None)
+    monkeypatch.setattr(app, "resolve_keyword_tool", lambda q: None)
+    monkeypatch.setattr(app, "decide_tool",
+                        lambda q: ToolCall("open_app", {"name": "spotify"}))
+
+    ran = {}
+
+    def _fake_execute(call):
+        ran["call"] = call
+        return "Opening spotify."
+
+    monkeypatch.setattr(app, "execute_tool", _fake_execute)
+    monkeypatch.setattr(app, "speak", lambda t: None)
+
+    app.process_query("open spotify", _FakeTaskManager())
+    assert ran["call"] == ToolCall("open_app", {"name": "spotify"})
 
 
 def test_llm_fallback_saves_memory(monkeypatch):
     monkeypatch.setattr(app, "extract_personal_info", lambda q: None)
     monkeypatch.setattr(app, "parse_reminder", lambda q: None)
-    monkeypatch.setattr(app, "route_intent", lambda q: None)
+    monkeypatch.setattr(app, "resolve_keyword_tool", lambda q: None)
     monkeypatch.setattr(app, "decide_tool", lambda q: None)
     monkeypatch.setattr(app, "ask_llm", lambda q: "an answer")
     saved = {}

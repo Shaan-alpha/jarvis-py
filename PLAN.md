@@ -39,10 +39,11 @@ Architecture first. No giant single files.
 
 > Latest release: **v3.3.0 "Polish & Packaging"** (+ a HUD overhaul: fluid-blob
 > orb, Stop/Esc interrupt, wake-word + STT fixes) — **shipped**: merged to `main`,
-> tagged `v3.3.0`, GitHub Release published (2026-05-31, *Latest*). 96 tests green;
-> `pyproject`/`CHANGELOG` at 3.3.0 match the published version. The HUD shipped
-> ahead of the packaging milestone, so packaging shipped as v3.3.0. **Next up:
-> v3.4 — Agent Capabilities** (below).
+> tagged `v3.3.0`, GitHub Release published (2026-05-31, *Latest*). 129 tests green;
+> `pyproject`/`CHANGELOG` at 3.3.0 match the published version. **v3.4 — Agent
+> Capabilities is underway:** the Layer-1 tool foundation (tool registry + `@tool`
+> decorator + plugin loader) is merged to `main` (PR #4); next are capability tools
+> + orchestration (below).
 
 ### v3.2.0 — Desktop HUD (shipped)
 

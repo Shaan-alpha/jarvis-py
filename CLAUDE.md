@@ -29,11 +29,12 @@ psutil, PyAutoGUI.
 
 The **v3.3.0 "Polish & Packaging" milestone — plus a HUD overhaul — is shipped**:
 merged to `main` (tip `5c27a76`), **tagged `v3.3.0`**, and a **GitHub Release is
-published** (2026-05-31, marked *Latest*). 96 tests pass; source-level
-build-breaking lint is 0. `pyproject.toml` + `CHANGELOG.md` are at `3.3.0` and now
+published** (2026-05-31, marked *Latest*). 129 tests pass; source-level
+build-breaking lint is 0. `pyproject.toml` + `CHANGELOG.md` are at `3.3.0` and
 match the published version. See [`always-tag-and-release`] — this milestone
-followed it. **Next roadmap milestone is `v3.4 — Agent Capabilities`** (see
-[`PLAN.md`](PLAN.md)).
+followed it. **`v3.4 — Agent Capabilities` is now underway:** its Layer-1 tool
+foundation (tool registry + `@tool` decorator + plugin loader) is **merged to
+`main`** (PR #4); next are capability tools + orchestration (see [`PLAN.md`](PLAN.md)).
 
 **Shipped in this milestone (on `main`):**
 - **Packaging:** Windows one-folder build (`build.ps1` + `jarvis.spec`), a

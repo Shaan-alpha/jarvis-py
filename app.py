@@ -51,7 +51,7 @@ from core.memory.profile_memory import (
 )
 
 from core.router.intent_router import (
-    route_intent
+    resolve_keyword_tool
 )
 
 from core.state.session_manager import (
@@ -102,17 +102,6 @@ EXIT_WORDS = [
 ]
 
 
-def _run_intent_handler(handler, query):
-
-    if handler.__name__ == "handle_browser":
-
-        handler(query, speak, command)
-
-    else:
-
-        handler(query, speak)
-
-
 def process_query(query, task_manager, source="voice"):
     """Route one recognized/typed query through the pipeline.
 
@@ -150,30 +139,14 @@ def process_query(query, task_manager, source="voice"):
 
         return
 
-    handler = route_intent(query)
+    call = resolve_keyword_tool(query)
 
-    if handler:
+    if call is None:
 
-        try:
+        # Only the LLM path needs "thinking" — the keyword path is instant.
+        events.emit("state", state="thinking")
 
-            logger.info(f"Intent Handler: {handler.__name__}")
-
-            _run_intent_handler(handler, query)
-
-        except Exception as e:
-
-            logger.exception(f"Intent Error: {e}")
-
-            speak(
-                "Something went wrong "
-                "while executing that command."
-            )
-
-        return
-
-    events.emit("state", state="thinking")
-
-    call = decide_tool(query)
+        call = decide_tool(query)
 
     if call is not None:
 

@@ -14,7 +14,7 @@
 JARVIS-PY is a Python voice assistant built for:
 
 - Local-first, offline-capable operation
-- Real-time voice interaction with **wake-word barge-in** (interrupt mid-reply)
+- Real-time voice interaction with **interruptible replies** (Stop button / `Esc` / type a new query)
 - Semantic conversation memory + PDF document RAG
 - AI-driven tool routing
 - Fast keyword routing for known intents
@@ -41,7 +41,7 @@ platform (SAPI5 / NSSpeechSynthesizer / espeak).
 - **STT offline**: Vosk (local model, auto-fallback when offline)
 - **TTS**: pyttsx3 (SAPI5 / NSSpeechSynthesizer / espeak)
 - **Streaming sentence-level TTS queue** — each sentence speaks fully before the next, no cut-offs
-- **Barge-in** — say "hey jarvis" again while Jarvis is talking to interrupt and issue a new command
+- **Interruptible replies** — a **Stop** button, `Esc`, or typing a new query cuts Jarvis off mid-sentence (interrupting by *speaking* isn't reliable — the mic hears Jarvis's own voice, no echo cancellation)
 
 ### Brain
 - Local LLM via Ollama (default `phi3`)
@@ -82,8 +82,8 @@ STT  ─── online?  ─── Google ──┐
                                ↓
                        pyttsx3 speak
                                ↑
-            barge-in listener  │  ← "hey jarvis"
-                  interrupts ──┘
+          interrupt: Stop / Esc / │  typed query
+                       cancels ───┘
 ```
 
 Detailed: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
@@ -181,7 +181,7 @@ python app.py
 
 Speak the wake phrase **"hey jarvis"**, wait for *"Yes Boss?"*, then issue your command.
 
-**Barge-in:** if Jarvis is talking and you want to cut them off, say *"hey jarvis"* again. The current sentence is cancelled and Jarvis listens for your next command immediately.
+**Interrupting:** saying *"hey jarvis"* again while Jarvis is talking *can* cut the current sentence off, but it's unreliable — the mic hears Jarvis's own voice (no echo cancellation). For reliable interruption, run the HUD (`--hud`) and use the **Stop** button, `Esc`, or type a new query.
 
 **Exit / sleep:** say *"bye"*, *"goodbye"*, *"exit"*, *"shutdown"*, or *"stop listening"*. Or wait 20 s in silence.
 

@@ -1,3 +1,13 @@
+## [Unreleased]
+
+### v3.4 — Agent Capabilities (in progress)
+- **Tool foundation (Layer 1)**: a tool registry + `@tool` decorator, stdlib
+  argument coercion/validation, a `builtins` tool module, and a plugin loader
+  (`plugins/` plus `%APPDATA%\JarvisAI\plugins`). `decide_tool` now selects from
+  the registry and returns a `ToolCall`, and `execute_tool` is a generic registry
+  dispatch — both wired into the voice loop. Ships an example `roll_dice` plugin
+  and plugin-authoring docs. (PR #4)
+
 ## v3.3.0
 
 ### Polish & Packaging
