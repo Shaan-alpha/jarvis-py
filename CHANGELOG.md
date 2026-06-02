@@ -1,6 +1,13 @@
 ## [Unreleased]
 
 ### v3.4 — Agent Capabilities (in progress)
+- **Clipboard tools (Layer 2)**: two registry `@tool`s — `read_clipboard` (returns
+  the clipboard text; empty/whitespace → "The clipboard is empty.", verbatim up to
+  200 chars, a length report + truncated preview beyond) and `write_clipboard(text)`
+  (copies + confirms), backed by `pyperclip` (now pinned explicitly). `read_clipboard`
+  has an instant keyword fast-path ("read my clipboard", "what's on my clipboard", …);
+  `write_clipboard` is LLM-only, so a "copy … to clipboard" command routes through the
+  agent. The first v3.4 capability tool. (PR #7)
 - **Tool foundation (Layer 1)**: a tool registry + `@tool` decorator, stdlib
   argument coercion/validation, a `builtins` tool module, and a plugin loader
   (`plugins/` plus `%APPDATA%\JarvisAI\plugins`). `decide_tool` now selects from
