@@ -1,7 +1,7 @@
 # Routing Unification — Design (v3.4)
 
 **Date:** 2026-06-01
-**Status:** Proposed
+**Status:** Implemented (2026-06-02)
 **Audit finding:** A1 (keyword router shadows registry builtin tools)
 
 ---
