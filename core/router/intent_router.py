@@ -70,8 +70,9 @@ def resolve_keyword_tool(query):
 
             return ToolCall("open_app", {"name": name})
 
-    # Open Google homepage. Checked before the search triggers so "open google"
-    # opens the homepage instead of being parsed as a web search.
+    # "open google" routes to the zero-arg open_google tool (homepage), not
+    # open_app -- so it's kept out of the _OPEN_APPS dict, which passes a
+    # name arg. (It also can't collide with the prefix-based search triggers.)
     if "open google" in query:
 
         return ToolCall("open_google", {})
@@ -92,6 +93,8 @@ def resolve_keyword_tool(query):
 
         return ToolCall("decrease_volume", {})
 
+    # Substring match (preserves the legacy router's behavior): a word like
+    # "commute" would also match. Acceptable for a single-user voice assistant.
     if "mute" in query:
 
         return ToolCall("mute_volume", {})
