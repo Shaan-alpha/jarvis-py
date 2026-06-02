@@ -148,8 +148,10 @@ intents; only the intents import `automation.system` / `commands.handlers`).
 
 ## Risks / mitigations
 
-- **Resolver/`decide_tool` arg shape mismatch** → both go through
-  `registry.coerce_and_validate`; resolver emits already-valid args.
+- **Resolver/`decide_tool` arg shape mismatch** → the resolver hand-builds
+  already-valid args (so `execute_tool` calls the handler directly), while
+  `decide_tool`'s LLM-derived args go through `registry.coerce_and_validate`.
+  Both paths converge on valid args before dispatch.
 - **`taskkill` on Win11 UWP Calculator** — legacy used `calc.exe`; behavior is
   preserved verbatim (not improved here).
 - **Dropped two-step search UX** — intentional, per decision; single-utterance search
