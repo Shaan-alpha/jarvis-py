@@ -42,8 +42,10 @@ Architecture first. No giant single files.
 > tagged `v3.3.0`, GitHub Release published (2026-05-31, *Latest*). 129 tests green;
 > `pyproject`/`CHANGELOG` at 3.3.0 match the published version. **v3.4 — Agent
 > Capabilities is underway:** the Layer-1 tool foundation (tool registry + `@tool`
-> decorator + plugin loader) is merged to `main` (PR #4); next are capability tools
-> + orchestration (below).
+> decorator + plugin loader, PR #4) and the routing unification (registry is the
+> single source of truth, PR #6) are merged to `main`. **Layer 2 — capability
+> tools — has started:** clipboard read/write (the first capability tool) is in
+> review (PR #7). Next capability tools + orchestration are below.
 
 ### v3.2.0 — Desktop HUD (shipped)
 
@@ -113,13 +115,22 @@ Goal: ship-ready binary you can hand someone.
 
 Goal: make the tool-agent useful for real tasks, not just demos.
 
-- [ ] Tool-agent supports multi-step plans (e.g. "open VS Code and start the dev server")
+Layer 1 (foundation) and the routing unification are shipped to `main`; Layer 2
+(capability tools) is in progress.
+
+- [x] **Layer 1 — tool foundation**: registry + `@tool` decorator + arg
+  coercion/validation + `builtins` module (PR #4)
+- [x] **Plugin loader** — drop a Python file in `plugins/` (or
+  `%APPDATA%\JarvisAI\plugins`), get a new tool (PR #4)
+- [x] **Routing unification** — the registry is the single source of truth;
+  `decide_tool`/`execute_tool` dispatch generically (PR #6)
+- [x] **Clipboard tool (read + write)** — first Layer-2 capability; `read_clipboard`
+  has a keyword fast-path, `write_clipboard` is LLM-only (PR #7, in review)
 - [ ] File-system tools: read/write/search files in a sandboxed root
-- [ ] Clipboard tool (read + write)
 - [ ] Screenshot tool (capture + OCR via local model)
 - [ ] Window control (focus, minimize, list windows)
 - [ ] Browser automation via Playwright (search, open, scrape)
-- [ ] Plugin loader — drop a Python file in `plugins/`, get a new tool
+- [ ] Tool-agent supports multi-step plans (e.g. "open VS Code and start the dev server")
 
 ---
 

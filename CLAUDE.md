@@ -25,16 +25,24 @@ psutil, PyAutoGUI.
 
 ---
 
-## 2. Where we are right now (2026-06-01)
+## 2. Where we are right now (2026-06-03)
 
 The **v3.3.0 "Polish & Packaging" milestone — plus a HUD overhaul — is shipped**:
 merged to `main` (tip `5c27a76`), **tagged `v3.3.0`**, and a **GitHub Release is
-published** (2026-05-31, marked *Latest*). 129 tests pass; source-level
-build-breaking lint is 0. `pyproject.toml` + `CHANGELOG.md` are at `3.3.0` and
-match the published version. See [`always-tag-and-release`] — this milestone
-followed it. **`v3.4 — Agent Capabilities` is now underway:** its Layer-1 tool
-foundation (tool registry + `@tool` decorator + plugin loader) is **merged to
-`main`** (PR #4); next are capability tools + orchestration (see [`PLAN.md`](PLAN.md)).
+published** (2026-05-31, marked *Latest*). `pyproject.toml` + `CHANGELOG.md` are
+at `3.3.0` and match the published version. See [`always-tag-and-release`] — this
+milestone followed it.
+
+**`v3.4 — Agent Capabilities` is underway.** Layer-1 tool foundation (registry +
+`@tool` decorator + plugin loader, PR #4) and the routing unification (registry is
+the single source of truth, PR #6) are **merged to `main`**. **Layer 2 — capability
+tools — has started:** clipboard read/write (the first capability tool) is **in
+review on `feature/clipboard-tools` (PR #7)** — two `@tool`s in
+[`core/agent/builtins.py`](core/agent/builtins.py) (`read_clipboard` with a keyword
+fast-path, `write_clipboard` LLM-only) backed by `pyperclip` (now pinned). **179
+tests pass; build-breaking lint is 0.** Next Layer-2 tools: file-system, screenshot
++ OCR, window control, browser automation, then multi-step orchestration (see
+[`PLAN.md`](PLAN.md)).
 
 **Shipped in this milestone (on `main`):**
 - **Packaging:** Windows one-folder build (`build.ps1` + `jarvis.spec`), a

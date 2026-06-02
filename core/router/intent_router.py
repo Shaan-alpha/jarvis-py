@@ -42,6 +42,18 @@ _SYSTEM_STATUS = (
     "battery percentage",
 )
 
+# Read-specific phrases. A "copy ... to clipboard" command matches NONE of these,
+# so it falls through to the LLM write_clipboard (the resolver has no write path).
+_CLIPBOARD_READ = (
+    "read clipboard",
+    "read my clipboard",
+    "what's on my clipboard",
+    "what's in my clipboard",
+    "what's on the clipboard",
+    "check clipboard",
+    "show clipboard",
+)
+
 # Ordered: "search google for " before "google " so the longer, more specific
 # trigger wins (otherwise "google " would swallow it and mis-extract the term).
 _SEARCH_TRIGGERS = (
@@ -103,6 +115,11 @@ def resolve_keyword_tool(query):
     if any(p in query for p in _SYSTEM_STATUS):
 
         return ToolCall("system_status", {})
+
+    # Read clipboard.
+    if any(p in query for p in _CLIPBOARD_READ):
+
+        return ToolCall("read_clipboard", {})
 
     # Web search: strip the trigger prefix to get the search term.
     for trigger in _SEARCH_TRIGGERS:
