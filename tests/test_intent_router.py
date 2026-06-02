@@ -59,3 +59,27 @@ def test_unmatched_query_returns_none():
     # Falls through to the LLM tool agent / chat in the real pipeline.
     for query in ("what is python", "tell me a joke", "open spotify"):
         assert resolve_keyword_tool(query) is None
+
+
+@pytest.mark.parametrize("query", [
+    "read clipboard",
+    "read my clipboard",
+    "what's on my clipboard",
+    "what's in my clipboard",
+    "what's on the clipboard",
+    "check clipboard",
+    "show clipboard",
+])
+def test_clipboard_read_phrases_route(query):
+    assert resolve_keyword_tool(query) == ToolCall("read_clipboard", {})
+
+
+def test_clipboard_read_substring_in_sentence():
+    assert resolve_keyword_tool("hey jarvis what's on my clipboard please") == \
+        ToolCall("read_clipboard", {})
+
+
+def test_copy_command_is_not_a_clipboard_read():
+    # "copy ... to clipboard" must fall through to the LLM (write_clipboard),
+    # not match a read phrase.
+    assert resolve_keyword_tool("copy hello to clipboard") is None
