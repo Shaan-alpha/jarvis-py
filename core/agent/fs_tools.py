@@ -1,4 +1,4 @@
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 from core.paths import user_data_dir
 
@@ -33,9 +33,21 @@ def _resolve_in_workspace(name):
 
         return None
 
-    candidate = Path(name.strip())
+    stripped = name.strip()
+
+    candidate = Path(stripped)
 
     if candidate.is_absolute() or candidate.drive:
+
+        return None
+
+    # Also reject Windows drive / UNC paths under the Windows convention on any
+    # host: on POSIX a string like "C:\\x" parses as a plain relative filename
+    # (no drive), so the native check above misses it. PureWindowsPath sees the
+    # drive on every platform, keeping the guard correct cross-OS (CI is Linux).
+    win = PureWindowsPath(stripped)
+
+    if win.is_absolute() or win.drive:
 
         return None
 

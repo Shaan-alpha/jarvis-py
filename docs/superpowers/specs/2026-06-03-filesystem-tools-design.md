@@ -86,13 +86,21 @@ def _resolve_in_workspace(name):
 
         return None
 
-    candidate = Path(name.strip())
+    stripped = name.strip()
+
+    candidate = Path(stripped)
 
     if candidate.is_absolute() or candidate.drive:
 
         return None
 
-    root = _workspace()
+    win = PureWindowsPath(stripped)
+
+    if win.is_absolute() or win.drive:
+
+        return None
+
+    root = _workspace().resolve()
 
     resolved = (root / candidate).resolve()
 
@@ -105,13 +113,16 @@ def _resolve_in_workspace(name):
 
 `Path.resolve()` collapses `..` segments, so `_resolve_in_workspace("../secrets")`
 resolves outside `root` and `root not in resolved.parents` is `True` → `None`.
-A `None` from any tool returns the spoken refusal `"That path is outside my
-workspace."` and touches nothing. This guard is the security core of "sandboxed
-root" — the one place to audit.
+The extra `PureWindowsPath` check rejects Windows drive / UNC paths (e.g.
+`C:\x`) on **any** host: on POSIX a string like `C:\x` parses as a plain relative
+filename (no drive) and would otherwise slip past the native check, so the guard
+stays correct cross-OS (CI runs on Linux). A `None` from any tool returns the
+spoken refusal `"That path is outside my workspace."` and touches nothing. This
+guard is the security core of "sandboxed root" — the one place to audit.
 
 ### New `@tool`s in `core/agent/fs_tools.py`
 
-Module top: `from pathlib import Path`, `from core.paths import user_data_dir`,
+Module top: `from pathlib import Path, PureWindowsPath`, `from core.paths import user_data_dir`,
 `from core.agent.registry import tool`, `from core.utils.logger import logger`, and
 a `FILE_PREVIEW_LIMIT = 200` constant (mirrors the clipboard preview cap) and a
 `FILE_LIST_LIMIT = 20` constant (caps how many names `list_files`/`search_files`
