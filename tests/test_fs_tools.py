@@ -47,3 +47,26 @@ def test_preview_long_is_truncated():
     assert "3000 characters" in out
     assert out.endswith("(truncated).")
     assert len(out) < 300
+
+
+def test_list_files_empty(monkeypatch, tmp_path):
+    _patch_workspace(monkeypatch, tmp_path)
+    assert fs_tools.list_files() == "Your workspace is empty."
+
+
+def test_list_files_lists_names(monkeypatch, tmp_path):
+    _patch_workspace(monkeypatch, tmp_path)
+    (tmp_path / "a.txt").write_text("x")
+    (tmp_path / "b.txt").write_text("y")
+    out = fs_tools.list_files()
+    assert "a.txt" in out
+    assert "b.txt" in out
+
+
+def test_list_files_ignores_directories(monkeypatch, tmp_path):
+    _patch_workspace(monkeypatch, tmp_path)
+    (tmp_path / "sub").mkdir()
+    (tmp_path / "a.txt").write_text("x")
+    out = fs_tools.list_files()
+    assert "a.txt" in out
+    assert "sub" not in out

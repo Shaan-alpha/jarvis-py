@@ -64,3 +64,21 @@ def _preview(text):
         f"Your file has {len(text)} characters. "
         f'It starts: "{text[:FILE_PREVIEW_LIMIT]}..." (truncated).'
     )
+
+
+@tool("list_files", "List the files in your Jarvis workspace folder")
+def list_files():
+
+    names = sorted(p.name for p in _workspace().iterdir() if p.is_file())
+
+    if not names:
+
+        return "Your workspace is empty."
+
+    if len(names) <= FILE_LIST_LIMIT:
+
+        return "Your workspace has: " + ", ".join(names) + "."
+
+    shown = ", ".join(names[:FILE_LIST_LIMIT])
+
+    return f"Your workspace has {len(names)} files, including: {shown}."
