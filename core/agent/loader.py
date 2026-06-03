@@ -38,9 +38,13 @@ def load_builtins():
     import sys
 
     # Remove from sys.modules so re-import always re-executes @tool decorators.
-    sys.modules.pop("core.agent.builtins", None)
+    for mod in ("core.agent.builtins", "core.agent.fs_tools"):
 
-    import core.agent.builtins  # noqa: F401  (decorators register on import)
+        sys.modules.pop(mod, None)
+
+    import core.agent.builtins   # noqa: F401  (decorators register on import)
+
+    import core.agent.fs_tools   # noqa: F401  (decorators register on import)
 
 
 def load_plugins(dirs):

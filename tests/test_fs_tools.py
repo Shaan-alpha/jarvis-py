@@ -146,3 +146,10 @@ def test_search_files_miss(monkeypatch, tmp_path):
     _patch_workspace(monkeypatch, tmp_path)
     (tmp_path / "notes.txt").write_text("y")
     assert fs_tools.search_files("invoice") == "No files match invoice."
+
+
+def test_fs_tools_registered():
+    from core.agent import loader, registry
+    loader.load_builtins()
+    for name in ("list_files", "read_file", "write_file", "search_files"):
+        assert registry.get(name) is not None
