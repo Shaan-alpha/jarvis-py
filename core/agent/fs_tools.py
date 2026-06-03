@@ -122,3 +122,44 @@ def read_file(name):
         return f"{name} is empty."
 
     return _preview(text)
+
+
+@tool(
+    "write_file",
+    "Save text to a new file in your Jarvis workspace folder",
+    params={
+        "name": {
+            "type": "str",
+            "required": True,
+            "desc": "the file name to save, e.g. notes.txt",
+        },
+        "content": {
+            "type": "str",
+            "required": True,
+            "desc": "the text to write into the file",
+        },
+    },
+)
+def write_file(name, content):
+
+    path = _resolve_in_workspace(name)
+
+    if path is None:
+
+        return "That path is outside my workspace."
+
+    if path.exists():
+
+        return f"{name} already exists; pick another name."
+
+    try:
+
+        path.write_text(content, encoding="utf-8")
+
+    except OSError as e:
+
+        logger.warning(f"write_file failed for {name!r}: {e}")
+
+        return f"I couldn't save {name}."
+
+    return f"Saved {name}."

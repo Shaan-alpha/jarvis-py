@@ -102,3 +102,25 @@ def test_read_file_rejects_traversal(monkeypatch, tmp_path):
     _patch_workspace(monkeypatch, tmp_path)
     assert fs_tools.read_file("../../etc/passwd") == \
         "That path is outside my workspace."
+
+
+def test_write_file_creates_and_confirms(monkeypatch, tmp_path):
+    _patch_workspace(monkeypatch, tmp_path)
+    out = fs_tools.write_file("a.txt", "hi")
+    assert out == "Saved a.txt."
+    assert (tmp_path / "a.txt").read_text(encoding="utf-8") == "hi"
+
+
+def test_write_file_refuses_overwrite(monkeypatch, tmp_path):
+    _patch_workspace(monkeypatch, tmp_path)
+    (tmp_path / "a.txt").write_text("original")
+    out = fs_tools.write_file("a.txt", "replacement")
+    assert out == "a.txt already exists; pick another name."
+    assert (tmp_path / "a.txt").read_text(encoding="utf-8") == "original"
+
+
+def test_write_file_rejects_traversal(monkeypatch, tmp_path):
+    _patch_workspace(monkeypatch, tmp_path)
+    out = fs_tools.write_file("../evil.txt", "x")
+    assert out == "That path is outside my workspace."
+    assert not (tmp_path.parent / "evil.txt").exists()
