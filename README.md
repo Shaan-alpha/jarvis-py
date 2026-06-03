@@ -74,8 +74,8 @@ STT  ─── online?  ─── Google ──┐
                clean_query → routing
                                │
         ┌─── reminders / exit / profile capture
-        ├─── fast keyword router (intents)
-        ├─── action-verb gate → LLM tool agent
+        ├─── fast keyword router → registry ToolCall (instant)
+        ├─── action-verb gate → LLM tool agent → registry ToolCall
         └─── LLM chat fallback (Ollama)
                                ↓
                 Streaming TTS queue (serialized)
@@ -101,7 +101,7 @@ Detailed: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 | STT offline | Vosk (small-en-us) |
 | Wake word | openWakeWord (ONNX) |
 | TTS | pyttsx3 |
-| System control | PyAutoGUI, psutil |
+| System control | PyAutoGUI, psutil, pyperclip (clipboard) |
 
 ---
 
@@ -115,16 +115,15 @@ jarvis-py/
 ├── config/settings.py
 ├── core/
 │   ├── ai/                 # ollama LLM client
-│   ├── agent/              # tool agent + registry + executor
+│   ├── agent/              # registry + @tool builtins + plugin loader + LLM tool agent + executor
 │   ├── speech/             # wake, engine, online/offline STT, TTS queue
 │   ├── memory/             # embedder, semantic, document, profile
-│   ├── router/             # fast keyword intent router
-│   ├── intents/            # intent handlers
+│   ├── router/             # fast keyword router (returns a registry ToolCall)
 │   ├── tasks/              # reminders + persistence
 │   ├── state/              # session
-│   ├── commands/           # browser/social/schedule helpers
-│   ├── automation/         # OS app open/close, sys status
-│   └── utils/              # logger, greetings
+│   ├── setup/              # first-run checks + mic auto-detect + model pull
+│   ├── hud/                # HUD event bus, WebSocket server, stats/theme
+│   └── utils/              # logger, greetings, paths
 ├── data/                   # runtime data (gitignored, READMEs in each folder)
 │   ├── documents/          # drop PDFs here
 │   ├── profile/            # user_profile.json

@@ -63,6 +63,19 @@ _SEARCH_TRIGGERS = (
     "google ",
 )
 
+# Zero-arg tools matched by substring containment, checked top to bottom (first
+# match wins). Collapsing these into one table keeps resolve_keyword_tool flat
+# instead of one if-branch per tool. The ToolCall instances are shared and never
+# mutated (frozen dataclass; the executor only reads call.args). "mute" is a bare
+# substring (so "commute" would also match — acceptable for a single-user setup).
+_SUBSTRING_TOOLS = (
+    (_INCREASE_VOLUME, ToolCall("increase_volume", {})),
+    (_DECREASE_VOLUME, ToolCall("decrease_volume", {})),
+    (("mute",), ToolCall("mute_volume", {})),
+    (_SYSTEM_STATUS, ToolCall("system_status", {})),
+    (_CLIPBOARD_READ, ToolCall("read_clipboard", {})),
+)
+
 
 def resolve_keyword_tool(query):
     """Map a known command phrase to a registry ToolCall, or None.
@@ -96,30 +109,12 @@ def resolve_keyword_tool(query):
 
             return ToolCall("close_app", {"name": name})
 
-    # Volume.
-    if any(p in query for p in _INCREASE_VOLUME):
+    # Volume, mute, system status, read clipboard -- all zero-arg substring tools.
+    for phrases, call in _SUBSTRING_TOOLS:
 
-        return ToolCall("increase_volume", {})
+        if any(p in query for p in phrases):
 
-    if any(p in query for p in _DECREASE_VOLUME):
-
-        return ToolCall("decrease_volume", {})
-
-    # Substring match (preserves the legacy router's behavior): a word like
-    # "commute" would also match. Acceptable for a single-user voice assistant.
-    if "mute" in query:
-
-        return ToolCall("mute_volume", {})
-
-    # System status.
-    if any(p in query for p in _SYSTEM_STATUS):
-
-        return ToolCall("system_status", {})
-
-    # Read clipboard.
-    if any(p in query for p in _CLIPBOARD_READ):
-
-        return ToolCall("read_clipboard", {})
+            return call
 
     # Web search: strip the trigger prefix to get the search term.
     for trigger in _SEARCH_TRIGGERS:

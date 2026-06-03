@@ -36,8 +36,8 @@ milestone followed it.
 **`v3.4 — Agent Capabilities` is underway.** Layer-1 tool foundation (registry +
 `@tool` decorator + plugin loader, PR #4) and the routing unification (registry is
 the single source of truth, PR #6) are **merged to `main`**. **Layer 2 — capability
-tools — has started:** clipboard read/write (the first capability tool) is **in
-review on `feature/clipboard-tools` (PR #7)** — two `@tool`s in
+tools — has started:** clipboard read/write (the first capability tool) is **merged
+to `main`** (PR #7, squash `4168bfe`) — two `@tool`s in
 [`core/agent/builtins.py`](core/agent/builtins.py) (`read_clipboard` with a keyword
 fast-path, `write_clipboard` LLM-only) backed by `pyperclip` (now pinned). **179
 tests pass; build-breaking lint is 0.** Next Layer-2 tools: file-system, screenshot
