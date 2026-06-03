@@ -70,3 +70,35 @@ def test_list_files_ignores_directories(monkeypatch, tmp_path):
     out = fs_tools.list_files()
     assert "a.txt" in out
     assert "sub" not in out
+
+
+def test_read_file_missing(monkeypatch, tmp_path):
+    _patch_workspace(monkeypatch, tmp_path)
+    assert fs_tools.read_file("nope.txt") == \
+        "I couldn't find nope.txt in your workspace."
+
+
+def test_read_file_empty(monkeypatch, tmp_path):
+    _patch_workspace(monkeypatch, tmp_path)
+    (tmp_path / "e.txt").write_text("")
+    assert fs_tools.read_file("e.txt") == "e.txt is empty."
+
+
+def test_read_file_short_returns_verbatim(monkeypatch, tmp_path):
+    _patch_workspace(monkeypatch, tmp_path)
+    (tmp_path / "s.txt").write_text("hello world")
+    assert fs_tools.read_file("s.txt") == "hello world"
+
+
+def test_read_file_long_is_truncated(monkeypatch, tmp_path):
+    _patch_workspace(monkeypatch, tmp_path)
+    (tmp_path / "big.txt").write_text("x" * 3000)
+    out = fs_tools.read_file("big.txt")
+    assert out.startswith("Your file has")
+    assert len(out) < 300
+
+
+def test_read_file_rejects_traversal(monkeypatch, tmp_path):
+    _patch_workspace(monkeypatch, tmp_path)
+    assert fs_tools.read_file("../../etc/passwd") == \
+        "That path is outside my workspace."

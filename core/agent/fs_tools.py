@@ -82,3 +82,43 @@ def list_files():
     shown = ", ".join(names[:FILE_LIST_LIMIT])
 
     return f"Your workspace has {len(names)} files, including: {shown}."
+
+
+@tool(
+    "read_file",
+    "Read a text file from your Jarvis workspace folder",
+    params={
+        "name": {
+            "type": "str",
+            "required": True,
+            "desc": "the file to read, e.g. notes.txt",
+        }
+    },
+)
+def read_file(name):
+
+    path = _resolve_in_workspace(name)
+
+    if path is None:
+
+        return "That path is outside my workspace."
+
+    if not path.is_file():
+
+        return f"I couldn't find {name} in your workspace."
+
+    try:
+
+        text = path.read_text(encoding="utf-8")
+
+    except (OSError, UnicodeDecodeError) as e:
+
+        logger.warning(f"read_file failed for {name!r}: {e}")
+
+        return f"I couldn't read {name}."
+
+    if not text.strip():
+
+        return f"{name} is empty."
+
+    return _preview(text)
