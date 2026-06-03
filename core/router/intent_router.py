@@ -54,6 +54,18 @@ _CLIPBOARD_READ = (
     "show clipboard",
 )
 
+# Workspace file listing. Zero-arg, so it gets a fast-path; the arg-bearing fs
+# tools (read/write/search) stay LLM-only. Phrases are multi-word and workspace
+# specific, so they won't collide with open/close/volume triggers.
+_LIST_FILES = (
+    "list files",
+    "list my files",
+    "what files do i have",
+    "what's in my workspace",
+    "show my files",
+    "show my workspace",
+)
+
 # Ordered: "search google for " before "google " so the longer, more specific
 # trigger wins (otherwise "google " would swallow it and mis-extract the term).
 _SEARCH_TRIGGERS = (
@@ -74,6 +86,7 @@ _SUBSTRING_TOOLS = (
     (("mute",), ToolCall("mute_volume", {})),
     (_SYSTEM_STATUS, ToolCall("system_status", {})),
     (_CLIPBOARD_READ, ToolCall("read_clipboard", {})),
+    (_LIST_FILES, ToolCall("list_files", {})),
 )
 
 

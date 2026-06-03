@@ -37,3 +37,6 @@ data/chunks.pkl
 
 # Memory — conversation history is private
 core/memory/semantic_memory.json
+
+# Agent file-system tools sandbox — user files at runtime (dev: <repo>/workspace)
+workspace/

@@ -83,3 +83,32 @@ def test_copy_command_is_not_a_clipboard_read():
     # "copy ... to clipboard" must fall through to the LLM (write_clipboard),
     # not match a read phrase.
     assert resolve_keyword_tool("copy hello to clipboard") is None
+
+
+_LIST_FILES_PHRASES = [
+    "list files",
+    "list my files",
+    "what files do i have",
+    "what's in my workspace",
+    "show my files",
+    "show my workspace",
+]
+
+
+@pytest.mark.parametrize("phrase", _LIST_FILES_PHRASES)
+def test_list_files_keyword_path(phrase):
+    call = resolve_keyword_tool(phrase)
+    assert call is not None
+    assert call.name == "list_files"
+    assert call.args == {}
+
+
+def test_list_files_substring_in_sentence():
+    call = resolve_keyword_tool("hey jarvis list my files please")
+    assert call is not None
+    assert call.name == "list_files"
+
+
+def test_read_file_falls_through_to_llm():
+    # Arg-bearing fs tools are LLM-only; the keyword resolver must miss.
+    assert resolve_keyword_tool("read notes.txt") is None
