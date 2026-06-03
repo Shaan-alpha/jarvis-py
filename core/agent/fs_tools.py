@@ -163,3 +163,36 @@ def write_file(name, content):
         return f"I couldn't save {name}."
 
     return f"Saved {name}."
+
+
+@tool(
+    "search_files",
+    "Find files in your Jarvis workspace whose name matches a query",
+    params={
+        "query": {
+            "type": "str",
+            "required": True,
+            "desc": "text to match against file names",
+        }
+    },
+)
+def search_files(query):
+
+    q = query.strip().lower()
+
+    matches = sorted(
+        p.name for p in _workspace().iterdir()
+        if p.is_file() and q in p.name.lower()
+    )
+
+    if not matches:
+
+        return f"No files match {query}."
+
+    if len(matches) <= FILE_LIST_LIMIT:
+
+        return "Matches: " + ", ".join(matches) + "."
+
+    shown = ", ".join(matches[:FILE_LIST_LIMIT])
+
+    return f"{len(matches)} files match, including: {shown}."

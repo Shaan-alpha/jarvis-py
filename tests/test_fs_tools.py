@@ -124,3 +124,25 @@ def test_write_file_rejects_traversal(monkeypatch, tmp_path):
     out = fs_tools.write_file("../evil.txt", "x")
     assert out == "That path is outside my workspace."
     assert not (tmp_path.parent / "evil.txt").exists()
+
+
+def test_search_files_hit(monkeypatch, tmp_path):
+    _patch_workspace(monkeypatch, tmp_path)
+    (tmp_path / "report-q1.txt").write_text("x")
+    (tmp_path / "notes.txt").write_text("y")
+    out = fs_tools.search_files("report")
+    assert "report-q1.txt" in out
+    assert "notes.txt" not in out
+
+
+def test_search_files_case_insensitive(monkeypatch, tmp_path):
+    _patch_workspace(monkeypatch, tmp_path)
+    (tmp_path / "Report.txt").write_text("x")
+    out = fs_tools.search_files("report")
+    assert "Report.txt" in out
+
+
+def test_search_files_miss(monkeypatch, tmp_path):
+    _patch_workspace(monkeypatch, tmp_path)
+    (tmp_path / "notes.txt").write_text("y")
+    assert fs_tools.search_files("invoice") == "No files match invoice."
