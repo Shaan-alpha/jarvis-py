@@ -44,8 +44,9 @@ Architecture first. No giant single files.
 > Capabilities is underway:** the Layer-1 tool foundation (tool registry + `@tool`
 > decorator + plugin loader, PR #4) and the routing unification (registry is the
 > single source of truth, PR #6) are merged to `main`. **Layer 2 — capability
-> tools — has started:** clipboard read/write (the first capability tool) is
-> **merged to `main`** (PR #7). Next capability tools + orchestration are below.
+> tools — has started:** clipboard read/write (PR #7) and the sandboxed
+> file-system tools (PR #9) are **merged to `main`**. Next capability tools +
+> orchestration are below.
 
 ### v3.2.0 — Desktop HUD (shipped)
 
@@ -126,7 +127,9 @@ Layer 1 (foundation) and the routing unification are shipped to `main`; Layer 2
   `decide_tool`/`execute_tool` dispatch generically (PR #6)
 - [x] **Clipboard tool (read + write)** — first Layer-2 capability; `read_clipboard`
   has a keyword fast-path, `write_clipboard` is LLM-only (PR #7, merged)
-- [ ] File-system tools: read/write/search files in a sandboxed root
+- [x] **File-system tools** — `list_files`/`read_file`/`write_file`/`search_files`
+  in a sandboxed `user_data_dir()/workspace` root (one path-traversal guard);
+  `list_files` has a keyword fast-path, the rest LLM-only (PR #9, merged)
 - [ ] Screenshot tool (capture + OCR via local model)
 - [ ] Window control (focus, minimize, list windows)
 - [ ] Browser automation via Playwright (search, open, scrape)
