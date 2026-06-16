@@ -44,6 +44,33 @@ def set_wizard_mode(enabled):
     _wizard_mode = bool(enabled)
 
 
+def _origin_allowed(origin):
+    """True unless `origin` is an explicit remote web origin.
+
+    The HUD loads from file:// (pywebview), which sends ``Origin: null`` or no
+    Origin at all, so null/absent/file: are allowed. We reject http(s):// so a
+    web page you visit while Jarvis runs can't connect to ws://127.0.0.1 and
+    drive commands (open/close apps, write files) — the classic local-WebSocket
+    / DNS-rebinding surface.
+    """
+
+    if not origin:
+
+        return True
+
+    normalized = origin.strip().lower()
+
+    if normalized in ("null", ""):
+
+        return True
+
+    if normalized.startswith("file:"):
+
+        return True
+
+    return not normalized.startswith(("http://", "https://"))
+
+
 def _dispatch_command(raw):
     """Parse one raw command string and invoke the matching handler. Returns
     the handler's result, or None when ignored. Pure + unit-testable."""
@@ -85,6 +112,16 @@ def _dispatch_command(raw):
 
 
 async def _handle_client(connection):
+    try:
+        origin = connection.request.headers.get("Origin")
+    except Exception:
+        origin = None
+
+    if not _origin_allowed(origin):
+        logger.warning(f"HUD: rejected WS connection from origin {origin!r}")
+        await connection.close(code=1008, reason="origin not allowed")
+        return
+
     _clients.add(connection)
     logger.info("HUD client connected")
 
