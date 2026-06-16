@@ -1,5 +1,6 @@
 import os
 import pickle
+import threading
 
 # pyrefly: ignore [missing-import]
 import faiss
@@ -31,11 +32,16 @@ _cache = {
     "chunks": None
 }
 
+# Guards _cache against concurrent access (HUD text-query thread vs voice loop).
+_cache_lock = threading.Lock()
+
 
 def _invalidate_cache():
 
-    _cache["index"] = None
-    _cache["chunks"] = None
+    with _cache_lock:
+
+        _cache["index"] = None
+        _cache["chunks"] = None
 
 
 def _encode_matrix(texts):
@@ -112,25 +118,27 @@ def build_index():
 
 def _load_index_and_chunks():
 
-    if _cache["index"] is not None:
+    with _cache_lock:
+
+        if _cache["index"] is not None:
+
+            return _cache["index"], _cache["chunks"]
+
+        if not os.path.exists(INDEX_PATH):
+
+            return None, None
+
+        if not os.path.exists(CHUNKS_PATH):
+
+            return None, None
+
+        _cache["index"] = faiss.read_index(INDEX_PATH)
+
+        with open(CHUNKS_PATH, "rb") as file:
+
+            _cache["chunks"] = pickle.load(file)
 
         return _cache["index"], _cache["chunks"]
-
-    if not os.path.exists(INDEX_PATH):
-
-        return None, None
-
-    if not os.path.exists(CHUNKS_PATH):
-
-        return None, None
-
-    _cache["index"] = faiss.read_index(INDEX_PATH)
-
-    with open(CHUNKS_PATH, "rb") as file:
-
-        _cache["chunks"] = pickle.load(file)
-
-    return _cache["index"], _cache["chunks"]
 
 
 def search_documents(query, top_k=3):

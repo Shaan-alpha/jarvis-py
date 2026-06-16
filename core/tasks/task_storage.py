@@ -1,7 +1,11 @@
-import json
 import os
 
 from core.paths import user_data_dir
+
+from core.utils.jsonio import (
+    read_json,
+    write_json_atomic,
+)
 
 
 TASKS_FILE = os.path.join(
@@ -14,31 +18,9 @@ TASKS_FILE = os.path.join(
 
 def load_tasks():
 
-    if not os.path.exists(
-        TASKS_FILE
-    ):
-
-        return []
-
-    with open(
-        TASKS_FILE,
-        "r"
-    ) as file:
-
-        return json.load(file)
+    return read_json(TASKS_FILE, default=[])
 
 
 def save_tasks(tasks):
 
-    os.makedirs(os.path.dirname(TASKS_FILE), exist_ok=True)
-
-    with open(
-        TASKS_FILE,
-        "w"
-    ) as file:
-
-        json.dump(
-            tasks,
-            file,
-            indent=4
-        )
+    write_json_atomic(TASKS_FILE, tasks)

@@ -1,5 +1,5 @@
-import json
 import os
+import threading
 
 import numpy as np
 
@@ -12,6 +12,11 @@ from core.memory.embedder import (
 )
 
 from core.paths import user_data_dir
+
+from core.utils.jsonio import (
+    read_json,
+    write_json_atomic,
+)
 
 
 MEMORY_PATH = os.path.join(
@@ -27,25 +32,22 @@ _cache = {
     "embeddings": None
 }
 
+# Guards _cache: the HUD text-query path runs process_query on its own thread
+# while the voice loop may also be mid-query, so cache reads/writes race.
+_cache_lock = threading.Lock()
+
 
 def _invalidate_cache():
 
-    _cache["memories"] = None
-    _cache["embeddings"] = None
+    with _cache_lock:
+
+        _cache["memories"] = None
+        _cache["embeddings"] = None
 
 
 def load_memories():
 
-    if not os.path.exists(MEMORY_PATH):
-
-        return []
-
-    with open(
-        MEMORY_PATH,
-        "r"
-    ) as file:
-
-        return json.load(file)
+    return read_json(MEMORY_PATH, default=[])
 
 
 def save_memory(user, assistant):
@@ -57,48 +59,39 @@ def save_memory(user, assistant):
         "assistant": assistant
     })
 
-    os.makedirs(os.path.dirname(MEMORY_PATH), exist_ok=True)
-
-    with open(
-        MEMORY_PATH,
-        "w"
-    ) as file:
-
-        json.dump(
-            memories,
-            file,
-            indent=4
-        )
+    write_json_atomic(MEMORY_PATH, memories)
 
     _invalidate_cache()
 
 
 def _get_embeddings():
 
-    memories = _cache["memories"]
+    with _cache_lock:
 
-    if memories is None:
+        memories = _cache["memories"]
 
-        memories = load_memories()
+        if memories is None:
 
-        _cache["memories"] = memories
+            memories = load_memories()
 
-        if memories:
+            _cache["memories"] = memories
 
-            texts = [
-                f"{m['user']} {m['assistant']}"
-                for m in memories
-            ]
+            if memories:
 
-            _cache["embeddings"] = np.stack(
-                encode(texts)
-            )
+                texts = [
+                    f"{m['user']} {m['assistant']}"
+                    for m in memories
+                ]
 
-        else:
+                _cache["embeddings"] = np.stack(
+                    encode(texts)
+                )
 
-            _cache["embeddings"] = None
+            else:
 
-    return memories, _cache["embeddings"]
+                _cache["embeddings"] = None
+
+        return memories, _cache["embeddings"]
 
 
 def search_memory(query):
