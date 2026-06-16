@@ -25,10 +25,10 @@ def test_fast_path_resolves_and_executes_tool(monkeypatch):
     monkeypatch.setattr(app, "extract_personal_info", lambda q: None)
     monkeypatch.setattr(app, "parse_reminder", lambda q: None)
     monkeypatch.setattr(app, "resolve_keyword_tool",
-                        lambda q: ToolCall("increase_volume", {}))
+                        lambda q, raw=None: ToolCall("increase_volume", {}))
 
     # The LLM path must NOT run on a keyword hit.
-    def _boom(q):
+    def _boom(q, raw=None):
         raise AssertionError("decide_tool should not run on a keyword hit")
 
     monkeypatch.setattr(app, "decide_tool", _boom)
@@ -51,9 +51,9 @@ def test_fast_path_resolves_and_executes_tool(monkeypatch):
 def test_keyword_miss_falls_through_to_llm_tool_agent(monkeypatch):
     monkeypatch.setattr(app, "extract_personal_info", lambda q: None)
     monkeypatch.setattr(app, "parse_reminder", lambda q: None)
-    monkeypatch.setattr(app, "resolve_keyword_tool", lambda q: None)
+    monkeypatch.setattr(app, "resolve_keyword_tool", lambda q, raw=None: None)
     monkeypatch.setattr(app, "decide_tool",
-                        lambda q: ToolCall("open_app", {"name": "spotify"}))
+                        lambda q, raw=None: ToolCall("open_app", {"name": "spotify"}))
 
     ran = {}
 
@@ -71,11 +71,39 @@ def test_keyword_miss_falls_through_to_llm_tool_agent(monkeypatch):
 def test_llm_fallback_saves_memory(monkeypatch):
     monkeypatch.setattr(app, "extract_personal_info", lambda q: None)
     monkeypatch.setattr(app, "parse_reminder", lambda q: None)
-    monkeypatch.setattr(app, "resolve_keyword_tool", lambda q: None)
-    monkeypatch.setattr(app, "decide_tool", lambda q: None)
+    monkeypatch.setattr(app, "resolve_keyword_tool", lambda q, raw=None: None)
+    monkeypatch.setattr(app, "decide_tool", lambda q, raw=None: None)
     monkeypatch.setattr(app, "ask_llm", lambda q: "an answer")
     saved = {}
     monkeypatch.setattr(app, "save_memory", lambda q, r: saved.setdefault("v", (q, r)))
     monkeypatch.setattr(app, "speak", lambda t: None)
     app.process_query("what is python", _FakeTaskManager())
     assert saved["v"] == ("what is python", "an answer")
+
+
+def test_raw_query_preserves_case_for_routers(monkeypatch):
+    monkeypatch.setattr(app, "extract_personal_info", lambda q: None)
+    monkeypatch.setattr(app, "parse_reminder", lambda q: None)
+
+    seen = {}
+
+    def _resolve(q, raw=None):
+        seen["resolve"] = (q, raw)
+        return None
+
+    def _decide(q, raw=None):
+        seen["decide"] = (q, raw)
+        return None
+
+    monkeypatch.setattr(app, "resolve_keyword_tool", _resolve)
+    monkeypatch.setattr(app, "decide_tool", _decide)
+    monkeypatch.setattr(app, "ask_llm", lambda q: "")
+    monkeypatch.setattr(app, "speak", lambda t: None)
+
+    app.process_query("copy hello world to clipboard", _FakeTaskManager(),
+                      raw_query="copy Hello World to clipboard")
+
+    assert seen["resolve"] == ("copy hello world to clipboard",
+                               "copy Hello World to clipboard")
+    assert seen["decide"] == ("copy hello world to clipboard",
+                              "copy Hello World to clipboard")

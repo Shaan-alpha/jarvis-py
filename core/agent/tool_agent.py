@@ -121,11 +121,60 @@ def _extract_first_json(text):
         return None
 
 
-def decide_tool(query):
+def _build_call_from_parsed(parsed):
+    """Validate a parsed {"tool", "args"} object into a ToolCall, or None."""
+
+    name = parsed.get("tool", "none")
+
+    if not isinstance(name, str):
+
+        return None
+
+    name = name.strip().lower()
+
+    if name in ("", "none", "null"):
+
+        return None
+
+    spec = registry.get(name)
+
+    if spec is None:
+
+        logger.info(
+            f"Tool agent picked unknown tool {name!r}; falling back to chat"
+        )
+
+        return None
+
+    raw_args = parsed.get("args", {})
+
+    if not isinstance(raw_args, dict):
+
+        raw_args = {}
+
+    args, error = registry.coerce_and_validate(spec, raw_args)
+
+    if error:
+
+        logger.info(f"Tool {name!r} arg error: {error}; falling back to chat")
+
+        return None
+
+    return registry.ToolCall(name=name, args=args)
+
+
+def decide_tool(query, raw_query=None):
 
     if not _looks_like_action(query):
 
         return None
+
+    # Gate on the normalized query, but show the model the RAW utterance so the
+    # content it extracts (e.g. write_clipboard/write_file text) keeps its
+    # original case and punctuation instead of the lowercased form.
+    if raw_query is None:
+
+        raw_query = query
 
     prompt = f"""You are a strict tool selector. Map the user's request to
 exactly one of the available tools, OR return "none" if the request is not an
@@ -149,7 +198,7 @@ Examples:
 - "what is python" -> {{"tool": "none"}}
 
 User Request:
-{query}
+{raw_query}
 
 JSON:"""
 
@@ -181,43 +230,7 @@ JSON:"""
 
             return None
 
-        name = parsed.get("tool", "none")
-
-        if not isinstance(name, str):
-
-            return None
-
-        name = name.strip().lower()
-
-        if name in ("", "none", "null"):
-
-            return None
-
-        spec = registry.get(name)
-
-        if spec is None:
-
-            logger.info(
-                f"Tool agent picked unknown tool {name!r}; falling back to chat"
-            )
-
-            return None
-
-        raw_args = parsed.get("args", {})
-
-        if not isinstance(raw_args, dict):
-
-            raw_args = {}
-
-        args, error = registry.coerce_and_validate(spec, raw_args)
-
-        if error:
-
-            logger.info(f"Tool {name!r} arg error: {error}; falling back to chat")
-
-            return None
-
-        return registry.ToolCall(name=name, args=args)
+        return _build_call_from_parsed(parsed)
 
     except Exception as e:
 

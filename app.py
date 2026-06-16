@@ -105,13 +105,20 @@ EXIT_WORDS = [
 ]
 
 
-def process_query(query, task_manager, source="voice"):
+def process_query(query, task_manager, source="voice", raw_query=None):
     """Route one recognized/typed query through the pipeline.
 
-    `source` is "voice" or "text". Session/exit-word handling stays in the
-    voice loop; this function only does profile capture, reminders, intent
-    routing, the tool agent, and the LLM fallback.
+    `source` is "voice" or "text". `query` is normalized (lowercased) for
+    matching; `raw_query` is the original utterance (defaults to `query`) and is
+    passed to the routers so content tools (write_clipboard/write_file/search)
+    keep their original case. Session/exit-word handling stays in the voice
+    loop; this function only does profile capture, reminders, intent routing,
+    the tool agent, and the LLM fallback.
     """
+
+    if raw_query is None:
+
+        raw_query = query
 
     personal_info = extract_personal_info(query)
 
@@ -142,14 +149,14 @@ def process_query(query, task_manager, source="voice"):
 
         return
 
-    call = resolve_keyword_tool(query)
+    call = resolve_keyword_tool(query, raw_query)
 
     if call is None:
 
         # Only the LLM path needs "thinking" — the keyword path is instant.
         events.emit("state", state="thinking")
 
-        call = decide_tool(query)
+        call = decide_tool(query, raw_query)
 
     if call is not None:
 
@@ -200,9 +207,13 @@ def _hud_on_text_query(session, task_manager, text):
 
     logger.info(f"HUD text query received: {text!r}")
 
-    text = (text or "").lower().strip()
+    # Keep the raw text (case + punctuation) for content tools; the lowercased
+    # copy is only used for command matching.
+    raw = (text or "").strip()
 
-    if not text:
+    query = raw.lower()
+
+    if not query:
 
         return
 
@@ -222,8 +233,8 @@ def _hud_on_text_query(session, task_manager, text):
     # token ensures a superseded stream abandons itself.
     threading.Thread(
         target=process_query,
-        args=(text, task_manager),
-        kwargs={"source": "text"},
+        args=(query, task_manager),
+        kwargs={"source": "text", "raw_query": raw},
         daemon=True,
     ).start()
 

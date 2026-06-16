@@ -114,14 +114,27 @@ def _match_substring_tool(query):
     return None
 
 
-def _match_search(query):
-    """Web search: strip the trigger prefix to get the search term."""
+def _match_search(query, raw_query):
+    """Web search: strip the trigger prefix to get the search term.
+
+    The trigger is detected on the normalized `query`, but the term is pulled
+    from `raw_query` so a typed search keeps its original case ("search for
+    Tony Stark" -> "Tony Stark", not "tony stark").
+    """
 
     for trigger in _SEARCH_TRIGGERS:
 
         if query.startswith(trigger):
 
-            term = query[len(trigger):].strip()
+            idx = raw_query.lower().find(trigger)
+
+            if idx != -1:
+
+                term = raw_query[idx + len(trigger):].strip()
+
+            else:
+
+                term = query[len(trigger):].strip()
 
             if term:
 
@@ -130,7 +143,7 @@ def _match_search(query):
     return None
 
 
-def resolve_keyword_tool(query):
+def resolve_keyword_tool(query, raw_query=None):
     """Map a known command phrase to a registry ToolCall, or None.
 
     Deterministic, LLM-free, stdlib + registry only (importable in CI). This is
@@ -141,7 +154,12 @@ def resolve_keyword_tool(query):
     extraction so the search term can be pulled off the trigger phrase. Checked
     in order; first match wins. "open google" beats the search triggers and the
     open_app table (it's the zero-arg homepage tool, not open_app with a name).
+    `raw_query` (the un-normalized utterance) preserves case for the search term.
     """
+
+    if raw_query is None:
+
+        raw_query = query
 
     open_call = _match_named_app(query, _OPEN_APPS, "open_app")
 
@@ -158,5 +176,5 @@ def resolve_keyword_tool(query):
     return (
         _match_named_app(query, _CLOSE_APPS, "close_app")
         or _match_substring_tool(query)
-        or _match_search(query)
+        or _match_search(query, raw_query)
     )
