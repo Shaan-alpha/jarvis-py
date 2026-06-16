@@ -37,31 +37,56 @@ _cache = {
 _cache_lock = threading.Lock()
 
 
-def _invalidate_cache():
-
-    with _cache_lock:
-
-        _cache["memories"] = None
-        _cache["embeddings"] = None
-
-
 def load_memories():
 
     return read_json(MEMORY_PATH, default=[])
+
+
+def _add_to_cache(entry, all_memories):
+    """Extend the cached embedding matrix with one new memory.
+
+    Saving turn n used to invalidate the whole cache, so the next search
+    re-encoded all n memories — O(n^2) over a session. Here we encode just the
+    new entry and stack it on. If the cache is cold, leave it cold (the next
+    search lazy-loads once); on any error, drop the cache so it rebuilds cleanly.
+    """
+
+    with _cache_lock:
+
+        if _cache["memories"] is None or _cache["embeddings"] is None:
+
+            return
+
+        try:
+
+            vector = np.stack(
+                encode([f"{entry['user']} {entry['assistant']}"])
+            )
+
+            _cache["embeddings"] = np.vstack([_cache["embeddings"], vector])
+
+            _cache["memories"] = all_memories
+
+        except Exception:
+
+            _cache["memories"] = None
+            _cache["embeddings"] = None
 
 
 def save_memory(user, assistant):
 
     memories = load_memories()
 
-    memories.append({
+    entry = {
         "user": user,
         "assistant": assistant
-    })
+    }
+
+    memories.append(entry)
 
     write_json_atomic(MEMORY_PATH, memories)
 
-    _invalidate_cache()
+    _add_to_cache(entry, memories)
 
 
 def _get_embeddings():
