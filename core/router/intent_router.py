@@ -90,46 +90,33 @@ _SUBSTRING_TOOLS = (
 )
 
 
-def resolve_keyword_tool(query):
-    """Map a known command phrase to a registry ToolCall, or None.
+def _match_named_app(query, table, tool_name):
+    """First phrase in `table` contained in `query` -> ToolCall(tool_name, name)."""
 
-    Deterministic, LLM-free, stdlib + registry only (importable in CI). This is
-    the fast path: common voice commands resolve here without paying Ollama
-    latency. A miss returns None and the caller falls back to the LLM tool
-    agent. Open/close/volume/status use substring containment (so an embedded
-    keyword in a longer sentence still matches); web search uses prefix
-    extraction so the search term can be pulled off the trigger phrase.
-    """
-
-    # Open apps.
-    for phrase, name in _OPEN_APPS.items():
+    for phrase, name in table.items():
 
         if phrase in query:
 
-            return ToolCall("open_app", {"name": name})
+            return ToolCall(tool_name, {"name": name})
 
-    # "open google" routes to the zero-arg open_google tool (homepage), not
-    # open_app -- so it's kept out of the _OPEN_APPS dict, which passes a
-    # name arg. (It also can't collide with the prefix-based search triggers.)
-    if "open google" in query:
+    return None
 
-        return ToolCall("open_google", {})
 
-    # Close apps.
-    for phrase, name in _CLOSE_APPS.items():
+def _match_substring_tool(query):
+    """First zero-arg substring tool whose any trigger is contained in `query`."""
 
-        if phrase in query:
-
-            return ToolCall("close_app", {"name": name})
-
-    # Volume, mute, system status, read clipboard -- all zero-arg substring tools.
     for phrases, call in _SUBSTRING_TOOLS:
 
         if any(p in query for p in phrases):
 
             return call
 
-    # Web search: strip the trigger prefix to get the search term.
+    return None
+
+
+def _match_search(query):
+    """Web search: strip the trigger prefix to get the search term."""
+
     for trigger in _SEARCH_TRIGGERS:
 
         if query.startswith(trigger):
@@ -141,3 +128,35 @@ def resolve_keyword_tool(query):
                 return ToolCall("search_web", {"query": term})
 
     return None
+
+
+def resolve_keyword_tool(query):
+    """Map a known command phrase to a registry ToolCall, or None.
+
+    Deterministic, LLM-free, stdlib + registry only (importable in CI). This is
+    the fast path: common voice commands resolve here without paying Ollama
+    latency. A miss returns None and the caller falls back to the LLM tool
+    agent. Open/close/volume/status use substring containment (so an embedded
+    keyword in a longer sentence still matches); web search uses prefix
+    extraction so the search term can be pulled off the trigger phrase. Checked
+    in order; first match wins. "open google" beats the search triggers and the
+    open_app table (it's the zero-arg homepage tool, not open_app with a name).
+    """
+
+    open_call = _match_named_app(query, _OPEN_APPS, "open_app")
+
+    if open_call is not None:
+
+        return open_call
+
+    # "open google" routes to the zero-arg open_google homepage tool (it's kept
+    # out of _OPEN_APPS, which passes a name arg, and beats the search triggers).
+    if "open google" in query:
+
+        return ToolCall("open_google", {})
+
+    return (
+        _match_named_app(query, _CLOSE_APPS, "close_app")
+        or _match_substring_tool(query)
+        or _match_search(query)
+    )
