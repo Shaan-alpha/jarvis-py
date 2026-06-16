@@ -40,6 +40,9 @@ ACTION_VERBS = (
 )
 
 
+_GATE_MAX_WORDS = 6
+
+
 def _looks_like_action(query):
 
     q = query.strip().lower()
@@ -49,6 +52,13 @@ def _looks_like_action(query):
         return True
 
     words = set(re.findall(r"[a-z0-9]+", q))
+
+    # A bare tool-name-token match (e.g. "read", "file") only counts as a command
+    # for short, command-shaped utterances. A long sentence that merely mentions
+    # a tool word ("i read a book on the weekend") shouldn't pay an Ollama call.
+    if len(words) > _GATE_MAX_WORDS:
+
+        return False
 
     for spec in registry.all_tools():
 

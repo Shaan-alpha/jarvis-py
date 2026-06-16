@@ -36,6 +36,19 @@ def test_gate_blocks_chitchat():
     assert tool_agent._looks_like_action("what is python") is False
 
 
+def test_gate_ignores_tool_token_in_long_sentence():
+    registry.clear()
+
+    @registry.tool("roll_dice", "Roll a die")
+    def _r():
+        return "rolled"
+
+    # Contains the tool token "roll" but is a long conversational sentence, so
+    # the bare-token fallback should NOT trip the LLM selector.
+    long_chat = "i really enjoy board games and i roll a dice almost every weekend"
+    assert tool_agent._looks_like_action(long_chat) is False
+
+
 def test_decide_tool_parameterized(monkeypatch):
     _register_open_app()
     monkeypatch.setattr(
