@@ -94,12 +94,6 @@ def clear_queue():
             pass
 
 
-def wait_until_done():
-    """Block until every queued sentence has been spoken."""
-
-    tts_queue.join()
-
-
 def wait_until_done_or_barge_in():
     """
     Block until the TTS queue drains, OR the user says the wake word

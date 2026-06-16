@@ -53,7 +53,9 @@ def read_pdf(path):
 
     for page in reader.pages:
 
-        text += page.extract_text() + "\n"
+        # extract_text() returns None on some pages (scanned/empty); guard so
+        # the concatenation doesn't raise TypeError mid-index.
+        text += (page.extract_text() or "") + "\n"
 
     return text
 
@@ -69,6 +71,10 @@ def chunk_text(text, chunk_size=500):
 def build_index():
 
     documents = []
+
+    # The documents folder may not exist yet on a fresh install; create it so
+    # listdir doesn't raise FileNotFoundError (an empty dir -> "no PDFs").
+    os.makedirs(DOCS_PATH, exist_ok=True)
 
     for file in os.listdir(DOCS_PATH):
 

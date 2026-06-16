@@ -95,9 +95,36 @@ def tool(name, description, params=None):
     return decorator
 
 
+def _to_bool(value):
+    """Coerce an LLM-supplied value to bool. Accepts real bools, numbers, and
+    the usual string spellings; naive bool('false') would wrongly be True."""
+
+    if isinstance(value, bool):
+
+        return value
+
+    if isinstance(value, (int, float)):
+
+        return bool(value)
+
+    text = str(value).strip().lower()
+
+    if text in ("true", "yes", "1", "on"):
+
+        return True
+
+    if text in ("false", "no", "0", "off", ""):
+
+        return False
+
+    raise ValueError(f"not a boolean: {value!r}")
+
+
 _COERCERS = {
     "str": str,
     "int": int,
+    "float": float,
+    "bool": _to_bool,
 }
 
 
