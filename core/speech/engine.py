@@ -161,8 +161,12 @@ def speak(text):
 
             speech_thread.join(timeout=0.2)
 
+        # Route through speak_sync (which holds speech_lock) so this async
+        # utterance can't run a second pyttsx3 engine concurrently with the
+        # TTS-queue worker (which also speaks via speak_sync). stop_speaking()
+        # above still cuts the current engine first, preserving barge-in.
         speech_thread = threading.Thread(
-            target=_speak_thread,
+            target=speak_sync,
             args=(text,),
             daemon=True
         )
