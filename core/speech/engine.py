@@ -114,15 +114,40 @@ def create_engine():
     return engine
 
 
+# Per-thread persistent pyttsx3 engine. SAPI engines have thread affinity, so
+# each speaking thread keeps its own; the long-lived TTS-queue worker thus reuses
+# one engine across all streamed sentences instead of re-initialising per
+# sentence (the hot path). Ephemeral speak() threads still create one per call.
+_engines = threading.local()
+
+
+def _get_thread_engine():
+    """This thread's persistent engine, created once and reused thereafter."""
+
+    engine = getattr(_engines, "engine", None)
+
+    if engine is None:
+
+        engine = create_engine()
+
+        _engines.engine = engine
+
+    return engine
+
+
+def _drop_thread_engine():
+    """Discard this thread's engine so the next call re-initialises it."""
+
+    _engines.engine = None
+
+
 def _speak_thread(text):
 
     global current_engine
 
-    engine = None
-
     try:
 
-        engine = create_engine()
+        engine = _get_thread_engine()
 
         current_engine = engine
 
@@ -130,11 +155,13 @@ def _speak_thread(text):
 
         engine.runAndWait()
 
-        engine.stop()
-
     except Exception as e:
 
+        # Drop the (possibly wedged) engine so the next call re-inits — preserves
+        # the old per-call crash-recovery while reusing on the happy path.
         logger.exception(f"TTS error, will re-init next call: {e}")
+
+        _drop_thread_engine()
 
     finally:
 
