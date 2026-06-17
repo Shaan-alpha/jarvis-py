@@ -205,7 +205,15 @@ JSON:"""
     payload = {
         "model": MODEL_NAME,
         "prompt": prompt,
-        "stream": False
+        "stream": False,
+        # Tool selection only emits a tiny JSON object, so cap generation and pin
+        # temperature: the model returns fast and deterministically instead of
+        # rambling before we parse the first {...}. A real tail-latency win on the
+        # action path (this call blocks before ask_llm even starts).
+        "options": {
+            "num_predict": 80,
+            "temperature": 0,
+        },
     }
 
     try:

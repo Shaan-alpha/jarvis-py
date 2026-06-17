@@ -87,3 +87,19 @@ def test_decide_tool_missing_required_arg_is_none(monkeypatch):
 def test_extract_first_json_handles_nested():
     obj = tool_agent._extract_first_json('noise {"tool": "x", "args": {"a": 1}} trailing')
     assert obj == {"tool": "x", "args": {"a": 1}}
+
+
+def test_decide_tool_caps_generation(monkeypatch):
+    _register_open_app()
+    captured = {}
+
+    def _post(*a, **k):
+        captured["json"] = k.get("json")
+        return _Resp({"response": '{"tool": "open_app", "args": {"name": "notepad"}}'})
+
+    monkeypatch.setattr(tool_agent.requests, "post", _post)
+    tool_agent.decide_tool("open notepad")
+
+    opts = captured["json"]["options"]
+    assert opts["num_predict"] <= 100      # bounded so selection returns fast
+    assert opts["temperature"] == 0        # deterministic JSON
