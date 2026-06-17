@@ -87,6 +87,8 @@ import config.settings as settings
 
 from core.paths import is_frozen
 
+from core.warmup import warm_start
+
 from core.setup.checks import check_microphone
 
 from core.setup.first_run import (
@@ -400,6 +402,10 @@ def main():
         return
 
     start_tts_queue()
+
+    # Preload the LLM + embedder off-thread so the first real query isn't a cold
+    # start; overlaps with the greeting and mic selection below. Best-effort.
+    warm_start()
 
     time.sleep(1)
 
