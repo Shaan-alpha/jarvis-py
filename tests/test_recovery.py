@@ -17,7 +17,38 @@ def test_ask_llm_handles_connection_error(monkeypatch):
     assert any("ollama" in s.lower() for s in spoken)
 
 
+def test_speak_sync_reuses_engine_on_same_thread(monkeypatch):
+    se._drop_thread_engine()      # hermetic start
+    calls = {"n": 0}
+    said = []
+
+    class _Eng:
+        def say(self, t):
+            said.append(t)
+
+        def runAndWait(self):
+            pass
+
+        def stop(self):
+            pass
+
+    def factory():
+        calls["n"] += 1
+        return _Eng()
+
+    monkeypatch.setattr(se, "create_engine", factory)
+
+    se.speak_sync("one")
+    se.speak_sync("two")
+    se.speak_sync("three")
+
+    assert calls["n"] == 1                       # engine created once, then reused
+    assert said == ["one", "two", "three"]
+    se._drop_thread_engine()                     # clean up the persistent engine
+
+
 def test_speak_sync_survives_engine_failure(monkeypatch):
+    se._drop_thread_engine()      # hermetic start (don't reuse a prior test's engine)
     calls = {"n": 0}
     said = []
 
