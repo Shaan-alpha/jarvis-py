@@ -8,6 +8,10 @@
   (`first_token` / `first_audio`). Behaviour-neutral; establishes the latency
   baseline the rest of v3.5 is measured against. STT/wake stage marks + a HUD
   readout are the next follow-up.
+- **Faster tool selection**: `decide_tool` now caps the Ollama call
+  (`num_predict=80`, `temperature=0`) so the tiny selection JSON returns quickly
+  and deterministically instead of an unbounded completion blocking before
+  `ask_llm`.
 
 ## v3.4.0 — Agent Capabilities & Hardening
 
