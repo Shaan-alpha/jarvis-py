@@ -107,3 +107,29 @@ def test_raw_query_preserves_case_for_routers(monkeypatch):
                                "copy Hello World to clipboard")
     assert seen["decide"] == ("copy hello world to clipboard",
                               "copy Hello World to clipboard")
+
+
+def test_process_query_records_latency_metrics(monkeypatch):
+    import core.utils.metrics as metrics
+
+    captured = {}
+
+    def _capture(evt, **kw):
+        if evt == "metrics":
+            captured["metrics"] = kw
+
+    monkeypatch.setattr(metrics.events, "emit", _capture)
+    monkeypatch.setattr(app, "extract_personal_info", lambda q: None)
+    monkeypatch.setattr(app, "parse_reminder", lambda q: None)
+    monkeypatch.setattr(app, "resolve_keyword_tool",
+                        lambda q, raw=None: ToolCall("increase_volume", {}))
+    monkeypatch.setattr(app, "decide_tool", lambda q, raw=None: None)
+    monkeypatch.setattr(app, "execute_tool", lambda c: "ok")
+    monkeypatch.setattr(app, "speak", lambda t: None)
+
+    app.process_query("volume up", _FakeTaskManager())
+
+    assert "metrics" in captured
+    stages = captured["metrics"]["stages"]
+    assert "routed" in stages and "done" in stages
+    assert metrics.current() is None      # turn cleaned up even on the tool path

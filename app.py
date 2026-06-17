@@ -37,6 +37,8 @@ from core.utils.logger import (
     logger
 )
 
+from core.utils import metrics
+
 from core.ai.ollama_engine import (
     ask_llm
 )
@@ -120,69 +122,81 @@ def process_query(query, task_manager, source="voice", raw_query=None):
 
         raw_query = query
 
-    personal_info = extract_personal_info(query)
+    # Start the per-turn latency timeline; end_turn() in the finally logs the
+    # stage summary and emits a HUD metrics event on every exit path.
+    metrics.start_turn(source)
 
-    if personal_info:
+    try:
 
-        update_profile(
-            personal_info["key"],
-            personal_info["value"]
-        )
+        personal_info = extract_personal_info(query)
 
-        logger.info(f"Profile Updated: {personal_info}")
+        if personal_info:
 
-    reminder = parse_reminder(query)
+            update_profile(
+                personal_info["key"],
+                personal_info["value"]
+            )
 
-    if reminder:
+            logger.info(f"Profile Updated: {personal_info}")
 
-        task_manager.add_reminder_in_minutes(
-            reminder["minutes"],
-            reminder["message"]
-        )
+        reminder = parse_reminder(query)
 
-        logger.info(f"Reminder Created: {reminder}")
+        if reminder:
 
-        speak(
-            f"Reminder set for "
-            f"{reminder['minutes']} minutes."
-        )
+            task_manager.add_reminder_in_minutes(
+                reminder["minutes"],
+                reminder["message"]
+            )
 
-        return
+            logger.info(f"Reminder Created: {reminder}")
 
-    call = resolve_keyword_tool(query, raw_query)
+            speak(
+                f"Reminder set for "
+                f"{reminder['minutes']} minutes."
+            )
 
-    if call is None:
+            return
 
-        # Only the LLM path needs "thinking" — the keyword path is instant.
-        events.emit("state", state="thinking")
+        call = resolve_keyword_tool(query, raw_query)
 
-        call = decide_tool(query, raw_query)
+        if call is None:
 
-    if call is not None:
+            # Only the LLM path needs "thinking" — the keyword path is instant.
+            events.emit("state", state="thinking")
 
-        logger.info(f"Executed Tool: {call.name} args={call.args}")
+            call = decide_tool(query, raw_query)
 
-        response = execute_tool(call)
+        metrics.mark("routed")
 
+        if call is not None:
+
+            logger.info(f"Executed Tool: {call.name} args={call.args}")
+
+            response = execute_tool(call)
+
+            if response:
+
+                speak(response)
+
+            return
+
+        logger.info("Generating LLM response")
+
+        response = ask_llm(query)
+
+        logger.info("LLM response generated")
+
+        # ask_llm returns "" when it was superseded by a newer query (barge-in)
+        # or could not reach Ollama; don't persist an empty turn.
         if response:
 
-            speak(response)
+            save_memory(query, response)
 
-        return
+            logger.info("Conversation saved to memory")
 
-    logger.info("Generating LLM response")
+    finally:
 
-    response = ask_llm(query)
-
-    logger.info("LLM response generated")
-
-    # ask_llm returns "" when it was superseded by a newer query (barge-in) or
-    # could not reach Ollama; don't persist an empty turn.
-    if response:
-
-        save_memory(query, response)
-
-        logger.info("Conversation saved to memory")
+        metrics.end_turn()
 
 
 def _select_mic():
