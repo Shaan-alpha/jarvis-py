@@ -112,3 +112,15 @@ def test_list_files_substring_in_sentence():
 def test_read_file_falls_through_to_llm():
     # Arg-bearing fs tools are LLM-only; the keyword resolver must miss.
     assert resolve_keyword_tool("read notes.txt") is None
+
+
+def test_search_preserves_case_from_raw_query():
+    raw = "search for Tony Stark"
+    call = resolve_keyword_tool(raw.lower(), raw_query=raw)
+    assert call == ToolCall("search_web", {"query": "Tony Stark"})
+
+
+def test_search_without_raw_query_uses_normalized():
+    # Backward compatible: no raw_query -> term comes from the (lowercased) query.
+    assert resolve_keyword_tool("search for cats") == \
+        ToolCall("search_web", {"query": "cats"})

@@ -48,6 +48,21 @@ def test_speak_sync_survives_engine_failure(monkeypatch):
     assert se.current_engine is None
 
 
+def test_speak_routes_through_locked_speak_sync(monkeypatch):
+    # speak() must dispatch via speak_sync (which holds speech_lock) rather than
+    # run an unlocked engine that could collide with the TTS-queue worker.
+    got = []
+    monkeypatch.setattr(se, "stop_speaking", lambda: None)
+    monkeypatch.setattr(se, "speak_sync", lambda t: got.append(t))
+
+    se.speak("hello there")
+
+    if se.speech_thread:
+        se.speech_thread.join(timeout=2)
+
+    assert got == ["hello there"]
+
+
 def test_offline_returns_none_when_model_load_fails(monkeypatch):
     def boom():
         raise RuntimeError("vosk model missing")

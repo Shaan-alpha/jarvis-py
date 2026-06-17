@@ -1,5 +1,6 @@
 import os
 import pickle
+import threading
 
 # pyrefly: ignore [missing-import]
 import faiss
@@ -31,11 +32,16 @@ _cache = {
     "chunks": None
 }
 
+# Guards _cache against concurrent access (HUD text-query thread vs voice loop).
+_cache_lock = threading.Lock()
+
 
 def _invalidate_cache():
 
-    _cache["index"] = None
-    _cache["chunks"] = None
+    with _cache_lock:
+
+        _cache["index"] = None
+        _cache["chunks"] = None
 
 
 def _encode_matrix(texts):
@@ -53,7 +59,9 @@ def read_pdf(path):
 
     for page in reader.pages:
 
-        text += page.extract_text() + "\n"
+        # extract_text() returns None on some pages (scanned/empty); guard so
+        # the concatenation doesn't raise TypeError mid-index.
+        text += (page.extract_text() or "") + "\n"
 
     return text
 
@@ -69,6 +77,10 @@ def chunk_text(text, chunk_size=500):
 def build_index():
 
     documents = []
+
+    # The documents folder may not exist yet on a fresh install; create it so
+    # listdir doesn't raise FileNotFoundError (an empty dir -> "no PDFs").
+    os.makedirs(DOCS_PATH, exist_ok=True)
 
     for file in os.listdir(DOCS_PATH):
 
@@ -106,25 +118,27 @@ def build_index():
 
 def _load_index_and_chunks():
 
-    if _cache["index"] is not None:
+    with _cache_lock:
+
+        if _cache["index"] is not None:
+
+            return _cache["index"], _cache["chunks"]
+
+        if not os.path.exists(INDEX_PATH):
+
+            return None, None
+
+        if not os.path.exists(CHUNKS_PATH):
+
+            return None, None
+
+        _cache["index"] = faiss.read_index(INDEX_PATH)
+
+        with open(CHUNKS_PATH, "rb") as file:
+
+            _cache["chunks"] = pickle.load(file)
 
         return _cache["index"], _cache["chunks"]
-
-    if not os.path.exists(INDEX_PATH):
-
-        return None, None
-
-    if not os.path.exists(CHUNKS_PATH):
-
-        return None, None
-
-    _cache["index"] = faiss.read_index(INDEX_PATH)
-
-    with open(CHUNKS_PATH, "rb") as file:
-
-        _cache["chunks"] = pickle.load(file)
-
-    return _cache["index"], _cache["chunks"]
 
 
 def search_documents(query, top_k=3):

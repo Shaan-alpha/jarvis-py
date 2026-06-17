@@ -1,7 +1,11 @@
-import json
 import os
 
 from core.paths import user_data_dir
+
+from core.utils.jsonio import (
+    read_json,
+    write_json_atomic,
+)
 
 
 PROFILE_PATH = os.path.join(
@@ -14,34 +18,12 @@ PROFILE_PATH = os.path.join(
 
 def load_profile():
 
-    if not os.path.exists(
-        PROFILE_PATH
-    ):
-
-        return {}
-
-    with open(
-        PROFILE_PATH,
-        "r"
-    ) as file:
-
-        return json.load(file)
+    return read_json(PROFILE_PATH, default={})
 
 
 def save_profile(profile):
 
-    os.makedirs(os.path.dirname(PROFILE_PATH), exist_ok=True)
-
-    with open(
-        PROFILE_PATH,
-        "w"
-    ) as file:
-
-        json.dump(
-            profile,
-            file,
-            indent=4
-        )
+    write_json_atomic(PROFILE_PATH, profile)
 
 
 def update_profile(

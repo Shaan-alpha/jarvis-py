@@ -112,3 +112,25 @@ def test_null_optional_uses_default():
     args, err = coerce_and_validate(spec, {"sides": None})
     assert err is None
     assert args == {"sides": 6}
+
+
+def test_coerce_float():
+    spec = _spec({"x": ParamSpec(type="float")})
+    args, err = coerce_and_validate(spec, {"x": "3.5"})
+    assert err is None
+    assert args == {"x": 3.5}
+
+
+def test_coerce_bool_from_strings():
+    spec = _spec({"b": ParamSpec(type="bool")})
+    for raw, expected in (("true", True), ("false", False),
+                          ("yes", True), ("0", False), (True, True)):
+        args, err = coerce_and_validate(spec, {"b": raw})
+        assert err is None
+        assert args == {"b": expected}
+
+
+def test_coerce_bool_rejects_garbage():
+    spec = _spec({"b": ParamSpec(type="bool", required=True)})
+    args, err = coerce_and_validate(spec, {"b": "maybe"})
+    assert err is not None

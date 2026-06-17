@@ -1,5 +1,5 @@
-import json
 import os
+import threading
 
 import numpy as np
 
@@ -12,6 +12,11 @@ from core.memory.embedder import (
 )
 
 from core.paths import user_data_dir
+
+from core.utils.jsonio import (
+    read_json,
+    write_json_atomic,
+)
 
 
 MEMORY_PATH = os.path.join(
@@ -27,78 +32,91 @@ _cache = {
     "embeddings": None
 }
 
-
-def _invalidate_cache():
-
-    _cache["memories"] = None
-    _cache["embeddings"] = None
+# Guards _cache: the HUD text-query path runs process_query on its own thread
+# while the voice loop may also be mid-query, so cache reads/writes race.
+_cache_lock = threading.Lock()
 
 
 def load_memories():
 
-    if not os.path.exists(MEMORY_PATH):
+    return read_json(MEMORY_PATH, default=[])
 
-        return []
 
-    with open(
-        MEMORY_PATH,
-        "r"
-    ) as file:
+def _add_to_cache(entry, all_memories):
+    """Extend the cached embedding matrix with one new memory.
 
-        return json.load(file)
+    Saving turn n used to invalidate the whole cache, so the next search
+    re-encoded all n memories — O(n^2) over a session. Here we encode just the
+    new entry and stack it on. If the cache is cold, leave it cold (the next
+    search lazy-loads once); on any error, drop the cache so it rebuilds cleanly.
+    """
+
+    with _cache_lock:
+
+        if _cache["memories"] is None or _cache["embeddings"] is None:
+
+            return
+
+        try:
+
+            vector = np.stack(
+                encode([f"{entry['user']} {entry['assistant']}"])
+            )
+
+            _cache["embeddings"] = np.vstack([_cache["embeddings"], vector])
+
+            _cache["memories"] = all_memories
+
+        except Exception:
+
+            _cache["memories"] = None
+            _cache["embeddings"] = None
 
 
 def save_memory(user, assistant):
 
     memories = load_memories()
 
-    memories.append({
+    entry = {
         "user": user,
         "assistant": assistant
-    })
+    }
 
-    os.makedirs(os.path.dirname(MEMORY_PATH), exist_ok=True)
+    memories.append(entry)
 
-    with open(
-        MEMORY_PATH,
-        "w"
-    ) as file:
+    write_json_atomic(MEMORY_PATH, memories)
 
-        json.dump(
-            memories,
-            file,
-            indent=4
-        )
-
-    _invalidate_cache()
+    _add_to_cache(entry, memories)
 
 
 def _get_embeddings():
 
-    memories = _cache["memories"]
+    with _cache_lock:
 
-    if memories is None:
+        memories = _cache["memories"]
 
-        memories = load_memories()
+        if memories is None:
 
-        _cache["memories"] = memories
+            memories = load_memories()
 
-        if memories:
+            _cache["memories"] = memories
 
-            texts = [
-                f"{m['user']} {m['assistant']}"
-                for m in memories
-            ]
+            if memories:
 
-            _cache["embeddings"] = np.stack(
-                encode(texts)
-            )
+                texts = [
+                    f"{m['user']} {m['assistant']}"
+                    for m in memories
+                ]
 
-        else:
+                _cache["embeddings"] = np.stack(
+                    encode(texts)
+                )
 
-            _cache["embeddings"] = None
+            else:
 
-    return memories, _cache["embeddings"]
+                _cache["embeddings"] = None
+
+        return memories, _cache["embeddings"]
 
 
 def search_memory(query):

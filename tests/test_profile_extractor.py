@@ -25,3 +25,15 @@ def test_extracts_likes():
 
 def test_returns_none_for_plain_query():
     assert extract_personal_info("open the calculator") is None
+
+
+def test_name_stops_at_clause_boundary():
+    result = extract_personal_info("my name is tony and i like pizza")
+    assert result == {"key": "name", "value": "tony"}
+
+
+def test_value_is_length_capped():
+    long_tail = "x" * 200
+    result = extract_personal_info(f"i like {long_tail}")
+    assert result["key"] == "likes"
+    assert len(result["value"]) <= 60

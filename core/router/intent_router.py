@@ -90,7 +90,60 @@ _SUBSTRING_TOOLS = (
 )
 
 
-def resolve_keyword_tool(query):
+def _match_named_app(query, table, tool_name):
+    """First phrase in `table` contained in `query` -> ToolCall(tool_name, name)."""
+
+    for phrase, name in table.items():
+
+        if phrase in query:
+
+            return ToolCall(tool_name, {"name": name})
+
+    return None
+
+
+def _match_substring_tool(query):
+    """First zero-arg substring tool whose any trigger is contained in `query`."""
+
+    for phrases, call in _SUBSTRING_TOOLS:
+
+        if any(p in query for p in phrases):
+
+            return call
+
+    return None
+
+
+def _match_search(query, raw_query):
+    """Web search: strip the trigger prefix to get the search term.
+
+    The trigger is detected on the normalized `query`, but the term is pulled
+    from `raw_query` so a typed search keeps its original case ("search for
+    Tony Stark" -> "Tony Stark", not "tony stark").
+    """
+
+    for trigger in _SEARCH_TRIGGERS:
+
+        if query.startswith(trigger):
+
+            idx = raw_query.lower().find(trigger)
+
+            if idx != -1:
+
+                term = raw_query[idx + len(trigger):].strip()
+
+            else:
+
+                term = query[len(trigger):].strip()
+
+            if term:
+
+                return ToolCall("search_web", {"query": term})
+
+    return None
+
+
+def resolve_keyword_tool(query, raw_query=None):
     """Map a known command phrase to a registry ToolCall, or None.
 
     Deterministic, LLM-free, stdlib + registry only (importable in CI). This is
@@ -98,46 +151,30 @@ def resolve_keyword_tool(query):
     latency. A miss returns None and the caller falls back to the LLM tool
     agent. Open/close/volume/status use substring containment (so an embedded
     keyword in a longer sentence still matches); web search uses prefix
-    extraction so the search term can be pulled off the trigger phrase.
+    extraction so the search term can be pulled off the trigger phrase. Checked
+    in order; first match wins. "open google" beats the search triggers and the
+    open_app table (it's the zero-arg homepage tool, not open_app with a name).
+    `raw_query` (the un-normalized utterance) preserves case for the search term.
     """
 
-    # Open apps.
-    for phrase, name in _OPEN_APPS.items():
+    if raw_query is None:
 
-        if phrase in query:
+        raw_query = query
 
-            return ToolCall("open_app", {"name": name})
+    open_call = _match_named_app(query, _OPEN_APPS, "open_app")
 
-    # "open google" routes to the zero-arg open_google tool (homepage), not
-    # open_app -- so it's kept out of the _OPEN_APPS dict, which passes a
-    # name arg. (It also can't collide with the prefix-based search triggers.)
+    if open_call is not None:
+
+        return open_call
+
+    # "open google" routes to the zero-arg open_google homepage tool (it's kept
+    # out of _OPEN_APPS, which passes a name arg, and beats the search triggers).
     if "open google" in query:
 
         return ToolCall("open_google", {})
 
-    # Close apps.
-    for phrase, name in _CLOSE_APPS.items():
-
-        if phrase in query:
-
-            return ToolCall("close_app", {"name": name})
-
-    # Volume, mute, system status, read clipboard -- all zero-arg substring tools.
-    for phrases, call in _SUBSTRING_TOOLS:
-
-        if any(p in query for p in phrases):
-
-            return call
-
-    # Web search: strip the trigger prefix to get the search term.
-    for trigger in _SEARCH_TRIGGERS:
-
-        if query.startswith(trigger):
-
-            term = query[len(trigger):].strip()
-
-            if term:
-
-                return ToolCall("search_web", {"query": term})
-
-    return None
+    return (
+        _match_named_app(query, _CLOSE_APPS, "close_app")
+        or _match_substring_tool(query)
+        or _match_search(query, raw_query)
+    )

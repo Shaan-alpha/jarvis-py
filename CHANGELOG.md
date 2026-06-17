@@ -1,6 +1,34 @@
 ## [Unreleased]
 
-### v3.4 — Agent Capabilities (in progress)
+_Next milestone: **v3.5 — Responsiveness & Efficiency** (speed-first). See `PLAN.md`._
+
+## v3.4.0 — Agent Capabilities & Hardening
+
+### Audit hardening (2026-06-17)
+Deep-audit follow-up (see `docs/AUDIT-2026-06-17.md`). 26 new tests; CI green.
+- **Security**: the HUD WebSocket now rejects remote `http(s)` origins, so a web
+  page you visit can't drive `ws://127.0.0.1` (open/close apps, write files).
+- **Crash-safe persistence**: profile/tasks/memory writes go through a new
+  `core/utils/jsonio.py` (temp file + `os.replace`); reads tolerate a missing or
+  corrupt file. The semantic- and document-memory caches are now lock-guarded.
+- **Memory perf**: saving a turn extends the embedding cache incrementally
+  instead of re-encoding every memory (was O(n²) over a session).
+- **Content fidelity**: typed queries keep their original case/punctuation for
+  `write_clipboard` / `write_file` / web-search terms (`raw_query` threading).
+- **NLU**: reminders understand hours/seconds, short forms, "a/an/half an", and
+  the reversed word order; profile capture stops at clause boundaries and is
+  length-capped; the LLM action-gate no longer fires on long chit-chat.
+- **TTS**: `speak()` routes through the locked `speak_sync` so it can't run a
+  second engine concurrently with the TTS-queue worker.
+- **Robustness/cleanup**: `read_pdf` tolerates `None` page text; `build_index`
+  creates the documents dir; registry gains `float`/`bool` arg coercers; dead
+  `wait_until_done()` removed; `_start_hud`/`resolve_keyword_tool` flattened
+  under the complexity gate.
+
+### Agent Capabilities (Layer 1 + Layer 2)
+- **File-system tools (Layer 2)**: `list_files` / `read_file` / `write_file` /
+  `search_files` in a sandboxed `user_data_dir()/workspace` root (path-traversal
+  guard); `list_files` has a keyword fast-path, the rest are LLM-only. (PR #9)
 - **Clipboard tools (Layer 2)**: two registry `@tool`s — `read_clipboard` (returns
   the clipboard text; empty/whitespace → "The clipboard is empty.", verbatim up to
   200 chars, a length report + truncated preview beyond) and `write_clipboard(text)`

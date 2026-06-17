@@ -27,6 +27,7 @@ def test_ollama_not_running():
 
 def test_model_present_true():
     payload = {"models": [{"name": "phi3:latest"}]}
+
     def get(url, timeout=0):
         return _Resp(200, payload)
     result = checks.check_model_present("phi3", get=get)
@@ -35,6 +36,7 @@ def test_model_present_true():
 
 def test_model_present_false():
     payload = {"models": [{"name": "llama3:latest"}]}
+
     def get(url, timeout=0):
         return _Resp(200, payload)
     result = checks.check_model_present("phi3", get=get)

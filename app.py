@@ -5,6 +5,8 @@ import sys
 import threading
 import time
 
+from functools import partial
+
 from config.settings import (
     SESSION_TIMEOUT
 )
@@ -19,7 +21,8 @@ from core.speech.engine import (
 from core.speech.tts_queue import (
     start_tts_queue,
     stop_tts_queue,
-    wait_until_done_or_barge_in
+    wait_until_done_or_barge_in,
+    clear_queue
 )
 
 from core.speech.openwakeword_listener import (
@@ -102,13 +105,20 @@ EXIT_WORDS = [
 ]
 
 
-def process_query(query, task_manager, source="voice"):
+def process_query(query, task_manager, source="voice", raw_query=None):
     """Route one recognized/typed query through the pipeline.
 
-    `source` is "voice" or "text". Session/exit-word handling stays in the
-    voice loop; this function only does profile capture, reminders, intent
-    routing, the tool agent, and the LLM fallback.
+    `source` is "voice" or "text". `query` is normalized (lowercased) for
+    matching; `raw_query` is the original utterance (defaults to `query`) and is
+    passed to the routers so content tools (write_clipboard/write_file/search)
+    keep their original case. Session/exit-word handling stays in the voice
+    loop; this function only does profile capture, reminders, intent routing,
+    the tool agent, and the LLM fallback.
     """
+
+    if raw_query is None:
+
+        raw_query = query
 
     personal_info = extract_personal_info(query)
 
@@ -139,14 +149,14 @@ def process_query(query, task_manager, source="voice"):
 
         return
 
-    call = resolve_keyword_tool(query)
+    call = resolve_keyword_tool(query, raw_query)
 
     if call is None:
 
         # Only the LLM path needs "thinking" — the keyword path is instant.
         events.emit("state", state="thinking")
 
-        call = decide_tool(query)
+        call = decide_tool(query, raw_query)
 
     if call is not None:
 
@@ -193,99 +203,115 @@ def _select_mic():
     return True
 
 
+def _hud_on_text_query(session, task_manager, text):
+
+    logger.info(f"HUD text query received: {text!r}")
+
+    # Keep the raw text (case + punctuation) for content tools; the lowercased
+    # copy is only used for command matching.
+    raw = (text or "").strip()
+
+    query = raw.lower()
+
+    if not query:
+
+        return
+
+    # Barge-in: a new typed query interrupts whatever Jarvis is currently
+    # saying. Stop the current utterance and drop anything still queued so the
+    # new answer doesn't play behind the old one.
+    logger.info("Barge-in: stop_speaking + clear_queue")
+
+    stop_speaking()
+
+    clear_queue()
+
+    session.activate()
+
+    # Run off the WS thread so a slow generation doesn't block the socket (and
+    # so the next typed query can interrupt this one). ask_llm's generation
+    # token ensures a superseded stream abandons itself.
+    threading.Thread(
+        target=process_query,
+        args=(query, task_manager),
+        kwargs={"source": "text", "raw_query": raw},
+        daemon=True,
+    ).start()
+
+
+def _hud_on_wake(session):
+
+    session.activate()
+
+    speak("Yes Boss?")
+
+
+def _hud_on_stop():
+
+    stop_speaking()
+
+    clear_queue()
+
+
+def _hud_on_run_checks():
+
+    for result in run_checks():
+
+        events.emit("check", **result)
+
+
+def _hud_on_pull_model(model):
+
+    # `ollama pull` runs for minutes; doing it inline would block the WS asyncio
+    # loop (and the broadcaster), so the queued pull_progress events would not
+    # stream live. Run it off-thread and signal completion.
+    def _pull():
+
+        try:
+
+            pull_model(
+                model,
+                on_progress=lambda line: events.emit("pull_progress", line=line)
+            )
+
+        finally:
+
+            # Always signal completion, even if the pull raised — otherwise the
+            # wizard's pull log strands with no "done" transition.
+            events.emit("pull_done")
+
+    threading.Thread(target=_pull, daemon=True).start()
+
+
+def _hud_on_save_name(name):
+
+    update_profile("name", name or "Boss")
+
+    events.emit("setup_complete")
+
+
+def _hud_handlers(session, task_manager):
+    """Build the HUD WebSocket command handlers, bound to this session. Handlers
+    are module-level functions wired here via partial so _start_hud stays flat."""
+
+    return {
+        "text_query": partial(_hud_on_text_query, session, task_manager),
+        "wake": partial(_hud_on_wake, session),
+        "stop": _hud_on_stop,
+        "run_checks": _hud_on_run_checks,
+        "pull_model": _hud_on_pull_model,
+        "save_name": _hud_on_save_name,
+    }
+
+
 def _start_hud(session, task_manager, wizard=False):
     """Enable the HUD event bus, wire commands, start servers, spawn the UI."""
 
     from core.hud import ws_server, stats
-    from core.speech.tts_queue import clear_queue
 
     events.enable()
 
-    def _on_text_query(text):
-
-        logger.info(f"HUD text query received: {text!r}")
-
-        text = (text or "").lower().strip()
-
-        if not text:
-
-            return
-
-        # Barge-in: a new typed query interrupts whatever Jarvis is currently
-        # saying. Stop the current utterance and drop anything still queued so
-        # the new answer doesn't play behind the old one.
-        logger.info("Barge-in: stop_speaking + clear_queue")
-
-        stop_speaking()
-
-        clear_queue()
-
-        session.activate()
-
-        # Run off the WS thread so a slow generation doesn't block the socket
-        # (and so the next typed query can interrupt this one). ask_llm's
-        # generation token ensures a superseded stream abandons itself.
-        threading.Thread(
-            target=process_query,
-            args=(text, task_manager),
-            kwargs={"source": "text"},
-            daemon=True,
-        ).start()
-
-    def _on_wake():
-
-        session.activate()
-
-        speak("Yes Boss?")
-
-    def _on_stop():
-
-        stop_speaking()
-
-        clear_queue()
-
-    def _on_run_checks():
-
-        for result in run_checks():
-
-            events.emit("check", **result)
-
-    def _on_pull_model(model):
-
-        # `ollama pull` runs for minutes; doing it inline would block the WS
-        # asyncio loop (and the broadcaster), so the queued pull_progress events
-        # would not stream live. Run it off-thread and signal completion.
-        def _pull():
-
-            try:
-
-                pull_model(
-                    model,
-                    on_progress=lambda line: events.emit("pull_progress", line=line)
-                )
-
-            finally:
-
-                # Always signal completion, even if the pull raised — otherwise
-                # the wizard's pull log strands with no "done" transition.
-                events.emit("pull_done")
-
-        threading.Thread(target=_pull, daemon=True).start()
-
-    def _on_save_name(name):
-
-        update_profile("name", name or "Boss")
-
-        events.emit("setup_complete")
-
-    ws_server.register_handlers(
-        text_query=_on_text_query,
-        wake=_on_wake,
-        stop=_on_stop,
-        run_checks=_on_run_checks,
-        pull_model=_on_pull_model,
-        save_name=_on_save_name,
-    )
+    ws_server.register_handlers(**_hud_handlers(session, task_manager))
 
     # Carry the wizard flag in the WS `ready` handshake so a slow-starting HUD
     # that connects after _start_hud runs still opens the wizard (a one-shot

@@ -33,6 +33,19 @@ def test_bad_json_is_ignored():
     assert ws._dispatch_command("not json") is None
 
 
+def test_origin_allows_file_and_null_and_absent():
+    assert ws._origin_allowed(None) is True
+    assert ws._origin_allowed("") is True
+    assert ws._origin_allowed("null") is True
+    assert ws._origin_allowed("file:///C:/x/index.html") is True
+
+
+def test_origin_rejects_web_pages():
+    assert ws._origin_allowed("http://evil.example") is False
+    assert ws._origin_allowed("https://evil.example") is False
+    assert ws._origin_allowed("HTTPS://Evil.Example") is False
+
+
 def test_wizard_mode_defaults_false():
     assert ws._wizard_mode is False
 
