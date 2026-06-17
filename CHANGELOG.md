@@ -1,6 +1,13 @@
 ## [Unreleased]
 
-_Next milestone: **v3.5 — Responsiveness & Efficiency** (speed-first). See `PLAN.md`._
+### v3.5 — Responsiveness & Efficiency (in progress)
+- **Latency instrumentation** (`core/utils/metrics.py`): a per-turn `Timeline`
+  records stage marks and emits a compact summary (`route`/`first_token`/
+  `first_audio`/`total`) to the log + a HUD `metrics` event. Wired into
+  `process_query` (turn boundaries + `routed`) and the Ollama stream
+  (`first_token` / `first_audio`). Behaviour-neutral; establishes the latency
+  baseline the rest of v3.5 is measured against. STT/wake stage marks + a HUD
+  readout are the next follow-up.
 
 ## v3.4.0 — Agent Capabilities & Hardening
 

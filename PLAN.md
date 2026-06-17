@@ -149,9 +149,12 @@ Goal: a clean, tagged baseline before the speed work starts.
 Goal: make Jarvis *feel* instant — measured, not guessed — without giving up
 offline. This is the motto milestone.
 
-- [ ] **Latency instrumentation (do first)** — time each pipeline stage
+- [~] **Latency instrumentation (do first)** — time each pipeline stage
       (wake → listen → STT → route → first-token → first-audio → done), log it,
       surface in the HUD. Every later change is judged against these numbers.
+      *Started:* `core/utils/metrics.py` `Timeline` + thread-local API, wired for
+      the `routed`/`first_token`/`first_audio`/`done` stages. Remaining: STT/wake
+      marks (voice-loop + HUD entry) and the HUD readout.
 - [ ] **TTS engine reuse** — own a single persistent `pyttsx3` engine on one
       dedicated thread instead of `create_engine()` per sentence
       (`core/speech/engine.py` `_speak_thread`). Biggest easy win; keep the

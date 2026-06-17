@@ -26,6 +26,8 @@ from core.memory.profile_memory import (
 
 from core.hud import events
 
+from core.utils import metrics
+
 from core.utils.logger import (
     logger
 )
@@ -128,6 +130,11 @@ def _stream_response(response, my_generation):
 
         token = data.get("response", "")
 
+        if token:
+
+            # Dedup keeps the first occurrence, so this records time-to-first-token.
+            metrics.mark("first_token")
+
         print(token, end="", flush=True)
 
         full_response += token
@@ -139,6 +146,8 @@ def _stream_response(response, my_generation):
         if _ends_sentence(sentence_buffer):
 
             add_to_queue(sentence_buffer.strip())
+
+            metrics.mark("first_audio")
 
             sentence_buffer = ""
 
