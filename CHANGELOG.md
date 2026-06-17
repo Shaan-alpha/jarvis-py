@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+_Next milestone: **v3.5 — Responsiveness & Efficiency** (speed-first). See `PLAN.md`._
+
+## v3.4.0 — Agent Capabilities & Hardening
+
 ### Audit hardening (2026-06-17)
 Deep-audit follow-up (see `docs/AUDIT-2026-06-17.md`). 26 new tests; CI green.
 - **Security**: the HUD WebSocket now rejects remote `http(s)` origins, so a web
@@ -21,7 +25,10 @@ Deep-audit follow-up (see `docs/AUDIT-2026-06-17.md`). 26 new tests; CI green.
   `wait_until_done()` removed; `_start_hud`/`resolve_keyword_tool` flattened
   under the complexity gate.
 
-### v3.4 — Agent Capabilities (in progress)
+### Agent Capabilities (Layer 1 + Layer 2)
+- **File-system tools (Layer 2)**: `list_files` / `read_file` / `write_file` /
+  `search_files` in a sandboxed `user_data_dir()/workspace` root (path-traversal
+  guard); `list_files` has a keyword fast-path, the rest are LLM-only. (PR #9)
 - **Clipboard tools (Layer 2)**: two registry `@tool`s — `read_clipboard` (returns
   the clipboard text; empty/whitespace → "The clipboard is empty.", verbatim up to
   200 chars, a length report + truncated preview beyond) and `write_clipboard(text)`
