@@ -37,16 +37,20 @@ Architecture first. No giant single files.
 
 ## Current Status
 
-> Latest release: **v3.3.0 "Polish & Packaging"** (+ a HUD overhaul: fluid-blob
-> orb, Stop/Esc interrupt, wake-word + STT fixes) — **shipped**: merged to `main`,
-> tagged `v3.3.0`, GitHub Release published (2026-05-31, *Latest*). 129 tests green;
-> `pyproject`/`CHANGELOG` at 3.3.0 match the published version. **v3.4 — Agent
-> Capabilities is underway:** the Layer-1 tool foundation (tool registry + `@tool`
-> decorator + plugin loader, PR #4) and the routing unification (registry is the
-> single source of truth, PR #6) are merged to `main`. **Layer 2 — capability
-> tools — has started:** clipboard read/write (PR #7) and the sandboxed
-> file-system tools (PR #9) are **merged to `main`**. Next capability tools +
-> orchestration are below.
+> Latest release: **v3.3.0 "Polish & Packaging"** (+ a HUD overhaul) — shipped,
+> tagged, GitHub Release published (2026-05-31). **v3.4 — Agent Capabilities** is
+> on `main` but **unreleased**: Layer-1 tool foundation (PR #4), routing
+> unification (PR #6), clipboard tools (PR #7), and sandboxed file-system tools
+> (PR #9) are all merged. A **deep audit-hardening pass** (findings F1–F15:
+> security, crash-safe persistence, memory perf, NLU, content fidelity, TTS,
+> cleanup; +26 tests; CI green) is ready on branch `fix/audit-2026-06-17`.
+>
+> **Roadmap direction (2026-06-17): speed-first.** The guiding motto is *offline +
+> online, but efficient and fast to respond*. So after cutting the pending
+> **v3.4.0** release, the immediate milestone is **v3.5 — Responsiveness &
+> Efficiency**; agent capabilities, smarter memory, the UI panels, and
+> distribution each follow on top of a faster, measured core. See the sequenced
+> milestones below.
 
 ### v3.2.0 — Desktop HUD (shipped)
 
@@ -112,34 +116,75 @@ Goal: ship-ready binary you can hand someone.
 
 ---
 
-## v3.4 — Agent Capabilities
+## Cross-cutting guardrails (every milestone)
 
-Goal: make the tool-agent useful for real tasks, not just demos.
+These hold for all work below — they are the project's identity, not a milestone:
 
-Layer 1 (foundation) and the routing unification are shipped to `main`; Layer 2
-(capability tools) is in progress.
-
-- [x] **Layer 1 — tool foundation**: registry + `@tool` decorator + arg
-  coercion/validation + `builtins` module (PR #4)
-- [x] **Plugin loader** — drop a Python file in `plugins/` (or
-  `%APPDATA%\JarvisAI\plugins`), get a new tool (PR #4)
-- [x] **Routing unification** — the registry is the single source of truth;
-  `decide_tool`/`execute_tool` dispatch generically (PR #6)
-- [x] **Clipboard tool (read + write)** — first Layer-2 capability; `read_clipboard`
-  has a keyword fast-path, `write_clipboard` is LLM-only (PR #7, merged)
-- [x] **File-system tools** — `list_files`/`read_file`/`write_file`/`search_files`
-  in a sandboxed `user_data_dir()/workspace` root (one path-traversal guard);
-  `list_files` has a keyword fast-path, the rest LLM-only (PR #9, merged)
-- [ ] Screenshot tool (capture + OCR via local model)
-- [ ] Window control (focus, minimize, list windows)
-- [ ] Browser automation via Playwright (search, open, scrape)
-- [ ] Tool-agent supports multi-step plans (e.g. "open VS Code and start the dev server")
+- **Free / local / zero-money.** No paid APIs, no cloud services, no paid signing.
+- **Offline + online parity.** Online is an enhancement, never a requirement; every
+  capability must degrade gracefully offline.
+- **Latency budget.** Once v3.5 establishes a measured baseline, no later milestone
+  may regress it. New features are judged against the stage timings.
+- **CI stays green.** Public adoption signal; keep tests + lint passing.
 
 ---
 
-## v3.5 — Smarter Memory
+## v3.4.0 — Release the pending work (do first)
 
-Goal: memory that gets better over time.
+Goal: a clean, tagged baseline before the speed work starts.
+
+- [x] Clipboard tools (PR #7) + sandboxed file-system tools (PR #9) — on `main`
+- [ ] Merge the audit-hardening pass (`fix/audit-2026-06-17`, F1–F15)
+- [ ] Bump `pyproject` + `CHANGELOG` to **3.4.0**, tag, publish a GitHub Release
+      (the project's always-tag-and-release habit)
+
+> The remaining "agent capability" tools originally filed under v3.4
+> (screenshot/window/browser/multi-step) move **after** the speed milestone — see
+> v3.6. They inherit the faster routing built in v3.5.
+
+---
+
+## 🏎️ v3.5 — Responsiveness & Efficiency  ← immediate focus
+
+Goal: make Jarvis *feel* instant — measured, not guessed — without giving up
+offline. This is the motto milestone.
+
+- [ ] **Latency instrumentation (do first)** — time each pipeline stage
+      (wake → listen → STT → route → first-token → first-audio → done), log it,
+      surface in the HUD. Every later change is judged against these numbers.
+- [ ] **TTS engine reuse** — own a single persistent `pyttsx3` engine on one
+      dedicated thread instead of `create_engine()` per sentence
+      (`core/speech/engine.py` `_speak_thread`). Biggest easy win; keep the
+      failure-reinit recovery.
+- [ ] **Warm-start** — preload Ollama (priming ping), the embedder, Vosk, and
+      openWakeWord at startup off-thread so the first real query isn't cold.
+- [ ] **Faster tool routing** — widen the deterministic keyword path so common
+      commands never hit the LLM; cap/stop-token the `decide_tool` call so its
+      JSON returns fast; evaluate folding selection into the main streamed call.
+- [ ] **STT tuning** — calibrate ambient noise once per session (not every
+      listen), adaptive `pause_threshold`, optional Vosk partial results; optionally
+      race online + offline STT and take the first good result (pure motto).
+- [ ] **Model bake-off** — benchmark `phi3` vs `phi3.5` / `llama3.2:1b–3b` /
+      `qwen2.5:1.5b` on tool-JSON accuracy + chat latency/quality; pick a faster
+      default, document the swap. Stays local/offline.
+
+---
+
+## v3.6 — Agent Capabilities II
+
+Goal: the rest of the agent toolset, riding v3.5's faster routing.
+
+- [ ] Screenshot tool (capture + OCR via a local model)
+- [ ] Window control (focus, minimize, list windows)
+- [ ] Browser automation via Playwright (search, open, scrape)
+- [ ] Multi-step tool plans (e.g. "open VS Code and start the dev server")
+
+---
+
+## v3.7 — Smarter Memory
+
+Goal: memory that gets better over time (groundwork already laid — saves now
+extend the embedding cache incrementally instead of re-encoding all).
 
 - [ ] Hybrid retrieval: BM25 (fastembed has it) + dense, then re-rank
 - [ ] Auto-summarize long conversation chains into long-term memory
@@ -150,28 +195,17 @@ Goal: memory that gets better over time.
 
 ---
 
-## v4.0 — Iron Man Interface
+## v4.0 — Iron Man Interface (data UIs)
 
-Goal: a real UI, not a terminal.
+Goal: the data-management UI, plus the one missing interaction.
 
 > **Partly shipped in v3.2.0.** The HUD chose **pywebview + vanilla JS over a
-> local WebSocket** instead of the Tauri/React/FastAPI stack originally sketched
-> here — no Rust+Node toolchain. The orb, live waveform, and dual subtitles are
-> done. What remains is the data-management UI below.
+> local WebSocket** instead of the Tauri/React/FastAPI stack originally sketched.
+> The orb, live waveform, and dual subtitles are done. What remains is below.
 
-Stack (as built):
-
-| Surface | Stack (shipped) |
-|---|---|
-| Desktop shell | pywebview window |
-| Voice orb + waveform | Canvas |
-| Real-time channel | WebSocket to the Python core |
-| Subtitles / streaming | WebSocket events |
-
-Features:
-- [x] Animated wake-word orb
-- [x] Live subtitles for both user and Jarvis
-- [x] Floating overlay (always-on-top panel) + type-to-Jarvis input
+- [x] Animated wake-word orb · live dual subtitles · always-on-top overlay + type input
+- [ ] **Echo cancellation** — interrupt by *speaking* mid-reply (today the mic hears
+      Jarvis's own TTS; Stop/Esc/typing are the only interrupts). The last big UX gap.
 - [ ] Memory dashboard (search + edit memories)
 - [ ] Document drop zone (PDFs → auto-index)
 - [ ] Reminder list + edit
@@ -180,7 +214,7 @@ Features:
 
 ---
 
-## v5.0 — Deployment
+## v5.0 — Distribution
 
 Goal: production distribution.
 
