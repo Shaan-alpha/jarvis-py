@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" href="logo.svg" />
   <link rel="stylesheet" href="style.css" />
   <title>Jarvis</title>
 </head>
@@ -11,6 +12,21 @@
   <div id="grain"></div>
 
   <main id="panel">
+    <div id="titlebar">
+      <div class="brand">
+        <img class="brand-mark" src="logo.svg" alt="" width="22" height="22" />
+        <span class="brand-name">JARVIS</span>
+      </div>
+      <div class="wctrls">
+        <button id="min" class="wctrl" type="button" title="Minimize" aria-label="Minimize">
+          <span class="ico-min"></span>
+        </button>
+        <button id="close" class="wctrl close" type="button" title="Close Jarvis" aria-label="Close Jarvis">
+          <span class="ico-close"></span>
+        </button>
+      </div>
+    </div>
+
     <header class="stage">
       <div id="orb" data-state="idle">
         <div class="orb-glow"></div>

@@ -278,6 +278,34 @@ def _hud_on_stop():
     clear_queue()
 
 
+def _hud_on_shutdown(task_manager):
+    """Full shutdown from the HUD close button: stop the background services
+    (TTS playback + queue, reminders) and hard-exit the process. The HUD closes
+    its own window separately, so the backend and HUD both terminate and nothing
+    is left running (the mic is released)."""
+
+    logger.info("HUD requested shutdown; stopping services and exiting")
+
+    try:
+
+        stop_speaking()
+
+        clear_queue()
+
+        stop_tts_queue()
+
+        task_manager.stop()
+
+    except Exception:
+
+        logger.exception("Error during shutdown cleanup")
+
+    # Hard exit: the voice loop is a blocking while-True (on the main thread when
+    # not frozen), so there's no clean signal to unwind it from this WS-thread
+    # handler. Services are stopped above; os._exit takes the rest of the threads.
+    os._exit(0)
+
+
 def _hud_on_run_checks():
 
     for result in run_checks():
@@ -323,6 +351,7 @@ def _hud_handlers(session, task_manager):
         "text_query": partial(_hud_on_text_query, session, task_manager),
         "wake": partial(_hud_on_wake, session),
         "stop": _hud_on_stop,
+        "shutdown": partial(_hud_on_shutdown, task_manager),
         "run_checks": _hud_on_run_checks,
         "pull_model": _hud_on_pull_model,
         "save_name": _hud_on_save_name,

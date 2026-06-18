@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <defs>
+    <radialGradient id="jcore" cx="50%" cy="42%" r="62%">
+      <stop offset="0%" stop-color="#d2f8ff"/>
+      <stop offset="55%" stop-color="#8be9ff"/>
+      <stop offset="100%" stop-color="#1aa0e6"/>
+    </radialGradient>
+  </defs>
+  <!-- outer ring -->
+  <circle cx="32" cy="32" r="27" stroke="#1aa0e6" stroke-width="3"/>
+  <!-- segmented reactor coil -->
+  <circle cx="32" cy="32" r="20" stroke="#41e8c6" stroke-width="2.4"
+          stroke-dasharray="7 4.2" stroke-linecap="round"/>
+  <!-- glowing core -->
+  <circle cx="32" cy="32" r="12.5" fill="url(#jcore)"/>
+  <!-- the J -->
+  <text x="32" y="33.5" text-anchor="middle" dominant-baseline="central"
+        font-family="Segoe UI, Arial, sans-serif" font-weight="700"
+        font-size="20" fill="#05080f">J</text>
+</svg>

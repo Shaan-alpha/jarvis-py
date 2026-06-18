@@ -140,6 +140,75 @@ html, body {
   -webkit-backdrop-filter: blur(22px) saturate(160%);
 }
 
+/* ---- Titlebar (brand mark + window controls) -------------------------- */
+#titlebar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  animation: rise .5s cubic-bezier(.2, .8, .2, 1) both;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.brand-mark { filter: drop-shadow(0 0 6px var(--halo)); }
+.brand-name {
+  font-size: 10px;
+  letter-spacing: .26em;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+.wctrls {
+  display: flex;
+  gap: 6px;
+}
+.wctrl {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  cursor: pointer;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-fill);
+  color: var(--text-soft);
+  backdrop-filter: blur(6px);
+  transition: background .18s ease, color .18s ease,
+              border-color .18s ease, transform .12s ease;
+}
+.wctrl:hover { background: var(--glass-fill-hi); color: var(--text-strong); }
+.wctrl:active { transform: scale(.9); }
+.wctrl.close:hover {
+  background: color-mix(in srgb, var(--stop) 28%, transparent);
+  border-color: color-mix(in srgb, var(--stop) 55%, transparent);
+  color: #fff;
+}
+.ico-min {
+  width: 9px;
+  height: 2px;
+  border-radius: 2px;
+  background: currentColor;
+}
+.ico-close {
+  position: relative;
+  width: 11px;
+  height: 11px;
+}
+.ico-close::before, .ico-close::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 12px;
+  height: 1.6px;
+  border-radius: 2px;
+  background: currentColor;
+}
+.ico-close::before { transform: translate(-50%, -50%) rotate(45deg); }
+.ico-close::after  { transform: translate(-50%, -50%) rotate(-45deg); }
+
 /* ---- Stage (3D orb hero) ---------------------------------------------- */
 .stage {
   position: relative;
@@ -557,7 +626,7 @@ body[data-state="speaking"] .stop {
 
 /* Respect reduced-motion preferences. */
 @media (prefers-reduced-motion: reduce) {
-  #ambient, .orb-wrap::before, .pill.state::before, .stop, .top, .caps, .status, #form {
+  #ambient, .orb-wrap::before, .pill.state::before, .stop, #titlebar, .caps, .status, #form {
     animation: none !important;
   }
 }

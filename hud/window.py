@@ -10,6 +10,27 @@ from config.settings import (
 )
 
 
+class _Api:
+    """Window controls exposed to the HUD JS as ``window.pywebview.api.*``.
+
+    The close button drives a full shutdown: the page first sends a ``shutdown``
+    command over the WebSocket (which stops the backend's voice loop / TTS / WS
+    threads), then calls ``quit()`` here to destroy this window — returning from
+    ``webview.start()`` so the HUD process exits too. Nothing is left running.
+    """
+
+    def __init__(self):
+        self.window = None
+
+    def minimize(self):
+        if self.window:
+            self.window.minimize()
+
+    def quit(self):
+        if self.window:
+            self.window.destroy()
+
+
 def _web_path():
     base = os.path.dirname(os.path.abspath(__file__))
     return os.path.join(base, "web", "index.html")
@@ -24,11 +45,14 @@ def launch():
     # location.hash in the page.
     url = f"file:///{_web_path().replace(os.sep, '/')}#ws={ws_url}"
 
-    webview.create_window(
+    api = _Api()
+
+    window = webview.create_window(
         "Jarvis",
         url=url,
+        js_api=api,
         width=440,
-        height=380,
+        height=410,
         x=40,
         y=40,
         frameless=True,
@@ -37,6 +61,8 @@ def launch():
         resizable=False,
         background_color="#05080f",
     )
+
+    api.window = window
 
     # Blocking GUI loop. pywebview requires this to run on the main thread, so
     # the caller (app.main when frozen) puts the voice loop on a background
