@@ -114,40 +114,25 @@ def create_engine():
     return engine
 
 
-# Per-thread persistent pyttsx3 engine. SAPI engines have thread affinity, so
-# each speaking thread keeps its own; the long-lived TTS-queue worker thus reuses
-# one engine across all streamed sentences instead of re-initialising per
-# sentence (the hot path). Ephemeral speak() threads still create one per call.
-_engines = threading.local()
-
-
-def _get_thread_engine():
-    """This thread's persistent engine, created once and reused thereafter."""
-
-    engine = getattr(_engines, "engine", None)
-
-    if engine is None:
-
-        engine = create_engine()
-
-        _engines.engine = engine
-
-    return engine
-
-
-def _drop_thread_engine():
-    """Discard this thread's engine so the next call re-initialises it."""
-
-    _engines.engine = None
-
-
 def _speak_thread(text):
+    """Speak one utterance on a freshly-created engine, then dispose it.
+
+    A pyttsx3/SAPI engine reused across multiple ``runAndWait()`` calls only
+    produces audio the FIRST time and is silent thereafter (v3.5 PR #12 reused a
+    persistent per-thread engine and made the long-lived TTS-queue worker
+    inaudible after its first sentence). Creating a fresh engine per utterance —
+    the proven pre-v3.5 behaviour — keeps every sentence audible; the init cost is
+    small next to staying audible, and dropping the reference in `finally` lets
+    pyttsx3 hand back a new engine on the next call.
+    """
 
     global current_engine
 
+    engine = None
+
     try:
 
-        engine = _get_thread_engine()
+        engine = create_engine()
 
         current_engine = engine
 
@@ -157,15 +142,13 @@ def _speak_thread(text):
 
     except Exception as e:
 
-        # Drop the (possibly wedged) engine so the next call re-inits — preserves
-        # the old per-call crash-recovery while reusing on the happy path.
-        logger.exception(f"TTS error, will re-init next call: {e}")
-
-        _drop_thread_engine()
+        logger.exception(f"TTS error: {e}")
 
     finally:
 
         current_engine = None
+
+        engine = None
 
 
 def speak_sync(text):

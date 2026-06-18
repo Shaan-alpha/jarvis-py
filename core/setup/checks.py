@@ -71,12 +71,90 @@ def check_model_present(name=MODEL_NAME, get=requests.get):
     )
 
 
-def select_input_device(devices, default_index):
-    """Return the index of a usable input device, or None.
+# Tokens that mark a Bluetooth / headset HFP mic. Their hands-free profile is
+# low-quality (8/16kHz, heavy processing) and openWakeWord scores it ~0, so we
+# avoid them for capture even when the OS makes them the default device.
+_BLUETOOTH_TOKENS = (
+    "headset", "hands-free", "hands free", "handsfree", "bthhf", "bluetooth"
+)
 
-    Prefer the OS default if it can capture; else the first input-capable
-    device; else None.
+
+# Host-API preference, by purpose (first matching token wins). Wake word needs
+# clean audio (WASAPI; MME's "communications" processing distorts speech for the
+# model). STT opens mono via speech_recognition, where MME/DirectSound downmix
+# cleanly and Google transcribes well, but WASAPI mono on a multi-channel device
+# is unintelligible — so it's penalised.
+_WAKE_HOST_SCORE = (("wasapi", 100), ("directsound", 10), ("wdm-ks", 10))
+
+_STT_HOST_SCORE = (("mme", 100), ("directsound", 80), ("wasapi", -50), ("wdm-ks", -100))
+
+
+def _host_score(host, table):
+
+    for token, points in table:
+
+        if token in host:
+
+            return points
+
+    return 0
+
+
+def _device_score(device, for_wake):
+    """Rank an input device for capture quality. Higher is better.
+
+    Bluetooth/headset HFP mics are penalised heavily for both purposes (their
+    hands-free audio scores ~0 for the wake word and transcribes poorly), built-in
+    microphones are preferred, and the host-API preference inverts by purpose
+    (see _WAKE_HOST_SCORE / _STT_HOST_SCORE).
     """
+
+    name = (device.get("name") or "").lower()
+
+    host = (device.get("host") or "").lower()
+
+    score = 0
+
+    if any(token in name for token in _BLUETOOTH_TOKENS):
+
+        score -= 1000
+
+    if "microphone array" in name:
+
+        score += 20
+
+    elif "microphone" in name:
+
+        score += 10
+
+    score += _host_score(host, _WAKE_HOST_SCORE if for_wake else _STT_HOST_SCORE)
+
+    return score
+
+
+def select_input_device(devices, default_index, for_wake=False):
+    """Return the index of the best usable input device, or None.
+
+    `for_wake` flips the host preference (WASAPI for the wake word, MME/
+    DirectSound for STT — see _device_score). When devices carry name/host
+    metadata, pick the highest-scoring real mic so the OS default being a
+    Bluetooth headset doesn't sink detection. Without that metadata (e.g. unit
+    tests), fall back to the OS default if input-capable, else the first input.
+    """
+
+    inputs = [d for d in devices if d.get("maxInputChannels", 0) > 0]
+
+    if not inputs:
+
+        return None
+
+    has_metadata = any(("name" in d or "host" in d) for d in inputs)
+
+    if has_metadata:
+
+        best = max(inputs, key=lambda d: (_device_score(d, for_wake), -d["index"]))
+
+        return best["index"]
 
     by_index = {d["index"]: d for d in devices}
 
@@ -86,13 +164,7 @@ def select_input_device(devices, default_index):
 
         return default_index
 
-    for device in devices:
-
-        if device.get("maxInputChannels", 0) > 0:
-
-            return device["index"]
-
-    return None
+    return inputs[0]["index"]
 
 
 def check_microphone(pyaudio_module=None):
@@ -106,10 +178,25 @@ def check_microphone(pyaudio_module=None):
 
     try:
 
-        devices = [
-            pa.get_device_info_by_index(i)
-            for i in range(pa.get_device_count())
-        ]
+        devices = []
+
+        for i in range(pa.get_device_count()):
+
+            info = pa.get_device_info_by_index(i)
+
+            # Attach the host-API name so select_input_device can prefer WASAPI.
+            # Best-effort: a stub PyAudio (tests) may not expose host APIs.
+            try:
+
+                info = dict(info)
+
+                info["host"] = pa.get_host_api_info_by_index(info["hostApi"])["name"]
+
+            except Exception:
+
+                pass
+
+            devices.append(info)
 
         try:
 
@@ -127,15 +214,21 @@ def check_microphone(pyaudio_module=None):
 
         pa.terminate()
 
-    chosen = select_input_device(devices, default_index)
+    chosen = select_input_device(devices, default_index, for_wake=False)
 
     if chosen is None:
 
         return _result(False, "No microphone found.", fixable=False)
 
+    wake = select_input_device(devices, default_index, for_wake=True)
+
     out = _result(True, "Microphone detected.")
 
+    # STT device (MME/DirectSound-preferred) and wake-word device
+    # (WASAPI-preferred); the same mic via different host APIs when possible.
     out["index"] = chosen
+
+    out["wake_index"] = wake if wake is not None else chosen
 
     return out
 

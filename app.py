@@ -216,6 +216,15 @@ def _select_mic():
 
     settings.INPUT_DEVICE_INDEX = result["index"]
 
+    # Wake word listens on a WASAPI-preferred device, STT on an MME/DirectSound
+    # one (see core.setup.checks); same mic, host best-suited to each consumer.
+    settings.WAKE_DEVICE_INDEX = result.get("wake_index", result["index"])
+
+    logger.info(
+        f"Mic: STT device {settings.INPUT_DEVICE_INDEX}, "
+        f"wake device {settings.WAKE_DEVICE_INDEX}"
+    )
+
     return True
 
 

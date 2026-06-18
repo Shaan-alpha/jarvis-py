@@ -9,11 +9,15 @@ OLLAMA_URL = "http://localhost:11434/api/generate"
 # Ollama model-list endpoint (used by setup checks)
 OLLAMA_TAGS_URL = "http://localhost:11434/api/tags"
 
-# Wake-word sensitivity. 0.4 was too low — ambient speech/noise scored ~0.43
-# and woke Jarvis spuriously. 0.6 is the recommended low-false-positive range;
-# WAKE_CONSECUTIVE additionally requires the score to clear the threshold on
-# back-to-back frames so a single noisy blip doesn't trigger.
-WAKE_THRESHOLD = 0.6
+# Wake-word sensitivity. 0.6 suited the old (degraded MME) capture path. With
+# clean WASAPI capture + resampling (see openwakeword_listener), ambient sits
+# near 0, but real "hey jarvis" utterances vary a lot by distance/articulation:
+# measured peaks ranged 0.47 (quiet) to 0.97 (clear), and at 0.4 a quiet pass
+# only cleared the bar for a single frame — below WAKE_CONSECUTIVE's 2-frame
+# requirement, so it never fired. 0.3 gives a 3-frame run on a quiet "hey jarvis"
+# while ambient stays well under it. Tune up if you get false wakes, down if it
+# misses you.
+WAKE_THRESHOLD = 0.3
 
 WAKE_CONSECUTIVE = 2
 
@@ -63,7 +67,15 @@ ONLINE_CHECK_TIMEOUT = 1.0
 ONLINE_CACHE_TTL = 5.0
 
 # Chosen at startup by mic auto-detect; None = PyAudio default.
+# INPUT_DEVICE_INDEX feeds STT (speech_recognition): prefers an MME/DirectSound
+# mic, which downmixes to mono cleanly and which Google STT transcribes well.
+# WAKE_DEVICE_INDEX feeds the wake-word listener: prefers the same mic on WASAPI,
+# whose clean shared-mode audio openWakeWord needs (MME's "communications"
+# processing scores ~0). They are the same physical mic via different host APIs;
+# both fall back to the PyAudio default when None.
 INPUT_DEVICE_INDEX = None
+
+WAKE_DEVICE_INDEX = None
 
 # -------------------- #
 # HUD (desktop overlay)

@@ -19,6 +19,7 @@ fastembed==0.8.0
 faiss-cpu==1.13.2
 pypdf==6.11.0
 numpy==2.4.4
+scipy==1.17.1   # signal.resample_poly: resample mic audio to 16kHz for openWakeWord
 
 # System automation
 PyAutoGUI==0.9.54
