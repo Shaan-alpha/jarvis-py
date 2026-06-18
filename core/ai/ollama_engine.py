@@ -255,6 +255,38 @@ Jarvis:"""
             timeout=60
         )
 
+        # Ollama answered, but with an error status (commonly 500 when the model
+        # needs more memory than is free). The streamed body carries no response
+        # tokens, so without this guard the user just hears silence. Surface it.
+        if not response.ok:
+
+            detail = ""
+
+            try:
+
+                detail = (response.json() or {}).get("error", "") or ""
+
+            except Exception:
+
+                detail = (response.text or "")[:200]
+
+            logger.error(f"Ollama returned {response.status_code}: {detail}")
+
+            if "memory" in detail.lower():
+
+                message = (
+                    "I couldn't run the model — it needs more memory than is "
+                    "free right now."
+                )
+
+            else:
+
+                message = "Something went wrong running the model."
+
+            add_to_queue(message)
+
+            return ""
+
         full_response = _stream_response(response, my_generation)
 
         # None = a newer query superseded this stream (barge-in); don't queue
