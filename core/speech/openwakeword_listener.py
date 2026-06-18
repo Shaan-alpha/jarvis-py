@@ -1,7 +1,12 @@
 import os
 
+from math import gcd
+
 import pyaudio
 import numpy as np
+
+# pyrefly: ignore [missing-import]
+from scipy.signal import resample_poly
 
 # pyrefly: ignore [missing-import]
 import openwakeword
@@ -30,6 +35,30 @@ FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 16000
 CHUNK = 1280
+
+
+def _resample_to_16k(samples, src_rate):
+    """Resample mono int16 PCM from `src_rate` to 16kHz (what openWakeWord needs).
+
+    Force-opening a 44.1/48kHz mic at 16kHz (PyAudio + MME on Windows) yields
+    degraded audio that openWakeWord scores near zero — so capture at the device's
+    native rate and resample here instead. Verified: the same "hey jarvis" that
+    scored ~0 force-opened at 16kHz scores ~0.97 when captured native + resampled.
+    """
+
+    if src_rate == RATE:
+
+        return samples
+
+    divisor = gcd(int(src_rate), RATE)
+
+    up = RATE // divisor
+
+    down = int(src_rate) // divisor
+
+    resampled = resample_poly(samples.astype(np.float64), up, down)
+
+    return resampled.astype(np.int16)
 
 
 _model = None
@@ -93,6 +122,48 @@ def _get_model():
 DRAIN_CHUNKS = 12
 
 
+def _device_format(audio, device_index):
+    """The input device's native (sample_rate, channels). PyAudio delivers clean
+    audio at the native rate; resampling to 16kHz and the mono downmix happen in
+    software — force-opening at 16kHz corrupts the audio for openWakeWord."""
+
+    if device_index is None:
+
+        info = audio.get_default_input_device_info()
+
+    else:
+
+        info = audio.get_device_info_by_index(device_index)
+
+    return int(info["defaultSampleRate"]), max(1, int(info.get("maxInputChannels", 1)))
+
+
+def _frame_stream(stream, src_rate, read_size, channels):
+    """Yield resampled-16kHz, mono, CHUNK-sized openWakeWord frames from `stream`,
+    downmixing multi-channel audio and reading as many native blocks as each
+    frame needs."""
+
+    pending = np.empty(0, dtype=np.int16)
+
+    while True:
+
+        while len(pending) < CHUNK:
+
+            data = stream.read(read_size, exception_on_overflow=False)
+
+            block = np.frombuffer(data, dtype=np.int16)
+
+            if channels > 1:
+
+                block = block.reshape(-1, channels).mean(axis=1).astype(np.int16)
+
+            pending = np.concatenate([pending, _resample_to_16k(block, src_rate)])
+
+        yield pending[:CHUNK]
+
+        pending = pending[CHUNK:]
+
+
 def detect_wake_word(stop_event=None, verbose=True):
 
     model = _get_model()
@@ -101,25 +172,45 @@ def detect_wake_word(stop_event=None, verbose=True):
 
     audio = pyaudio.PyAudio()
 
+    # Capture at the device's native rate, then resample to 16kHz in software.
+    # Force-opening a 44.1/48kHz mic at 16kHz (PyAudio + MME on Windows) corrupts
+    # the audio so openWakeWord never crosses threshold; native capture +
+    # _resample_to_16k restores detection.
+    # Wake word listens on its own (WASAPI-preferred) device; falls back to the
+    # STT/default device when no separate wake device was chosen.
+    device_index = settings.WAKE_DEVICE_INDEX
+
+    if device_index is None:
+
+        device_index = settings.INPUT_DEVICE_INDEX
+
+    src_rate, channels = _device_format(audio, device_index)
+
+    read_size = max(1, int(src_rate * 0.08))   # ~80ms native blocks
+
     stream = audio.open(
         format=FORMAT,
-        channels=CHANNELS,
-        rate=RATE,
+        channels=channels,
+        rate=src_rate,
         input=True,
-        input_device_index=settings.INPUT_DEVICE_INDEX,
-        frames_per_buffer=CHUNK
+        input_device_index=device_index,
+        frames_per_buffer=read_size
     )
 
     if verbose:
 
         logger.info(
-            f"Listening for wake word: '{WAKE_WORD}'"
+            f"Listening for wake word: '{WAKE_WORD}' "
+            f"(mic {device_index} @ {src_rate}Hz x{channels}ch -> {RATE}Hz)"
         )
 
         print(
             f"\nListening for wake word "
             f"('{WAKE_WORD.replace('_', ' ')}')..."
         )
+
+    # Resampled-16kHz mono frame generator (CHUNK samples per frame).
+    frames = _frame_stream(stream, src_rate, read_size, channels)
 
     try:
 
@@ -133,17 +224,7 @@ def detect_wake_word(stop_event=None, verbose=True):
 
                 return False
 
-            audio_data = stream.read(
-                CHUNK,
-                exception_on_overflow=False
-            )
-
-            audio_np = np.frombuffer(
-                audio_data,
-                dtype=np.int16
-            )
-
-            model.predict(audio_np)
+            model.predict(next(frames))
 
         # Consecutive frames above threshold required to fire (debounce).
         streak = 0
@@ -154,15 +235,7 @@ def detect_wake_word(stop_event=None, verbose=True):
 
                 return False
 
-            audio_data = stream.read(
-                CHUNK,
-                exception_on_overflow=False
-            )
-
-            audio_np = np.frombuffer(
-                audio_data,
-                dtype=np.int16
-            )
+            audio_np = next(frames)
 
             rms = float(np.sqrt(np.mean(audio_np.astype(np.float64) ** 2)))
 

@@ -65,8 +65,9 @@ def test_ask_llm_speaks_on_error_status(monkeypatch):
     assert any("memory" in s.lower() for s in spoken)
 
 
-def test_speak_sync_reuses_engine_on_same_thread(monkeypatch):
-    se._drop_thread_engine()      # hermetic start
+def test_speak_sync_creates_fresh_engine_per_call(monkeypatch):
+    # A pyttsx3/SAPI engine reused across runAndWait() calls only speaks the
+    # first time and is silent after, so each utterance must get a fresh engine.
     calls = {"n": 0}
     said = []
 
@@ -90,13 +91,11 @@ def test_speak_sync_reuses_engine_on_same_thread(monkeypatch):
     se.speak_sync("two")
     se.speak_sync("three")
 
-    assert calls["n"] == 1                       # engine created once, then reused
+    assert calls["n"] == 3                        # fresh engine per utterance
     assert said == ["one", "two", "three"]
-    se._drop_thread_engine()                     # clean up the persistent engine
 
 
 def test_speak_sync_survives_engine_failure(monkeypatch):
-    se._drop_thread_engine()      # hermetic start (don't reuse a prior test's engine)
     calls = {"n": 0}
     said = []
 

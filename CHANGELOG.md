@@ -1,3 +1,32 @@
+## v3.5.1 — Audio capture fixes (2026-06-18)
+
+Fixes the voice pipeline on Windows multi-device setups, found by running the app
+on a laptop whose OS-default mic was Bluetooth earbuds.
+
+- **Fix — wake word never fired ("can't hear me").** The wake-word listener
+  force-opened the mic at 16kHz; on a 44.1/48kHz device via PyAudio's MME host
+  that delivers degraded audio openWakeWord scores ~0. It now captures at the
+  device's **native rate via WASAPI** and resamples to 16kHz in software
+  (`scipy.signal.resample_poly`), downmixing multi-channel input.
+  (`core/speech/openwakeword_listener.py`)
+- **Fix — bot inaudible after one sentence ("can't hear bot"); regresses v3.5.0.**
+  v3.5.0's persistent per-thread `pyttsx3` engine (PR #12) only spoke its first
+  utterance — a reused SAPI engine is silent on subsequent `runAndWait()` calls,
+  so the TTS-queue worker went mute after one sentence. Reverted to a **fresh
+  engine per utterance**. (`core/speech/engine.py`)
+- **Purpose-aware, Bluetooth-avoiding mic selection.** Wake word and STT now use
+  the same physical mic via the host API each needs — **WASAPI** for the wake word
+  (clean audio) and **MME/DirectSound** for STT (intelligible mono that Google
+  transcribes) — via separate `WAKE_DEVICE_INDEX` / `INPUT_DEVICE_INDEX`.
+  Bluetooth/headset HFP mics are de-prioritised (unusable for detection).
+  (`core/setup/checks.py`, `config/settings.py`, `app.py`)
+- **Wake threshold 0.6 → 0.3.** Clean WASAPI capture keeps ambient near 0, but
+  real "hey jarvis" utterances vary ~0.47–0.97 by distance/articulation; 0.3 with
+  the existing 2-frame debounce fires reliably without spurious wakes.
+- **Dependency:** add `scipy` (mic-audio resampling).
+- Tests: new `tests/test_wake_resample.py`; selection + recovery tests updated.
+  267 pass; lint clean. Verified live end-to-end: wake → STT → tool → spoken answer.
+
 ## v3.5.0 — Responsiveness & Efficiency (2026-06-18)
 - **Latency instrumentation** (`core/utils/metrics.py`): a per-turn `Timeline`
   records stage marks and emits a compact summary (`route`/`first_token`/
