@@ -1,6 +1,4 @@
-## [Unreleased]
-
-### v3.5 — Responsiveness & Efficiency (in progress)
+## v3.5.0 — Responsiveness & Efficiency (2026-06-18)
 - **Latency instrumentation** (`core/utils/metrics.py`): a per-turn `Timeline`
   records stage marks and emits a compact summary (`route`/`first_token`/
   `first_audio`/`total`) to the log + a HUD `metrics` event. Wired into
@@ -12,6 +10,25 @@
   (`num_predict=80`, `temperature=0`) so the tiny selection JSON returns quickly
   and deterministically instead of an unbounded completion blocking before
   `ask_llm`.
+- **TTS engine reuse** (`core/speech/engine.py`): each speaking thread keeps a
+  persistent `pyttsx3` engine in thread-local storage and reuses it across
+  streamed sentences instead of re-initialising one per sentence (the hot path).
+  The failure path drops the (possibly wedged) engine so the next call re-inits,
+  preserving the old per-call crash recovery. (PR #12)
+- **Warm-start** (`core/warmup.py`): on launch, a daemon thread preloads the LLM
+  (priming ping) and the embedding model off the critical path so the user's
+  first real query isn't a cold start. Each step is best-effort — a failure is
+  logged and the component just lazy-loads on demand. Vosk and the wake-word
+  model are intentionally not warmed. (PR #14)
+- **Model bake-off** (`model_bakeoff.py`): a CI-safe benchmark script that scores
+  candidate local Ollama models on tool-selection accuracy and chat latency
+  (TTFT + total), skipping models that aren't pulled. Pure-logic helpers are
+  unit-tested; the I/O runs only against a live Ollama. (PR #13)
+- **Fix — silent Ollama error status**: `ask_llm` now checks the HTTP status
+  before streaming. Previously a non-200 (commonly a 500 when the model needs
+  more memory than is free) streamed a body with no tokens, so the user heard
+  nothing; it now logs the error and speaks a concise message (memory-specific
+  when the model is out of RAM). +1 test.
 
 ## v3.4.0 — Agent Capabilities & Hardening
 

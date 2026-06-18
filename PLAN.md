@@ -37,20 +37,24 @@ Architecture first. No giant single files.
 
 ## Current Status
 
-> Latest release: **v3.3.0 "Polish & Packaging"** (+ a HUD overhaul) — shipped,
-> tagged, GitHub Release published (2026-05-31). **v3.4 — Agent Capabilities** is
-> on `main` but **unreleased**: Layer-1 tool foundation (PR #4), routing
-> unification (PR #6), clipboard tools (PR #7), and sandboxed file-system tools
-> (PR #9) are all merged. A **deep audit-hardening pass** (findings F1–F15:
-> security, crash-safe persistence, memory perf, NLU, content fidelity, TTS,
-> cleanup; +26 tests; CI green) is ready on branch `fix/audit-2026-06-17`.
+> Latest release: **v3.4.0 "Agent Capabilities & Hardening"** — shipped, tagged,
+> GitHub Release published. It bundled the Layer-1 tool foundation (PR #4),
+> routing unification (PR #6), clipboard tools (PR #7), sandboxed file-system
+> tools (PR #9), and the deep audit-hardening pass (findings F1–F15: security,
+> crash-safe persistence, memory perf, NLU, content fidelity, TTS, cleanup).
 >
-> **Roadmap direction (2026-06-17): speed-first.** The guiding motto is *offline +
-> online, but efficient and fast to respond*. So after cutting the pending
-> **v3.4.0** release, the immediate milestone is **v3.5 — Responsiveness &
-> Efficiency**; agent capabilities, smarter memory, the UI panels, and
-> distribution each follow on top of a faster, measured core. See the sequenced
-> milestones below.
+> **v3.5 — Responsiveness & Efficiency is underway on `main` (unreleased).**
+> Merged: latency instrumentation + `decide_tool` generation cap (PR #11),
+> persistent-engine TTS reuse (PR #12), the model bake-off benchmark script
+> (PR #13), and warm-start preload of the LLM + embedder (PR #14). **258 tests
+> pass; lint clean.** Remaining v3.5 work: STT/wake stage marks + a HUD latency
+> readout, wider deterministic keyword routing, STT tuning, and picking a faster
+> default model from the bake-off (needs a run on the user's machine).
+>
+> **Roadmap direction: speed-first.** The guiding motto is *offline + online, but
+> efficient and fast to respond*. v3.5 establishes a measured baseline; agent
+> capabilities, smarter memory, the UI panels, and distribution each follow on
+> top of a faster, measured core. See the sequenced milestones below.
 
 ### v3.2.0 — Desktop HUD (shipped)
 
@@ -134,8 +138,8 @@ These hold for all work below — they are the project's identity, not a milesto
 Goal: a clean, tagged baseline before the speed work starts.
 
 - [x] Clipboard tools (PR #7) + sandboxed file-system tools (PR #9) — on `main`
-- [ ] Merge the audit-hardening pass (`fix/audit-2026-06-17`, F1–F15)
-- [ ] Bump `pyproject` + `CHANGELOG` to **3.4.0**, tag, publish a GitHub Release
+- [x] Merge the audit-hardening pass (`fix/audit-2026-06-17`, F1–F15)
+- [x] Bump `pyproject` + `CHANGELOG` to **3.4.0**, tag, publish a GitHub Release
       (the project's always-tag-and-release habit)
 
 > The remaining "agent capability" tools originally filed under v3.4
@@ -152,24 +156,29 @@ offline. This is the motto milestone.
 - [~] **Latency instrumentation (do first)** — time each pipeline stage
       (wake → listen → STT → route → first-token → first-audio → done), log it,
       surface in the HUD. Every later change is judged against these numbers.
-      *Started:* `core/utils/metrics.py` `Timeline` + thread-local API, wired for
-      the `routed`/`first_token`/`first_audio`/`done` stages. Remaining: STT/wake
-      marks (voice-loop + HUD entry) and the HUD readout.
-- [ ] **TTS engine reuse** — own a single persistent `pyttsx3` engine on one
-      dedicated thread instead of `create_engine()` per sentence
-      (`core/speech/engine.py` `_speak_thread`). Biggest easy win; keep the
-      failure-reinit recovery.
-- [ ] **Warm-start** — preload Ollama (priming ping), the embedder, Vosk, and
-      openWakeWord at startup off-thread so the first real query isn't cold.
-- [ ] **Faster tool routing** — widen the deterministic keyword path so common
-      commands never hit the LLM; cap/stop-token the `decide_tool` call so its
-      JSON returns fast; evaluate folding selection into the main streamed call.
+      *Done (PR #11):* `core/utils/metrics.py` `Timeline` + thread-local API,
+      wired for the `routed`/`first_token`/`first_audio`/`done` stages. Remaining:
+      STT/wake marks (voice-loop + HUD entry) and the HUD readout.
+- [x] **TTS engine reuse** (PR #12) — each speaking thread owns a persistent
+      `pyttsx3` engine in thread-local storage and reuses it across streamed
+      sentences instead of `create_engine()` per sentence
+      (`core/speech/engine.py`). Failure path drops + re-inits, keeping the old
+      crash recovery. *(Needs a real-device smoke test for cross-thread stop.)*
+- [x] **Warm-start** (PR #14) — a daemon thread preloads Ollama (priming ping)
+      and the embedder at startup off the critical path so the first real query
+      isn't cold (`core/warmup.py`). Best-effort per step. Vosk + openWakeWord are
+      intentionally not warmed (may be unused / would race the native load).
+- [~] **Faster tool routing** — *Done (PR #11):* `decide_tool` caps the Ollama
+      call (`num_predict=80`, `temperature=0`) so its JSON returns fast. Remaining:
+      widen the deterministic keyword path so common commands never hit the LLM;
+      evaluate folding selection into the main streamed call.
 - [ ] **STT tuning** — calibrate ambient noise once per session (not every
       listen), adaptive `pause_threshold`, optional Vosk partial results; optionally
       race online + offline STT and take the first good result (pure motto).
-- [ ] **Model bake-off** — benchmark `phi3` vs `phi3.5` / `llama3.2:1b–3b` /
-      `qwen2.5:1.5b` on tool-JSON accuracy + chat latency/quality; pick a faster
-      default, document the swap. Stays local/offline.
+- [~] **Model bake-off** — *Done (PR #13):* `model_bakeoff.py` benchmarks `phi3`
+      vs `phi3.5` / `llama3.2:3b` / `qwen2.5:1.5b` on tool-JSON accuracy + chat
+      latency. Remaining: run it on the user's machine, pick a faster default,
+      document the swap. Stays local/offline.
 
 ---
 

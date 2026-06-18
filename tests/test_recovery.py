@@ -1,3 +1,5 @@
+import json
+
 import core.ai.ollama_engine as oe
 import core.speech.engine as se
 import core.speech.offline_recognizer as off
@@ -15,6 +17,52 @@ def test_ask_llm_handles_connection_error(monkeypatch):
     oe.ask_llm("hello")  # must NOT raise
 
     assert any("ollama" in s.lower() for s in spoken)
+
+
+class _ErrorResponse:
+    """Stand-in for a requests Response carrying an error status.
+
+    Faithful to a real streamed Ollama 500: iter_lines() yields the error JSON
+    body (no "response" tokens), so without a status guard _stream_response just
+    returns "" and the user hears nothing — the bug under test.
+    """
+
+    def __init__(self, status_code, error):
+        self.status_code = status_code
+        self.ok = status_code < 400
+        self._error = error
+        self.text = error
+
+    def json(self):
+        return {"error": self._error}
+
+    def iter_lines(self):
+        yield json.dumps({"error": self._error}).encode("utf-8")
+
+    def close(self):
+        pass
+
+
+def test_ask_llm_speaks_on_error_status(monkeypatch):
+    # Ollama can answer with a non-200 (e.g. 500 when the model needs more memory
+    # than is free). The streamed body has no tokens, so without a status guard
+    # the user just hears silence. ask_llm must surface something spoken instead.
+    spoken = []
+
+    def error_post(*a, **k):
+        return _ErrorResponse(
+            500, "model requires more system memory than is available"
+        )
+
+    monkeypatch.setattr(oe.requests, "post", error_post)
+    monkeypatch.setattr(oe, "add_to_queue", lambda text: spoken.append(text))
+
+    result = oe.ask_llm("what is the capital of france")  # must NOT raise
+
+    assert result == ""
+    assert spoken, "expected a spoken message on an Ollama error status"
+    # The OOM case mentions memory so the user knows why.
+    assert any("memory" in s.lower() for s in spoken)
 
 
 def test_speak_sync_reuses_engine_on_same_thread(monkeypatch):
