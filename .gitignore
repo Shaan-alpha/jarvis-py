@@ -40,3 +40,6 @@ core/memory/semantic_memory.json
 
 # Agent file-system tools sandbox — user files at runtime (dev: <repo>/workspace)
 workspace/
+
+# Scratch HUD screenshots — debug captures, never committed
+_hud_shot.png

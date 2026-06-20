@@ -10,6 +10,12 @@
   (favicon + title-bar brand mark) and a Pillow-drawn `assets/jarvis.png` +
   multi-size `assets/jarvis.ico` (regen with `assets/make_logo.py`), wired into
   `jarvis.spec` (`icon=`) for the built `.exe`/window.
+- **Orb glass refinement.** The fluid orb is now a *contained glass sphere*: a
+  clipping `.orb-body` wrapper keeps the screen-blended colour layers inside a
+  crisp circle over a deep base (vivid flow instead of washing out to white),
+  with a glassy `.orb-rim` (bright top edge, soft dark bottom, faint accent
+  ring) and a smaller, repositioned specular glint. (`hud/web/index.html`,
+  `hud/web/style.css`)
 - **UI cleanup.** Slim brand title bar; removed a dead `.top` selector from the
   reduced-motion rule; window height nudged to fit the new bar.
 - Tests: +2 (shutdown WS dispatch + the shutdown handler stops services then

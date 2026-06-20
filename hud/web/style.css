@@ -231,66 +231,100 @@ html, body {
   filter: blur(7px);
 }
 
-/* ---- Fluid blob orb (Siri / ChatGPT style) ---------------------------- */
+/* ---- Fluid glass orb (Siri / ChatGPT style, contained) ---------------- */
 #orb {
   position: relative;
   z-index: 1;
-  width: 150px;
-  height: 150px;
+  width: 126px;
+  height: 126px;
   display: grid;
   place-items: center;
   --level: 0;
-  transform: scale(calc(1 + var(--level) * .14));
+  transform: scale(calc(1 + var(--level) * .12));
   transition: transform .12s ease-out;
 }
 
-/* Soft outer bloom that swells with the voice level. */
+/* Soft coloured halo behind the sphere; tight enough not to bleed into the
+   title bar or captions, swells a touch with the voice level. */
 .orb-glow {
   position: absolute;
   width: 150px;
   height: 150px;
   border-radius: 50%;
-  background: radial-gradient(circle, var(--halo), transparent 66%);
-  filter: blur(10px);
-  opacity: calc(.45 + var(--level) * .55);
+  background: radial-gradient(circle, var(--halo), transparent 58%);
+  filter: blur(13px);
+  opacity: calc(.5 + var(--level) * .5);
   animation: glow-pulse 5s ease-in-out infinite;
 }
 
-/* The fluid colour layers: blurred, screen-blended, morphing + spinning at
-   different rates so they flow into one another like the Siri orb. */
+/* The glass sphere body: a crisp circle that CLIPS the fluid colour inside,
+   over a deep base so the screen-blended blobs read as vivid flow instead of
+   washing out to white. The inset shadow gives it spherical depth. */
+.orb-body {
+  position: absolute;
+  width: 112px;
+  height: 112px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 60%,
+              color-mix(in srgb, var(--orb-b) 55%, #07111e), #060d18 80%);
+  box-shadow: inset 0 0 26px rgba(0, 0, 0, .55);
+}
+
+/* Fluid colour layers: morphing + spinning at different rates so they flow
+   into one another, screen-blended over the deep base. */
 .blob {
   position: absolute;
-  width: 96px;
-  height: 96px;
+  width: 92px;
+  height: 92px;
+  left: 10px;
+  top: 10px;
   border-radius: 50%;
-  filter: blur(15px);
+  filter: blur(13px);
   mix-blend-mode: screen;
-  opacity: .92;
+  opacity: .95;
   will-change: transform, border-radius;
 }
 .blob.b1 {
-  background: radial-gradient(circle at 35% 32%, var(--orb-a), transparent 62%);
+  background: radial-gradient(circle at 35% 32%, var(--orb-a), transparent 60%);
   animation: morphA 7s ease-in-out infinite, spin 16s linear infinite;
 }
 .blob.b2 {
-  background: radial-gradient(circle at 66% 60%, var(--orb-b), transparent 62%);
+  background: radial-gradient(circle at 66% 60%, var(--orb-b), transparent 58%);
   animation: morphB 9s ease-in-out infinite, spin 22s linear infinite reverse;
 }
 .blob.b3 {
-  background: radial-gradient(circle at 50% 70%, var(--orb-c), transparent 60%);
+  background: radial-gradient(circle at 50% 72%, var(--orb-c), transparent 56%);
   animation: morphA 11s ease-in-out infinite reverse, spin 28s linear infinite;
 }
 
-/* A faint highlight for a focal glint — soft, never a hard white ball. */
+/* Small specular glint near the top-left — a glass highlight, not a wash. */
 .orb-sheen {
   position: absolute;
-  width: 38px;
-  height: 38px;
+  left: 24%;
+  top: 18%;
+  width: 26px;
+  height: 18px;
   border-radius: 50%;
-  background: radial-gradient(circle at 42% 40%, rgba(255, 255, 255, .5), transparent 70%);
-  filter: blur(6px);
-  opacity: .55;
-  mix-blend-mode: screen;
+  background: radial-gradient(circle at 45% 40%, rgba(255, 255, 255, .8), transparent 70%);
+  filter: blur(3px);
+  opacity: .7;
+  transform: rotate(-22deg);
+}
+
+/* Glassy rim: bright top edge, soft dark bottom, faint accent ring — sells the
+   sphere and gives the orb a clean boundary. */
+.orb-rim {
+  position: absolute;
+  width: 112px;
+  height: 112px;
+  border-radius: 50%;
+  pointer-events: none;
+  box-shadow:
+    inset 0 1.5px 1px rgba(255, 255, 255, .45),
+    inset 0 -10px 20px rgba(0, 0, 0, .45),
+    inset 0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent),
+    0 0 0 1px rgba(255, 255, 255, .04);
 }
 
 /* State drives the flow speed (body[data-state] is set by app.js). */
