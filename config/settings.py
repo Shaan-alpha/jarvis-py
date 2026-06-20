@@ -12,14 +12,15 @@ OLLAMA_TAGS_URL = "http://localhost:11434/api/tags"
 # Wake-word sensitivity. 0.6 suited the old (degraded MME) capture path. With
 # clean WASAPI capture + resampling (see openwakeword_listener), ambient sits
 # near 0, but real "hey jarvis" utterances vary a lot by distance/articulation:
-# measured peaks ranged 0.47 (quiet) to 0.97 (clear), and at 0.4 a quiet pass
-# only cleared the bar for a single frame — below WAKE_CONSECUTIVE's 2-frame
-# requirement, so it never fired. 0.3 gives a 3-frame run on a quiet "hey jarvis"
-# while ambient stays well under it. Tune up if you get false wakes, down if it
-# misses you.
+# measured peaks ranged 0.47 (quiet) to 0.97 (clear). On some voices/mics a quiet
+# pass peaks ~0.5 but only crosses the bar for a SINGLE frame, so a 2-consecutive
+# requirement silently dropped ~4 of 5 attempts (the "it can't hear me" bug). With
+# ambient staying well under 0.3, a single frame over threshold is a safe trigger,
+# so WAKE_CONSECUTIVE is 1. Raise it to 2 if you get false wakes; lower THRESHOLD
+# if it still misses you.
 WAKE_THRESHOLD = 0.3
 
-WAKE_CONSECUTIVE = 2
+WAKE_CONSECUTIVE = 1
 
 SESSION_TIMEOUT = 20
 
