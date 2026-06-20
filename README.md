@@ -201,13 +201,44 @@ battery / model / online). The theme adapts to the time of day: **cyan** by day,
 python app.py --hud
 ```
 
+![The Jarvis HUD — a fluid glassmorphism orb, streaming captions, a live status row (model / CPU / battery / online), and a type-to-Jarvis box](assets/hud.png)
+
 The HUD is a separate [pywebview](https://pywebview.flowrl.com/) window that talks
 to the voice core over a local WebSocket — fully free and local. Without `--hud`,
 the assistant behaves exactly as above. (Note: interrupting by *speaking* while
 Jarvis talks isn't supported — the mic would hear its own voice — so use the Stop
 button, `Esc`, or just type the next question to interrupt.)
 
-> _Demo GIF coming soon — run it and watch the orb come alive._
+---
+
+## Extend with plugins
+
+Drop a `.py` file in `plugins/` and decorate a function with `@tool` — the loader
+auto-discovers it at startup and registers it with **both** the fast keyword router
+and the LLM tool-agent. No wiring, no restart of the architecture:
+
+```python
+# plugins/roll_dice.py
+import random
+
+from core.agent.registry import tool
+
+
+@tool(
+    "roll_dice",
+    "Roll an N-sided die",
+    params={
+        "sides": {"type": "int", "required": False, "default": 6, "desc": "number of sides"},
+    },
+)
+def roll_dice(sides=6):
+    return f"You rolled a {random.randint(1, sides)} on a {sides}-sided die."
+```
+
+Now say *"hey jarvis… roll a dice"* and Jarvis calls your tool, speaking the
+returned string. The same `@tool` decorator powers the built-in actions in
+[core/agent/builtins.py](core/agent/builtins.py) (open/close apps, volume,
+clipboard, system status, web search).
 
 ---
 
@@ -245,7 +276,8 @@ All config in [config/settings.py](config/settings.py):
 | `MODEL_NAME` | `phi3` | Ollama model |
 | `WAKE_WORD` | `hey_jarvis` | openWakeWord model name |
 | `WAKE_MODEL_PATH` | `models/wake/hey_jarvis_v0.1.onnx` | Project-local wake-word ONNX override |
-| `WAKE_THRESHOLD` | `0.4` | Wake-word confidence cutoff |
+| `WAKE_THRESHOLD` | `0.3` | Wake-word confidence cutoff |
+| `WAKE_CONSECUTIVE` | `1` | Frames over threshold required to fire (raise to debounce false wakes) |
 | `SESSION_TIMEOUT` | `20` | Seconds of silence before returning to sleep |
 | `VOSK_MODEL_PATH` | `models/vosk/vosk-model-small-en-us-0.15` | Project-local Vosk model |
 | `MEMORY_SIMILARITY_THRESHOLD` | `0.45` | Min cosine for conversation-memory recall |

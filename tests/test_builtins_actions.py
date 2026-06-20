@@ -5,7 +5,10 @@ from core.agent import registry
 # --- close_app -------------------------------------------------------------
 
 def test_resolve_close_image_known():
-    assert agent_builtins.resolve_close_image("Calculator") == "calc.exe"
+    # Win11 Calculator runs as the UWP process CalculatorApp.exe; calc.exe is
+    # only a launcher stub that exits immediately, so taskkilling it is a no-op.
+    assert agent_builtins.resolve_close_image("Calculator") == "CalculatorApp.exe"
+    assert agent_builtins.resolve_close_image("calc") == "CalculatorApp.exe"
     assert agent_builtins.resolve_close_image("notepad") == "notepad.exe"
     assert agent_builtins.resolve_close_image("paint") == "mspaint.exe"
 

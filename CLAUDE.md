@@ -200,8 +200,11 @@ Ubuntu/Python 3.11. **Keep CI green** — it's a public adoption signal.
   (pywebview requirement): `app.main()` puts the voice loop on a daemon thread and
   calls `window.launch()` on the main thread. Verify a build with
   `Jarvis.exe --check-paths`. Build/run details: `dist/`+`build/` are gitignored.
-- **Voice tunables (`config/settings.py`):** `WAKE_THRESHOLD` (0.6) +
-  `WAKE_CONSECUTIVE` (2-frame debounce) gate false wake-ups; `MAX_ENERGY_THRESHOLD`
+- **Voice tunables (`config/settings.py`):** `WAKE_THRESHOLD` (0.3) gates false
+  wake-ups; `WAKE_CONSECUTIVE` (1 frame) is how many consecutive over-threshold
+  frames must fire — it was 2, but some voices/mics peak ~0.5 for only a single
+  frame, so 2 silently dropped most wake attempts ("it can't hear me"). Raise it
+  back to 2 if you get false wakes. `MAX_ENERGY_THRESHOLD`
   caps STT sensitivity so quiet speech is still heard. Lower/raise to taste.
   Interrupting by *speaking* mid-reply is unsupported (mic hears Jarvis's TTS —
   no echo cancellation); the Stop button / Esc / typed query are the interrupts.

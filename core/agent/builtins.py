@@ -127,9 +127,12 @@ def mute_volume():
     return "Volume muted."
 
 
+# Win11 Calculator is a UWP app: launching calc.exe spawns CalculatorApp.exe and
+# the calc.exe stub exits immediately, so `taskkill /im calc.exe` finds nothing to
+# kill. Target the real process image instead.
 _CLOSE_IMAGES = {
-    "calculator": "calc.exe",
-    "calc": "calc.exe",
+    "calculator": "CalculatorApp.exe",
+    "calc": "CalculatorApp.exe",
     "notepad": "notepad.exe",
     "paint": "mspaint.exe",
     "mspaint": "mspaint.exe",
