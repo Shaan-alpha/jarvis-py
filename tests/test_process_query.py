@@ -1,3 +1,5 @@
+import pytest
+
 import app
 
 from core.agent.registry import ToolCall
@@ -133,3 +135,29 @@ def test_process_query_records_latency_metrics(monkeypatch):
     stages = captured["metrics"]["stages"]
     assert "routed" in stages and "done" in stages
     assert metrics.current() is None      # turn cleaned up even on the tool path
+
+
+def test_shutdown_handler_stops_services_then_exits(monkeypatch):
+    calls = []
+    monkeypatch.setattr(app, "stop_speaking", lambda: calls.append("stop_speaking"))
+    monkeypatch.setattr(app, "clear_queue", lambda: calls.append("clear_queue"))
+    monkeypatch.setattr(app, "stop_tts_queue", lambda: calls.append("stop_tts_queue"))
+
+    class _TM:
+        def stop(self):
+            calls.append("tm.stop")
+
+    exited = {}
+
+    def _fake_exit(code):
+        exited["code"] = code
+        raise SystemExit(code)     # halt like os._exit would, but testably
+
+    monkeypatch.setattr(app.os, "_exit", _fake_exit)
+
+    with pytest.raises(SystemExit):
+        app._hud_on_shutdown(_TM())
+
+    assert exited["code"] == 0
+    # Services stopped (mic released) before the process exits.
+    assert {"stop_speaking", "stop_tts_queue", "tm.stop"} <= set(calls)

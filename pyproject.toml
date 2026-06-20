@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "jarvis-py"
-version = "3.5.1"
+version = "3.5.2"
 description = "Local-first AI voice assistant with online/offline STT, wake-word detection, semantic memory, document RAG, streaming LLM responses, a tool-agent, and interruptible TTS."
 readme = "README.md"
 requires-python = ">=3.10"

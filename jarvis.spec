@@ -57,7 +57,7 @@ exe = EXE(
     # windowed with no console; the HUD is then the only visible surface.
     # (Logs still go to %APPDATA%\JarvisAI\logs\jarvis.log either way.)
     console=True,
-    icon=None,
+    icon="assets/jarvis.ico",
 )
 
 coll = COLLECT(

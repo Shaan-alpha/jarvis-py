@@ -126,6 +126,24 @@
     if (e.key === "Escape") send({ type: "stop" });
   });
 
+  // Minimize: hand off to the pywebview window (no-op in a plain browser).
+  const minBtn = document.getElementById("min");
+  if (minBtn) minBtn.addEventListener("click", () => {
+    if (window.pywebview && pywebview.api) pywebview.api.minimize();
+  });
+
+  // Close: shut the whole thing down. Tell the backend to stop (releases the
+  // mic + kills the voice loop / TTS / WS-server threads), then close this
+  // window — which exits the HUD process too, so nothing is left running.
+  const closeBtn = document.getElementById("close");
+  if (closeBtn) closeBtn.addEventListener("click", () => {
+    send({ type: "shutdown" });
+    // Give the WS message a moment to flush before tearing down the window.
+    setTimeout(() => {
+      if (window.pywebview && pywebview.api) pywebview.api.quit();
+    }, 180);
+  });
+
   connect();
   if (window.Wizard) Wizard.wireButtons(send);
 })();

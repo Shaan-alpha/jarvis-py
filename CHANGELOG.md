@@ -1,3 +1,27 @@
+## v3.5.2 — HUD close button & app logo (2026-06-19)
+
+- **HUD close + minimize controls.** The frameless HUD now has a top title bar
+  with **×** and **–** buttons. Closing sends a `shutdown` command over the
+  WebSocket — the backend stops TTS playback + queue and reminders, then
+  `os._exit(0)` — and the HUD destroys its own window via a pywebview `js_api`,
+  so **both processes exit and the mic is released** (no orphan left running).
+  (`hud/web/*`, `hud/window.py`, `app.py`)
+- **App logo.** An arc-reactor "J" mark matching the HUD theme: `hud/web/logo.svg`
+  (favicon + title-bar brand mark) and a Pillow-drawn `assets/jarvis.png` +
+  multi-size `assets/jarvis.ico` (regen with `assets/make_logo.py`), wired into
+  `jarvis.spec` (`icon=`) for the built `.exe`/window.
+- **Orb glass refinement.** The fluid orb is now a *contained glass sphere*: a
+  clipping `.orb-body` wrapper keeps the screen-blended colour layers inside a
+  crisp circle over a deep base (vivid flow instead of washing out to white),
+  with a glassy `.orb-rim` (bright top edge, soft dark bottom, faint accent
+  ring) and a smaller, repositioned specular glint. (`hud/web/index.html`,
+  `hud/web/style.css`)
+- **UI cleanup.** Slim brand title bar; removed a dead `.top` selector from the
+  reduced-motion rule; window height nudged to fit the new bar.
+- Tests: +2 (shutdown WS dispatch + the shutdown handler stops services then
+  exits). 269 pass; lint clean. Verified live: × shut down backend + HUD, no
+  orphan processes.
+
 ## v3.5.1 — Audio capture fixes (2026-06-18)
 
 Fixes the voice pipeline on Windows multi-device setups, found by running the app

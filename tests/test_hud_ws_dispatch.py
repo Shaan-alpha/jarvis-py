@@ -24,6 +24,13 @@ def _must_not_run():
     raise AssertionError("handler should not be called for an unknown type")
 
 
+def test_shutdown_calls_zero_arg_handler():
+    calls = []
+    ws.register_handlers(shutdown=lambda: calls.append("shutdown"))
+    ws._dispatch_command('{"type": "shutdown"}')
+    assert calls == ["shutdown"]
+
+
 def test_unknown_type_is_ignored():
     ws.register_handlers(stop=_must_not_run)
     assert ws._dispatch_command('{"type": "foo"}') is None
