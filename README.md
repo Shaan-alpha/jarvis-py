@@ -290,7 +290,7 @@ All config in [config/settings.py](config/settings.py):
 
 We welcome contributions, bug reports, and feature requests! Check out our new interactive issue forms if you have ideas for new tool agents or integrations. If you find Jarvis helpful, consider giving it a star or sponsoring the project!
 
-[![Star History Chart](https://api.star-history.com/svg?repos=Shaan-alpha/jarvis-py&type=Date)](https://star-history.com/#Shaan-alpha/jarvis-py&Date)
+[![GitHub stars](https://img.shields.io/github/stars/Shaan-alpha/jarvis-py?style=for-the-badge&logo=github)](https://github.com/Shaan-alpha/jarvis-py/stargazers) [![Star History](https://img.shields.io/badge/%F0%9F%93%88_Star_History-view-1F6FEB?style=for-the-badge)](https://star-history.com/#Shaan-alpha/jarvis-py&Date)
 
 ---
 
