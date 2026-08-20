@@ -26,7 +26,7 @@ JARVIS-PY is a Python voice assistant built for:
 
 JARVIS-PY is **developed and tested on Windows**. The voice/LLM/memory core
 (wake word, STT, TTS, Ollama, semantic + document memory) is portable, but the
-built-in OS automation — app launch/close and system status — currently targets
+built-in OS automation (app launch/close and system status) currently targets
 Windows (`os.startfile`, `taskkill`, SAPI5 voices). macOS/Linux parity is on the
 [roadmap](PLAN.md). TTS uses `pyttsx3.init()` and will pick the native driver per
 platform (SAPI5 / NSSpeechSynthesizer / espeak).
@@ -40,14 +40,14 @@ platform (SAPI5 / NSSpeechSynthesizer / espeak).
 - **STT online**: Google (`speech_recognition.recognize_google`)
 - **STT offline**: Vosk (local model, auto-fallback when offline)
 - **TTS**: pyttsx3 (SAPI5 / NSSpeechSynthesizer / espeak)
-- **Streaming sentence-level TTS queue** — each sentence speaks fully before the next, no cut-offs
-- **Interruptible replies** — a **Stop** button, `Esc`, or typing a new query cuts Jarvis off mid-sentence (interrupting by *speaking* isn't reliable — the mic hears Jarvis's own voice, no echo cancellation)
+- **Streaming sentence-level TTS queue** (each sentence speaks fully before the next, no cut-offs
+- **Interruptible replies**) a **Stop** button, `Esc`, or typing a new query cuts Jarvis off mid-sentence (interrupting by *speaking* isn't reliable; the mic hears Jarvis's own voice, no echo cancellation)
 
 ### Brain
 - Local LLM via Ollama (default `phi3`)
 - Streaming token output
 - Semantic memory retrieval (fastembed ONNX + numpy cosine)
-- Document RAG over PDFs (FAISS, similarity-thresholded — your résumé won't leak into unrelated answers)
+- Document RAG over PDFs (FAISS, similarity-thresholded; your résumé won't leak into unrelated answers)
 - User profile context injected into every prompt
 
 ### Routing
@@ -164,11 +164,11 @@ Auto-downloaded into the openWakeWord package on first run (one-time, ~1 MB). Fo
 
 ### User profile
 
-Optional — see [data/profile/README.md](data/profile/README.md) to pre-populate `user_profile.json` so Jarvis greets you by name.
+Optional, see [data/profile/README.md](data/profile/README.md) to pre-populate `user_profile.json` so Jarvis greets you by name.
 
 ### Documents (PDF RAG)
 
-Optional — drop PDFs in `data/documents/` and run `python build_memory.py`. See [data/documents/README.md](data/documents/README.md).
+Optional; drop PDFs in `data/documents/` and run `python build_memory.py`. See [data/documents/README.md](data/documents/README.md).
 
 ---
 
@@ -180,17 +180,17 @@ python app.py
 
 Speak the wake phrase **"hey jarvis"**, wait for *"Yes Boss?"*, then issue your command.
 
-**Interrupting:** saying *"hey jarvis"* again while Jarvis is talking *can* cut the current sentence off, but it's unreliable — the mic hears Jarvis's own voice (no echo cancellation). For reliable interruption, run the HUD (`--hud`) and use the **Stop** button, `Esc`, or type a new query.
+**Interrupting:** saying *"hey jarvis"* again while Jarvis is talking *can* cut the current sentence off, but it's unreliable; the mic hears Jarvis's own voice (no echo cancellation). For reliable interruption, run the HUD (`--hud`) and use the **Stop** button, `Esc`, or type a new query.
 
 **Exit / sleep:** say *"bye"*, *"goodbye"*, *"exit"*, *"shutdown"*, or *"stop listening"*. Or wait 20 s in silence.
 
-**Diagnostics:** if the wake word never fires, run `python debug_wake.py` — it lists your input devices and prints live wake-word confidence scores.
+**Diagnostics:** if the wake word never fires, run `python debug_wake.py`; it lists your input devices and prints live wake-word confidence scores.
 
 ---
 
 ## Desktop HUD (optional)
 
-Launch an always-on-top **HUD panel** — a **fluid glassmorphism orb** (a flowing,
+Launch an always-on-top **HUD panel**: a **fluid glassmorphism orb** (a flowing,
 audio-reactive blob that pulses with your voice and shifts by state), streaming
 captions (your speech *and* Jarvis's reply), a type-to-Jarvis text box, a **Stop**
 button (or `Esc`) to cut Jarvis off mid-sentence, and a live status row (CPU /
@@ -201,19 +201,19 @@ battery / model / online). The theme adapts to the time of day: **cyan** by day,
 python app.py --hud
 ```
 
-![The Jarvis HUD — a fluid glassmorphism orb, streaming captions, a live status row (model / CPU / battery / online), and a type-to-Jarvis box](assets/hud.png)
+![The Jarvis HUD: a fluid glassmorphism orb, streaming captions, a live status row (model / CPU / battery / online), and a type-to-Jarvis box](assets/hud.png)
 
 The HUD is a separate [pywebview](https://pywebview.flowrl.com/) window that talks
-to the voice core over a local WebSocket — fully free and local. Without `--hud`,
+to the voice core over a local WebSocket; fully free and local. Without `--hud`,
 the assistant behaves exactly as above. (Note: interrupting by *speaking* while
-Jarvis talks isn't supported — the mic would hear its own voice — so use the Stop
+Jarvis talks isn't supported (the mic would hear its own voice) so use the Stop
 button, `Esc`, or just type the next question to interrupt.)
 
 ---
 
 ## Extend with plugins
 
-Drop a `.py` file in `plugins/` and decorate a function with `@tool` — the loader
+Drop a `.py` file in `plugins/` and decorate a function with `@tool`; the loader
 auto-discovers it at startup and registers it with **both** the fast keyword router
 and the LLM tool-agent. No wiring, no restart of the architecture:
 
@@ -261,7 +261,7 @@ launches are voice-only (`--hud` to show the HUD).
 model pulled (`ollama pull phi3`) and the Microsoft **WebView2 runtime** (for the
 HUD). User data lives in `%APPDATA%\JarvisAI`.
 
-To sanity-check a build, run `dist\JarvisAI\Jarvis.exe --check-paths` — it prints
+To sanity-check a build, run `dist\JarvisAI\Jarvis.exe --check-paths`; it prints
 where the bundled models and HUD assets resolve and exits, without needing a mic
 or Ollama.
 
