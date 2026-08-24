@@ -33,6 +33,75 @@ platform (SAPI5 / NSSpeechSynthesizer / espeak).
 
 ---
 
+## How it fits together
+
+Three routing tiers, cheapest first: a keyword match never pays for a model call, and the
+LLM tool-agent only runs when the phrasing is fuzzy *and* an action verb is present.
+
+```mermaid
+flowchart TD
+    MIC(["🎙️ microphone"])
+    WAKE{"<b>openWakeWord</b><br/>hey_jarvis · ONNX, ~1 MB"}
+
+    subgraph STT ["Speech in"]
+        direction TB
+        ON["<b>online</b> · Google recognize_google"]
+        OFF["<b>offline</b> · Vosk, local model"]
+        ON -.->|"no network"| OFF
+    end
+
+    subgraph ROUTE ["Routing — cheapest tier that can answer wins"]
+        direction TB
+        R1["<b>1 · fast keyword router</b><br/>app · media · browser · system<br/><i>no model call</i>"]
+        R2["<b>2 · LLM tool agent</b><br/>action-verb gated, so idle chat<br/>never pays for a tool hop"]
+        R3["<b>3 · LLM chat</b> · final fallback"]
+        R1 -->|"no match"| R2 -->|"no tool fits"| R3
+    end
+
+    subgraph CTX ["Context assembled into every prompt"]
+        direction TB
+        SEM[("<b>semantic memory</b><br/>fastembed ONNX + numpy cosine")]
+        RAG[("<b>PDF RAG</b> · FAISS, similarity-thresholded<br/><i>your résumé won't leak<br/>into unrelated answers</i>")]
+        PROF[("<b>user profile</b>")]
+    end
+
+    LLM["<b>Ollama</b> · local, default phi3<br/>streaming token output"]
+    REG["<b>@tool registry</b><br/>drop a .py in plugins/, decorate,<br/>auto-discovered at startup<br/>registered with router <i>and</i> agent"]
+
+    TTS["<b>Streaming sentence-level TTS queue</b><br/>pyttsx3 · SAPI5 / NSSpeech / espeak<br/>each sentence completes before the next"]
+    STOP{"<b>Stop</b> · Esc · new query"}
+    SPK(["🔊 speech out"])
+    HUD["<b>HUD panel</b> · always-on-top<br/>glassmorphism orb, audio-reactive<br/>cyan by day, warmer by night"]
+    TIMER["<b>reminders</b> · threading.Timer<br/>persisted across restarts"]
+
+    MIC --> WAKE -->|"woken"| ON
+    STT --> R1
+    R2 <--> REG
+    R1 <--> REG
+    R3 --> LLM
+    R2 --> LLM
+    CTX --> LLM
+    LLM -->|"tokens"| TTS
+    R1 -->|"direct action"| TTS
+    TTS --> SPK
+    STOP -->|"cuts off mid-sentence"| TTS
+    HUD --> STOP
+    TIMER --> TTS
+
+    classDef cheap fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#d1fae5
+    classDef model fill:#312e81,stroke:#818cf8,stroke-width:2px,color:#e2e8f0
+    classDef store fill:#1e293b,stroke:#475569,stroke-width:1.5px,color:#cbd5e1
+    class R1,WAKE cheap
+    class R2,R3,LLM model
+    class SEM,RAG,PROF,REG store
+```
+
+Everything above runs on your machine. Interrupting by *speaking* isn't supported: the mic
+hears Jarvis's own voice and there's no echo cancellation, so the interrupt is a button, a
+key, or the next typed question.
+
+---
+
 ## Core Features
 
 ### Speech
@@ -40,8 +109,8 @@ platform (SAPI5 / NSSpeechSynthesizer / espeak).
 - **STT online**: Google (`speech_recognition.recognize_google`)
 - **STT offline**: Vosk (local model, auto-fallback when offline)
 - **TTS**: pyttsx3 (SAPI5 / NSSpeechSynthesizer / espeak)
-- **Streaming sentence-level TTS queue** (each sentence speaks fully before the next, no cut-offs
-- **Interruptible replies**) a **Stop** button, `Esc`, or typing a new query cuts Jarvis off mid-sentence (interrupting by *speaking* isn't reliable; the mic hears Jarvis's own voice, no echo cancellation)
+- **Streaming sentence-level TTS queue** — each sentence speaks fully before the next, no cut-offs
+- **Interruptible replies** — a **Stop** button, `Esc`, or typing a new query cuts Jarvis off mid-sentence (interrupting by *speaking* isn't reliable; the mic hears Jarvis's own voice, no echo cancellation)
 
 ### Brain
 - Local LLM via Ollama (default `phi3`)
