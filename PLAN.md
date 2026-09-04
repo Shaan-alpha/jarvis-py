@@ -37,19 +37,19 @@ Architecture first. No giant single files.
 
 ## Current Status
 
-> Latest release: **v3.4.0 "Agent Capabilities & Hardening"** — shipped, tagged,
-> GitHub Release published. It bundled the Layer-1 tool foundation (PR #4),
-> routing unification (PR #6), clipboard tools (PR #7), sandboxed file-system
-> tools (PR #9), and the deep audit-hardening pass (findings F1–F15: security,
-> crash-safe persistence, memory perf, NLU, content fidelity, TTS, cleanup).
+> Latest release: **v3.5.2 "HUD close button, app logo & glass orb"** — shipped and
+> tagged 2026-06-20. `pyproject.toml` is at 3.5.2.
 >
-> **v3.5 — Responsiveness & Efficiency is underway on `main` (unreleased).**
-> Merged: latency instrumentation + `decide_tool` generation cap (PR #11),
-> persistent-engine TTS reuse (PR #12), the model bake-off benchmark script
-> (PR #13), and warm-start preload of the LLM + embedder (PR #14). **258 tests
-> pass; lint clean.** Remaining v3.5 work: STT/wake stage marks + a HUD latency
-> readout, wider deterministic keyword routing, STT tuning, and picking a faster
-> default model from the bake-off (needs a run on the user's machine).
+> **v3.5 — Responsiveness & Efficiency has shipped.** v3.5.0 landed latency
+> instrumentation + a `decide_tool` generation cap (PR #11), persistent-engine TTS
+> reuse (PR #12), the model bake-off benchmark script (PR #13), and warm-start
+> preload of the LLM + embedder (PR #14). v3.5.1 repaired voice input and output on
+> Windows multi-device setups (PR #16), and v3.5.2 added the HUD close/minimize
+> controls and app logo (PR #17), followed by a Win11 UWP calculator fix and a more
+> reliable wake-word trigger (PR #18).
+>
+> Carried forward: wider deterministic keyword routing, STT tuning, and picking a
+> faster default model from the bake-off (needs a run on the user's machine).
 >
 > **Roadmap direction: speed-first.** The guiding motto is *offline + online, but
 > efficient and fast to respond*. v3.5 establishes a measured baseline; agent
@@ -99,6 +99,10 @@ goals — see v4.0 below for what remains.
 | v3.1.0 | Wake-word barge-in, doc-RAG threshold, repo privacy |
 | v3.2.0 | Desktop HUD (pywebview + local WebSocket); audit hardening |
 | v3.3.0 | Polish & Packaging — Windows one-folder build, setup wizard, crash-recovery |
+| v3.4.0 | Agent Capabilities & Hardening — tool foundation, routing unification, audit F1–F15 |
+| v3.5.0 | Responsiveness & Efficiency — latency instrumentation, TTS engine reuse, warm-start preload |
+| v3.5.1 | Audio capture fixes for Windows multi-device setups |
+| v3.5.2 | HUD close button, app logo & glass orb |
 
 ---
 

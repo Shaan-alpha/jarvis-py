@@ -17,6 +17,6 @@ nothing in here is ever committed.
 
 - Re-run `build_memory.py` whenever you add, remove, or update a PDF.
 - The retrieval threshold is `DOCUMENT_SIMILARITY_THRESHOLD` in
-  `config/settings.py` (default `0.45`). Lower → more chunks injected
+  `config/settings.py` (default `0.6`). Lower → more chunks injected
   into the LLM prompt; higher → only very relevant chunks.
 - If results feel noisy, raise the threshold to `0.55–0.65`.

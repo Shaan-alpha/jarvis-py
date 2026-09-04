@@ -192,7 +192,10 @@ jarvis-py/
 │   ├── state/              # session
 │   ├── setup/              # first-run checks + mic auto-detect + model pull
 │   ├── hud/                # HUD event bus, WebSocket server, stats/theme
-│   └── utils/              # logger, greetings, paths
+│   ├── paths.py            # resource_dir() / user_data_dir()
+│   └── utils/              # logger, helpers/greeting, jsonio, metrics
+├── hud/                    # pywebview HUD web assets
+├── plugins/                # drop-in @tool plugins
 ├── data/                   # runtime data (gitignored, READMEs in each folder)
 │   ├── documents/          # drop PDFs here
 │   ├── profile/            # user_profile.json
@@ -349,8 +352,8 @@ All config in [config/settings.py](config/settings.py):
 | `WAKE_CONSECUTIVE` | `1` | Frames over threshold required to fire (raise to debounce false wakes) |
 | `SESSION_TIMEOUT` | `20` | Seconds of silence before returning to sleep |
 | `VOSK_MODEL_PATH` | `models/vosk/vosk-model-small-en-us-0.15` | Project-local Vosk model |
-| `MEMORY_SIMILARITY_THRESHOLD` | `0.45` | Min cosine for conversation-memory recall |
-| `DOCUMENT_SIMILARITY_THRESHOLD` | `0.45` | Min cosine for doc-RAG injection |
+| `MEMORY_SIMILARITY_THRESHOLD` | `0.55` | Min cosine for conversation-memory recall |
+| `DOCUMENT_SIMILARITY_THRESHOLD` | `0.6` | Min cosine for doc-RAG injection |
 | `ONLINE_CHECK_*` | `8.8.8.8:53`, 1 s timeout, 5 s cache | Online/offline auto-detection |
 
 ---
