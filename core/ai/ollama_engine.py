@@ -1,11 +1,15 @@
 import json
+import re
 import threading
+
+from datetime import datetime
 
 import requests
 
 from config.settings import (
     LLM_KEEP_ALIVE,
     LLM_NUM_CTX,
+    LLM_TEMPERATURE,
     MODEL_NAME,
     OLLAMA_URL
 )
@@ -30,10 +34,20 @@ from core.ai import llm_health
 
 from core.hud import events
 
+from core.net import (
+    is_online
+)
+
+from core.state.conversation import (
+    conversation
+)
+
 from core.utils import metrics
 
 from core.text import (
-    normalize
+    normalize,
+    spoken_date,
+    spoken_time
 )
 
 from core.utils.logger import (
@@ -55,14 +69,34 @@ _CHITCHAT = {
 }
 
 
-# Ceiling for one spoken reply. ~160 tokens is a few sentences — comfortably
-# more than the two the prompt asks for, and far short of the multi-minute
-# monologue an unbounded generation produced.
-REPLY_TOKEN_LIMIT = 160
+# Generation ceilings. The prompt asks for two sentences, but a small model does
+# not reliably obey (unbounded, phi3 ran for minutes and scripted a whole new
+# conversation aloud), so the stream is also cut after MAX_SPOKEN_SENTENCES.
+REPLY_TOKEN_LIMIT = 96
 
-# Turn markers a rambling model writes when it stops answering and starts
-# scripting a new conversation instead.
-REPLY_STOP_SEQUENCES = ["\nUser:", "\nInstruction:", "\nJarvis:", "\n###"]
+DETAILED_TOKEN_LIMIT = 300
+
+MAX_SPOKEN_SENTENCES = 2
+
+DETAILED_SENTENCES = 6
+
+# Turn markers a rambling model writes when it starts scripting a new dialogue.
+REPLY_STOP_SEQUENCES = [
+    "\nUser:", "\nInstruction:", "\nJarvis:", "\n###", "\nUser Profile:", "\nRules:",
+]
+
+# A sentence ends at . ! or ? (plus closing quotes/brackets) followed by
+# whitespace — so "3.14" and "e.g.x" never split mid-number.
+_SENTENCE_END = re.compile(r"[.!?]+[\"')\]]*(?=\s)")
+
+_RULES = (
+    "Rules:\n"
+    "- If you are not sure, or it needs live data (news, prices, scores, weather), "
+    "say you don't know. Never guess.\n"
+    "- You cannot take actions. Never claim you opened, saved, set, sent or changed anything.\n"
+    "- Use what you know about the user, remembered facts or documents only when "
+    "the question is about them."
+)
 
 
 # Generation token for barge-in. Each ask_llm() call bumps the counter; an
@@ -119,9 +153,53 @@ def _should_retrieve(prompt):
     return True
 
 
-def _ends_sentence(text):
+def _clock():
 
-    return "." in text or "!" in text or "?" in text
+    return datetime.now()
+
+
+def _online():
+    """Connectivity for the prompt. A recent cached answer is fine here."""
+
+    return is_online(max_age=60)
+
+
+def build_prompt(query, *, now, online, profile="", facts=(), documents=(), history=(), detailed=False):
+    """The full grounded prompt. Pure (clock and connectivity passed in)."""
+
+    length = (
+        "Reply in up to six short sentences." if detailed
+        else "Reply in one or two short sentences, under 30 words."
+    )
+
+    parts = [
+        f"You are Jarvis, a voice assistant. {length}\n"
+        f"Plain spoken English: no lists, markdown or emojis.",
+        f"Now: {spoken_date(now)}, {spoken_time(now)}. "
+        f"Internet: {'online' if online else 'offline'}.",
+    ]
+
+    if profile:
+
+        parts.append(f"About the user:\n{profile}")
+
+    if facts:
+
+        parts.append("Things the user asked you to remember:\n" + "\n".join(f"- {f}" for f in facts))
+
+    if documents:
+
+        parts.append("Documents (use only if the question is about them):\n" + "\n".join(documents))
+
+    if history:
+
+        parts.append("Recent conversation:\n" + "\n".join(f"User: {u}\nJarvis: {r}" for u, r in history))
+
+    parts.append(_RULES)
+
+    parts.append(f"User: {query}\nJarvis:")
+
+    return "\n\n".join(parts)
 
 
 def _speak_error(message):
@@ -132,14 +210,40 @@ def _speak_error(message):
     add_to_queue(message)
 
 
-def _stream_response(response, my_generation):
-    """Consume the streamed Ollama response: print + emit each token and queue
-    complete sentences for TTS. Returns the full text, or None if a newer query
+def _flush_sentences(buffer, spoken, max_sentences):
+    """Queue each complete sentence in `buffer`; return the unfinished rest."""
+
+    while len(spoken) < max_sentences:
+
+        match = _SENTENCE_END.search(buffer)
+
+        if not match:
+
+            break
+
+        sentence = buffer[:match.end()].strip()
+
+        buffer = buffer[match.end():]
+
+        if sentence:
+
+            add_to_queue(sentence)
+
+            metrics.mark("first_audio")
+
+            spoken.append(sentence)
+
+    return buffer
+
+
+def _stream_response(response, my_generation, max_sentences=MAX_SPOKEN_SENTENCES):
+    """Consume the streamed reply: emit tokens, queue whole sentences, stop at
+    `max_sentences`. Returns exactly the spoken text, or None if a newer query
     superseded this stream (barge-in)."""
 
-    full_response = ""
+    spoken = []
 
-    sentence_buffer = ""
+    buffer = ""
 
     print("Jarvis: ", end="", flush=True)
 
@@ -160,50 +264,119 @@ def _stream_response(response, my_generation):
 
         try:
 
-            data = json.loads(line.decode("utf-8"))
+            token = json.loads(line.decode("utf-8")).get("response", "")
 
         except json.JSONDecodeError:
 
             continue
 
-        token = data.get("response", "")
+        if not token:
 
-        if token:
+            continue
 
-            # Dedup keeps the first occurrence, so this records time-to-first-token.
-            metrics.mark("first_token")
+        # Dedup keeps the first occurrence, so this records time-to-first-token.
+        metrics.mark("first_token")
 
         print(token, end="", flush=True)
 
-        full_response += token
-
         events.emit("assistant_token", text=token)
 
-        sentence_buffer += token
+        buffer = _flush_sentences(buffer + token, spoken, max_sentences)
 
-        if _ends_sentence(sentence_buffer):
+        if len(spoken) >= max_sentences:
 
-            add_to_queue(sentence_buffer.strip())
+            # Hard cap: hang up so the rest is never generated, queued or shown.
+            response.close()
 
-            metrics.mark("first_audio")
+            buffer = ""
 
-            sentence_buffer = ""
+            break
 
     # Superseded right as the stream ended.
     if not _is_current(my_generation):
 
         return None
 
-    if sentence_buffer.strip():
+    tail = buffer.strip()
 
-        add_to_queue(sentence_buffer.strip())
+    if tail and len(spoken) < max_sentences:
+
+        add_to_queue(tail)
+
+        metrics.mark("first_audio")
+
+        spoken.append(tail)
 
     print()
 
-    return full_response
+    return " ".join(spoken)
 
 
-def ask_llm(prompt):
+def _build_payload(prompt, detailed):
+
+    retrieve = _should_retrieve(prompt)
+
+    memory = search_memory(prompt) if retrieve else None
+
+    facts = [f"{memory['user']} -> {memory['assistant']}"] if memory else []
+
+    final_prompt = build_prompt(
+        prompt,
+        now=_clock(),
+        online=_online(),
+        profile=get_profile_context(),
+        facts=facts,
+        documents=search_documents(prompt) if retrieve else [],
+        history=conversation.history(),
+        detailed=detailed,
+    )
+
+    return {
+        "model": MODEL_NAME,
+        "prompt": final_prompt,
+        "stream": True,
+        "keep_alive": LLM_KEEP_ALIVE,
+        "options": {
+            "num_predict": DETAILED_TOKEN_LIMIT if detailed else REPLY_TOKEN_LIMIT,
+            "num_ctx": LLM_NUM_CTX,
+            "temperature": LLM_TEMPERATURE,
+            "top_p": 0.9,
+            "stop": REPLY_STOP_SEQUENCES,
+        },
+    }
+
+
+def _report_error_status(response):
+    """Ollama answered with an error status (commonly 500 when the model needs
+    more memory than is free). The body carries no tokens, so without this the
+    user just hears silence."""
+
+    detail = ""
+
+    try:
+
+        detail = (response.json() or {}).get("error", "") or ""
+
+    except Exception:
+
+        detail = (response.text or "")[:200]
+
+    logger.error(f"Ollama returned {response.status_code}: {detail}")
+
+    llm_health.mark_down(detail or f"HTTP {response.status_code}")
+
+    if "memory" in detail.lower():
+
+        _speak_error("I couldn't run the model — it needs more memory than is free right now.")
+
+    else:
+
+        _speak_error("Something went wrong running the model.")
+
+
+def ask_llm(prompt, detailed=False):
+    """Stream a grounded answer to `prompt`; returns exactly what was spoken,
+    or "" (superseded, or the model is unavailable — already said aloud)."""
 
     # Claim a generation; a later query bumps this and supersedes us.
     my_generation = _start_generation()
@@ -214,94 +387,11 @@ def ask_llm(prompt):
 
         return ""
 
-    # -------------------- #
-    # PROFILE CONTEXT
-    # -------------------- #
-
-    profile_context = (
-        get_profile_context()
-    )
-
-    retrieve = _should_retrieve(prompt)
-
-    # -------------------- #
-    # SEMANTIC MEMORY
-    # -------------------- #
-
-    memory = search_memory(prompt) if retrieve else None
-
-    memory_context = ""
-
-    if memory:
-
-        memory_context = f"""
-Relevant Memory:
-User: {memory['user']}
-Assistant: {memory['assistant']}
-"""
-
-    # -------------------- #
-    # DOCUMENT MEMORY
-    # -------------------- #
-
-    document_context = search_documents(prompt) if retrieve else []
-
-    document_block = ""
-
-    if document_context:
-
-        document_text = "\n".join(document_context)
-
-        document_block = (
-            f"\nRelevant Documents (only use if "
-            f"the user's question is clearly about them):\n"
-            f"{document_text}\n"
-        )
-
-    # -------------------- #
-    # PROMPT
-    # -------------------- #
-
-    final_prompt = f"""You are Jarvis, a concise voice assistant.
-
-User Profile:
-{profile_context}
-{memory_context}{document_block}
-Rules:
-- Answer the user's question directly. Two sentences max.
-- Only use the User Profile or Relevant Documents if the user's
-  question is clearly about them. Otherwise IGNORE them completely
-  and answer from general knowledge.
-- Do NOT invent details about projects, jobs, or tools that were
-  not asked about.
-- Speak naturally for voice playback. No markdown, no emojis.
-
-User: {prompt}
-
-Jarvis:"""
-
-    payload = {
-        "model": MODEL_NAME,
-        "prompt": final_prompt,
-        "stream": True,
-        "keep_alive": LLM_KEEP_ALIVE,
-        # The prompt asks for two sentences; a small model does not reliably
-        # obey. Left unbounded, phi3 has run for minutes and drifted into
-        # inventing a fresh conversation ("Instruction:", a new "User Profile:"),
-        # all of it queued for TTS and read aloud. num_predict is the ceiling and
-        # the stop markers cut the drift at the moment it starts a new turn.
-        "options": {
-            "num_predict": REPLY_TOKEN_LIMIT,
-            "num_ctx": LLM_NUM_CTX,
-            "stop": REPLY_STOP_SEQUENCES,
-        },
-    }
+    payload = _build_payload(prompt, detailed)
 
     try:
 
-        logger.info(
-            "Sending request to Ollama"
-        )
+        logger.info("Sending request to Ollama")
 
         response = requests.post(
             OLLAMA_URL,
@@ -310,53 +400,27 @@ Jarvis:"""
             timeout=60
         )
 
-        # Ollama answered, but with an error status (commonly 500 when the model
-        # needs more memory than is free). The streamed body carries no response
-        # tokens, so without this guard the user just hears silence. Surface it.
         if not response.ok:
 
-            detail = ""
-
-            try:
-
-                detail = (response.json() or {}).get("error", "") or ""
-
-            except Exception:
-
-                detail = (response.text or "")[:200]
-
-            logger.error(f"Ollama returned {response.status_code}: {detail}")
-
-            llm_health.mark_down(detail or f"HTTP {response.status_code}")
-
-            if "memory" in detail.lower():
-
-                message = (
-                    "I couldn't run the model — it needs more memory than is "
-                    "free right now."
-                )
-
-            else:
-
-                message = "Something went wrong running the model."
-
-            _speak_error(message)
+            _report_error_status(response)
 
             return ""
 
-        full_response = _stream_response(response, my_generation)
+        full_response = _stream_response(
+            response,
+            my_generation,
+            DETAILED_SENTENCES if detailed else MAX_SPOKEN_SENTENCES
+        )
 
-        # None = a newer query superseded this stream (barge-in); don't queue
-        # the tail or emit a done event that would clobber the new answer.
+        # None = a newer query superseded this stream (barge-in); don't emit a
+        # done event that would clobber the new answer.
         if full_response is None:
 
             return ""
 
         llm_health.mark_up()
 
-        logger.info(
-            "LLM response completed"
-        )
+        logger.info("LLM response completed")
 
         events.emit("assistant_done", full_text=full_response.strip())
 
@@ -364,16 +428,10 @@ Jarvis:"""
 
     except Exception as e:
 
-        logger.exception(
-            f"Ollama Error: {e}"
-        )
+        logger.exception(f"Ollama Error: {e}")
 
         llm_health.mark_down(str(e))
 
-        message = "I can't reach Ollama right now. Is it running?"
-
-        # Already queued for speech above; return empty so the caller
-        # does not speak it a second time.
-        _speak_error(message)
+        _speak_error("I can't reach Ollama right now. Is it running?")
 
         return ""

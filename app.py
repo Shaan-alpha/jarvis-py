@@ -90,6 +90,11 @@ from core.speech.reply import (
     respond
 )
 
+from core.state.conversation import (
+    conversation,
+    match_command
+)
+
 from core.hud import events
 
 import config.settings as settings
@@ -148,9 +153,49 @@ def _spawn(target, *args, **kwargs):
 
 
 def _reply(raw_query, value):
-    """Speak + show one reply."""
+    """Speak + show one reply and remember it for follow-ups."""
 
-    return respond(value)
+    reply = respond(value)
+
+    if reply is not None:
+
+        conversation.add_turn(raw_query, reply.say)
+
+    return reply
+
+
+def _handle_conversation(query):
+    """'repeat that' / 'tell me more'. True when handled."""
+
+    command = match_command(query)
+
+    if command == "repeat":
+
+        respond(conversation.last_reply or "I haven't said anything yet.")
+
+        return True
+
+    if command != "more":
+
+        return False
+
+    last = conversation.last_query
+
+    if not last:
+
+        respond("Tell me more about what?")
+
+        return True
+
+    events.emit("state", state="thinking")
+
+    response = ask_llm(last, detailed=True)
+
+    if response:
+
+        conversation.add_turn(last, response)
+
+    return True
 
 
 def process_query(query, task_manager, source="voice", raw_query=None):
@@ -173,6 +218,10 @@ def process_query(query, task_manager, source="voice", raw_query=None):
     metrics.start_turn(source)
 
     try:
+
+        if _handle_conversation(query):
+
+            return
 
         personal_info = extract_personal_info(query)
 
@@ -222,19 +271,22 @@ def process_query(query, task_manager, source="voice", raw_query=None):
 
             return
 
+        events.emit("state", state="thinking")
+
         logger.info("Generating LLM response")
 
-        response = ask_llm(query)
+        # The raw text: case and punctuation help the model understand.
+        response = ask_llm(raw_query)
 
         logger.info("LLM response generated")
 
         # ask_llm returns "" when it was superseded by a newer query (barge-in)
-        # or could not reach Ollama; don't persist an empty turn.
+        # or could not reach Ollama; don't record an empty turn.
         if response:
 
-            save_memory(query, response)
+            conversation.add_turn(raw_query, response)
 
-            logger.info("Conversation saved to memory")
+            save_memory(query, response)
 
     finally:
 
@@ -605,6 +657,8 @@ def _voice_loop(session, task_manager):
 
                     session.deactivate()
 
+                    conversation.clear()
+
                     events.emit("state", state="idle")
 
                 continue
@@ -632,6 +686,8 @@ def _voice_loop(session, task_manager):
                 speak("Going back to sleep.")
 
                 session.deactivate()
+
+                conversation.clear()
 
                 events.emit("state", state="idle")
 

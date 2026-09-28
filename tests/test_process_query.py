@@ -196,3 +196,44 @@ def test_save_name_closes_wizard_mode(monkeypatch):
     monkeypatch.setattr(app.events, "emit", lambda *a, **k: None)
     app._hud_on_save_name("Tony")
     assert ws_mod._wizard_mode is False
+
+
+from core.state.conversation import conversation
+
+
+def _quiet_routing(monkeypatch):
+    monkeypatch.setattr(app, "extract_personal_info", lambda q: None)
+    monkeypatch.setattr(app, "parse_reminder", lambda q: None)
+    monkeypatch.setattr(app, "resolve_keyword_tool", lambda q, raw=None: None)
+    monkeypatch.setattr(app, "decide_tool", lambda q, raw=None: None)
+
+
+def test_repeat_that_replays_the_last_reply(monkeypatch):
+    _quiet_routing(monkeypatch)
+    conversation.add_turn("what is python", "A programming language.")
+    responded = []
+    monkeypatch.setattr(app, "respond", lambda v: responded.append(v))
+    app.process_query("repeat that", _FakeTaskManager())
+    assert responded == ["A programming language."]
+
+
+def test_tell_me_more_reasks_the_last_question_in_detail(monkeypatch):
+    _quiet_routing(monkeypatch)
+    conversation.add_turn("who is alan turing", "A mathematician.")
+    asked = {}
+
+    def fake_ask(q, detailed=False):
+        asked.update(q=q, detailed=detailed)
+        return "More."
+
+    monkeypatch.setattr(app, "ask_llm", fake_ask)
+    app.process_query("tell me more", _FakeTaskManager())
+    assert asked == {"q": "who is alan turing", "detailed": True}
+
+
+def test_llm_turns_are_remembered_for_follow_ups(monkeypatch):
+    _quiet_routing(monkeypatch)
+    monkeypatch.setattr(app, "ask_llm", lambda q: "Lima.")
+    monkeypatch.setattr(app, "save_memory", lambda q, r: None)
+    app.process_query("capital of peru", _FakeTaskManager(), raw_query="Capital of Peru?")
+    assert conversation.history() == [("Capital of Peru?", "Lima.")]
