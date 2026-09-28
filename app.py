@@ -1,5 +1,6 @@
 import argparse
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -107,6 +108,20 @@ EXIT_WORDS = [
     "shutdown",
     "stop listening",
 ]
+
+
+# Whole words only. Plain substring containment ended the session on ordinary
+# speech that merely contains an exit word ("i exited the app" -> "exit"), so
+# Jarvis went quiet mid-conversation instead of answering.
+_EXIT_PATTERN = re.compile(
+    r"\b(?:" + "|".join(re.escape(word) for word in EXIT_WORDS) + r")\b"
+)
+
+
+def is_exit_command(query):
+    """True when the utterance explicitly ends the session."""
+
+    return _EXIT_PATTERN.search(query) is not None
 
 
 def process_query(query, task_manager, source="voice", raw_query=None):
@@ -569,10 +584,7 @@ def _voice_loop(session, task_manager):
 
             session.update_interaction()
 
-            if any(
-                word in query
-                for word in EXIT_WORDS
-            ):
+            if is_exit_command(query):
 
                 logger.info("Session manually ended")
 

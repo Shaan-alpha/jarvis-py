@@ -111,11 +111,30 @@ def _dispatch_command(raw):
         return None
 
 
-async def _handle_client(connection):
+def _read_origin(connection):
+    """The connection's Origin header, or None when it cannot be read.
+
+    `.request` exists on the ServerConnection that websockets >= 14 hands the
+    handler. Older releases aliased `websockets.serve` to the legacy
+    implementation, whose protocol object exposes `request_headers` instead —
+    there the lookup raises, every origin reads as absent, and _origin_allowed()
+    waves all of them through. requirements.txt pins the floor at 14 so this
+    cannot happen; the warning is here so that if it ever does, a disabled
+    Origin check announces itself instead of failing open in silence.
+    """
+
     try:
-        origin = connection.request.headers.get("Origin")
-    except Exception:
-        origin = None
+        return connection.request.headers.get("Origin")
+    except Exception as e:
+        logger.warning(
+            f"HUD: could not read the connection Origin ({e}); "
+            f"treating it as absent. Is websockets older than 14.0?"
+        )
+        return None
+
+
+async def _handle_client(connection):
+    origin = _read_origin(connection)
 
     if not _origin_allowed(origin):
         logger.warning(f"HUD: rejected WS connection from origin {origin!r}")
@@ -164,13 +183,32 @@ async def _serve():
         await _broadcaster()
 
 
+def _run_server_loop():
+    """Own the event loop for the server thread, and never die silently.
+
+    Binding fails when something already holds the port — almost always a Jarvis
+    that is still running. That used to surface as an unhandled exception in a
+    daemon thread: the app carried on, the HUD reconnected forever against a
+    socket nobody was listening on, and nothing said why."""
+
+    loop = asyncio.new_event_loop()
+
+    asyncio.set_event_loop(loop)
+
+    try:
+        loop.run_until_complete(_serve())
+    except OSError as e:
+        logger.error(
+            f"HUD WebSocket server could not start on "
+            f"{HUD_WS_HOST}:{HUD_WS_PORT} ({e}). "
+            f"Is another Jarvis already running? The HUD will not connect."
+        )
+    except Exception:
+        logger.exception("HUD WebSocket server stopped unexpectedly")
+
+
 def start_in_thread():
     """Start the WebSocket server in a daemon thread with its own event loop."""
 
-    def _run():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(_serve())
-
-    thread = threading.Thread(target=_run, daemon=True)
+    thread = threading.Thread(target=_run_server_loop, daemon=True)
     thread.start()

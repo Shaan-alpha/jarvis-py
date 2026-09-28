@@ -5,6 +5,23 @@ import app
 from core.agent.registry import ToolCall
 
 
+@pytest.mark.parametrize("query,ends_session", [
+    ("bye", True),
+    ("goodbye", True),
+    ("ok bye", True),
+    ("exit", True),
+    ("shutdown", True),
+    ("stop listening", True),
+    # A bare substring test ended the session on ordinary speech that merely
+    # contains an exit word, so Jarvis went quiet mid-conversation.
+    ("i exited the app", False),
+    ("the exits are marked", False),
+    ("shutdowns are scheduled monthly", False),
+])
+def test_exit_command_matches_whole_words_only(query, ends_session):
+    assert app.is_exit_command(query) is ends_session
+
+
 class _FakeTaskManager:
     def __init__(self):
         self.reminders = []

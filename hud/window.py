@@ -17,18 +17,27 @@ class _Api:
     command over the WebSocket (which stops the backend's voice loop / TTS / WS
     threads), then calls ``quit()`` here to destroy this window — returning from
     ``webview.start()`` so the HUD process exits too. Nothing is left running.
+
+    The window handle is ``_window``, and the underscore is load-bearing:
+    pywebview builds the JS bridge by walking every public attribute of this
+    object and recursing into nested ones (``webview.util.get_functions`` skips
+    underscore-prefixed names). Held publicly, the walk reached the native
+    WinForms object and recursed through ``window.native.AccessibilityObject
+    .Bounds.Empty.Empty…`` — each .NET property returning a fresh wrapper, so
+    pywebview's id()-based cycle guard never tripped — until the stack blew.
+    That froze the GUI thread ("Not Responding") and killed the HUD process.
     """
 
     def __init__(self):
-        self.window = None
+        self._window = None
 
     def minimize(self):
-        if self.window:
-            self.window.minimize()
+        if self._window:
+            self._window.minimize()
 
     def quit(self):
-        if self.window:
-            self.window.destroy()
+        if self._window:
+            self._window.destroy()
 
 
 def _web_path():
@@ -62,7 +71,7 @@ def launch():
         background_color="#05080f",
     )
 
-    api.window = window
+    api._window = window
 
     # Blocking GUI loop. pywebview requires this to run on the main thread, so
     # the caller (app.main when frozen) puts the voice loop on a background

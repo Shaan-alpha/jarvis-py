@@ -49,11 +49,23 @@ def _add_to_cache(entry, all_memories):
     re-encoded all n memories — O(n^2) over a session. Here we encode just the
     new entry and stack it on. If the cache is cold, leave it cold (the next
     search lazy-loads once); on any error, drop the cache so it rebuilds cleanly.
+
+    A warm-but-empty cache (a session that searched before anything was stored)
+    holds `memories == []` and no matrix to extend. Dropping it is what keeps
+    this entry findable: early-returning left the empty snapshot in place, so
+    every later search saw an empty store and semantic memory stayed dead for
+    the rest of the session.
     """
 
     with _cache_lock:
 
-        if _cache["memories"] is None or _cache["embeddings"] is None:
+        if _cache["memories"] is None:
+
+            return
+
+        if _cache["embeddings"] is None:
+
+            _cache["memories"] = None
 
             return
 

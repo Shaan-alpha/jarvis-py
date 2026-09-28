@@ -21,6 +21,16 @@ os.makedirs(
 )
 
 
+# Explicit utf-8: a Windows FileHandler otherwise encodes with the locale
+# codepage (cp1252 here), and any transcript or reply carrying a character
+# outside it raises inside logging — the line is dropped and a traceback is
+# printed in its place.
+_file_handler = logging.FileHandler(
+    LOG_FILE,
+    encoding="utf-8"
+)
+
+
 logging.basicConfig(
     level=logging.INFO,
 
@@ -31,7 +41,7 @@ logging.basicConfig(
     ),
 
     handlers=[
-        logging.FileHandler(LOG_FILE),
+        _file_handler,
         logging.StreamHandler()
     ]
 )

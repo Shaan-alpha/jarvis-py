@@ -1,6 +1,24 @@
 import core.warmup as w
 
 
+def test_ollama_warmup_waits_out_a_cold_model_load(monkeypatch):
+    # The point of warming Ollama is to take the model load off the first real
+    # query. A cold load of a multi-GB model on a machine that has to page it in
+    # takes minutes, so a 30s timeout meant the warmup timed out every single
+    # start and the user paid the load anyway. It runs on a daemon thread off the
+    # critical path, so waiting is free.
+    captured = {}
+
+    def fake_post(url, json=None, timeout=None, **kwargs):
+        captured["timeout"] = timeout
+
+    monkeypatch.setattr(w, "_post", fake_post)
+
+    w._warm_ollama()
+
+    assert captured["timeout"] >= 120
+
+
 def test_run_warmup_runs_all_tasks_in_order():
     ran = []
     tasks = (("a", lambda: ran.append("a")), ("b", lambda: ran.append("b")))

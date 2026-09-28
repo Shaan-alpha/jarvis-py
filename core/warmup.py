@@ -17,14 +17,28 @@ import threading
 from core.utils.logger import logger
 
 
-def _warm_ollama():
-    """Prime the LLM so the first ask_llm isn't a cold model load."""
+# A cold load of a multi-GB model — on a machine that has to page it in — takes
+# minutes, not seconds. At 30s the warmup timed out on every start, so the first
+# real query paid the model load anyway and the preload bought nothing. This runs
+# on a daemon thread off the critical path, so the long wait costs nothing.
+WARM_TIMEOUT = 180
+
+
+def _post(url, json=None, timeout=None):
+    """Seam for the warmup request. requests is imported here, not at module
+    level, so importing this module stays cheap."""
 
     import requests
 
+    return requests.post(url, json=json, timeout=timeout)
+
+
+def _warm_ollama():
+    """Prime the LLM so the first ask_llm isn't a cold model load."""
+
     from config.settings import MODEL_NAME, OLLAMA_URL
 
-    requests.post(
+    _post(
         OLLAMA_URL,
         json={
             "model": MODEL_NAME,
@@ -32,7 +46,7 @@ def _warm_ollama():
             "stream": False,
             "options": {"num_predict": 1},
         },
-        timeout=30,
+        timeout=WARM_TIMEOUT,
     )
 
 

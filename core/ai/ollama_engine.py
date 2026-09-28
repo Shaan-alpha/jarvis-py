@@ -45,6 +45,16 @@ _CHITCHAT = {
 }
 
 
+# Ceiling for one spoken reply. ~160 tokens is a few sentences — comfortably
+# more than the two the prompt asks for, and far short of the multi-minute
+# monologue an unbounded generation produced.
+REPLY_TOKEN_LIMIT = 160
+
+# Turn markers a rambling model writes when it stops answering and starts
+# scripting a new conversation instead.
+REPLY_STOP_SEQUENCES = ["\nUser:", "\nInstruction:", "\nJarvis:", "\n###"]
+
+
 # Generation token for barge-in. Each ask_llm() call bumps the counter; an
 # in-flight stream that finds a newer generation has started aborts itself, so
 # a new query (typed or spoken) interrupts the previous answer instead of
@@ -239,7 +249,16 @@ Jarvis:"""
     payload = {
         "model": MODEL_NAME,
         "prompt": final_prompt,
-        "stream": True
+        "stream": True,
+        # The prompt asks for two sentences; a small model does not reliably
+        # obey. Left unbounded, phi3 has run for minutes and drifted into
+        # inventing a fresh conversation ("Instruction:", a new "User Profile:"),
+        # all of it queued for TTS and read aloud. num_predict is the ceiling and
+        # the stop markers cut the drift at the moment it starts a new turn.
+        "options": {
+            "num_predict": REPLY_TOKEN_LIMIT,
+            "stop": REPLY_STOP_SEQUENCES,
+        },
     }
 
     try:

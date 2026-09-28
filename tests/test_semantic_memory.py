@@ -51,6 +51,22 @@ def test_search_returns_a_stored_memory(tmp_path, monkeypatch):
     assert set(result) == {"user", "assistant"}
 
 
+def test_first_save_is_searchable_when_the_store_started_empty(tmp_path, monkeypatch):
+    # A fresh install searches before anything is stored, which caches the empty
+    # memory list. The save that follows must not leave that empty snapshot in
+    # place — otherwise semantic memory stays dead for the whole session and
+    # only "comes back" after a restart.
+    monkeypatch.setattr(sm, "MEMORY_PATH", str(tmp_path / "mem.json"))
+    monkeypatch.setattr(sm, "encode", _fake_encoder([]))
+    _reset_cache()
+
+    assert sm.search_memory("what is my name") is None
+
+    sm.save_memory("my name is shaan", "nice to meet you shaan")
+
+    assert sm.search_memory("my name is shaan") is not None
+
+
 def test_search_none_when_empty(tmp_path, monkeypatch):
     monkeypatch.setattr(sm, "MEMORY_PATH", str(tmp_path / "empty.json"))
     monkeypatch.setattr(sm, "encode", _fake_encoder([]))
