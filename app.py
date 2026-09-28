@@ -41,7 +41,8 @@ from core.utils.logger import (
 from core.utils import metrics
 
 from core.ai.ollama_engine import (
-    ask_llm
+    ask_llm,
+    cancel_generation
 )
 
 from core.memory.semantic_memory import (
@@ -122,6 +123,21 @@ def is_exit_command(query):
     """True when the utterance explicitly ends the session."""
 
     return _EXIT_PATTERN.search(query) is not None
+
+
+def _spawn(target, *args, **kwargs):
+    """Run `target` on a daemon thread. A seam, so tests can run it inline."""
+
+    thread = threading.Thread(
+        target=target,
+        args=args,
+        kwargs=kwargs,
+        daemon=True,
+    )
+
+    thread.start()
+
+    return thread
 
 
 def process_query(query, task_manager, source="voice", raw_query=None):
@@ -260,7 +276,9 @@ def _hud_on_text_query(session, task_manager, text):
     # Barge-in: a new typed query interrupts whatever Jarvis is currently
     # saying. Stop the current utterance and drop anything still queued so the
     # new answer doesn't play behind the old one.
-    logger.info("Barge-in: stop_speaking + clear_queue")
+    logger.info("Barge-in: cancel generation + stop_speaking + clear_queue")
+
+    cancel_generation()
 
     stop_speaking()
 
@@ -268,15 +286,9 @@ def _hud_on_text_query(session, task_manager, text):
 
     session.activate()
 
-    # Run off the WS thread so a slow generation doesn't block the socket (and
-    # so the next typed query can interrupt this one). ask_llm's generation
-    # token ensures a superseded stream abandons itself.
-    threading.Thread(
-        target=process_query,
-        args=(query, task_manager),
-        kwargs={"source": "text", "raw_query": raw},
-        daemon=True,
-    ).start()
+    # Off the WS thread so a slow generation doesn't block the socket (and so
+    # the next typed query can interrupt this one).
+    _spawn(process_query, query, task_manager, source="text", raw_query=raw)
 
 
 def _hud_on_wake(session):
@@ -287,6 +299,10 @@ def _hud_on_wake(session):
 
 
 def _hud_on_stop():
+
+    # Cancel first: stopping the voice alone let the stream keep queueing the
+    # rest of the answer, which then played on.
+    cancel_generation()
 
     stop_speaking()
 
@@ -348,7 +364,7 @@ def _hud_on_pull_model(model):
             # wizard's pull log strands with no "done" transition.
             events.emit("pull_done")
 
-    threading.Thread(target=_pull, daemon=True).start()
+    _spawn(_pull)
 
 
 def _hud_on_save_name(name):
@@ -555,6 +571,8 @@ def _voice_loop(session, task_manager):
             if wait_until_done_or_barge_in():
 
                 logger.info("Barge-in: user interrupted")
+
+                cancel_generation()
 
             events.emit("state", state="listening")
 

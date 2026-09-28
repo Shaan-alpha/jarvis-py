@@ -80,6 +80,16 @@ def _is_current(generation):
     return generation == _generation
 
 
+def cancel_generation():
+    """Abandon whatever answer is streaming now (Stop / Esc / a new query).
+
+    Bumping the generation makes the in-flight stream fail its _is_current
+    check on the next line: it closes the HTTP response, queues nothing more
+    and skips assistant_done."""
+
+    _start_generation()
+
+
 def _should_retrieve(prompt):
     """True when the query is substantial enough to warrant document/memory
     retrieval. Skips greetings and very short utterances so RAG doesn't fire
