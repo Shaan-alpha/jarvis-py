@@ -5,6 +5,8 @@ import re
 import requests
 
 from config.settings import (
+    LLM_KEEP_ALIVE,
+    LLM_NUM_CTX,
     MODEL_NAME,
     OLLAMA_URL
 )
@@ -206,12 +208,14 @@ JSON:"""
         "model": MODEL_NAME,
         "prompt": prompt,
         "stream": False,
+        "keep_alive": LLM_KEEP_ALIVE,
         # Tool selection only emits a tiny JSON object, so cap generation and pin
         # temperature: the model returns fast and deterministically instead of
         # rambling before we parse the first {...}. A real tail-latency win on the
         # action path (this call blocks before ask_llm even starts).
         "options": {
             "num_predict": 80,
+            "num_ctx": LLM_NUM_CTX,
             "temperature": 0,
         },
     }

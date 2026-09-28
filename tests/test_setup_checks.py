@@ -69,3 +69,11 @@ def test_webview2_missing_when_reader_returns_none():
     result = checks.check_webview2(platform="win32", reader=reader)
     assert result["ok"] is False
     assert result["fixable"] is True
+
+
+def test_model_present_rejects_cloud_models():
+    def get(url, timeout=0):
+        return _Resp(200, {"models": [{"name": "minimax-m3:cloud"}]})
+    result = checks.check_model_present("minimax-m3:cloud", get=get)
+    assert result["ok"] is False
+    assert "local" in result["detail"]

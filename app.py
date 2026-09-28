@@ -353,11 +353,14 @@ def _hud_on_run_checks():
         events.emit("check", **result)
 
 
-def _hud_on_pull_model(model):
+def _hud_on_pull_model(_requested=None):
 
-    # `ollama pull` runs for minutes; doing it inline would block the WS asyncio
-    # loop (and the broadcaster), so the queued pull_progress events would not
-    # stream live. Run it off-thread and signal completion.
+    # Always the configured model: the page's value is only a label, and
+    # trusting it would let any WS client choose what gets downloaded.
+    model = settings.MODEL_NAME
+
+    # `ollama pull` runs for minutes; off-thread so progress streams live
+    # instead of blocking the WS asyncio loop.
     def _pull():
 
         try:
@@ -378,7 +381,12 @@ def _hud_on_pull_model(model):
 
 def _hud_on_save_name(name):
 
+    from core.hud import ws_server
+
     update_profile("name", name or "Boss")
+
+    # Setup is done: a reconnecting or reloaded HUD must not reopen the wizard.
+    ws_server.set_wizard_mode(False)
 
     events.emit("setup_complete")
 

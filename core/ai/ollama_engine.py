@@ -4,6 +4,8 @@ import threading
 import requests
 
 from config.settings import (
+    LLM_KEEP_ALIVE,
+    LLM_NUM_CTX,
     MODEL_NAME,
     OLLAMA_URL
 )
@@ -274,6 +276,7 @@ Jarvis:"""
         "model": MODEL_NAME,
         "prompt": final_prompt,
         "stream": True,
+        "keep_alive": LLM_KEEP_ALIVE,
         # The prompt asks for two sentences; a small model does not reliably
         # obey. Left unbounded, phi3 has run for minutes and drifted into
         # inventing a fresh conversation ("Instruction:", a new "User Profile:"),
@@ -281,6 +284,7 @@ Jarvis:"""
         # the stop markers cut the drift at the moment it starts a new turn.
         "options": {
             "num_predict": REPLY_TOKEN_LIMIT,
+            "num_ctx": LLM_NUM_CTX,
             "stop": REPLY_STOP_SEQUENCES,
         },
     }

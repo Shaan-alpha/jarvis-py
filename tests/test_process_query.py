@@ -178,3 +178,21 @@ def test_shutdown_handler_stops_services_then_exits(monkeypatch):
     assert exited["code"] == 0
     # Services stopped (mic released) before the process exits.
     assert {"stop_speaking", "stop_tts_queue", "tm.stop"} <= set(calls)
+
+
+def test_pull_model_always_pulls_the_configured_model(monkeypatch):
+    pulled = []
+    monkeypatch.setattr(app, "_spawn", lambda target, *a, **k: target(*a, **k))
+    monkeypatch.setattr(app, "pull_model", lambda name, on_progress=None: pulled.append(name))
+    monkeypatch.setattr(app.events, "emit", lambda *a, **k: None)
+    app._hud_on_pull_model("something-else")
+    assert pulled == [app.settings.MODEL_NAME]
+
+
+def test_save_name_closes_wizard_mode(monkeypatch):
+    import core.hud.ws_server as ws_mod
+    ws_mod.set_wizard_mode(True)
+    monkeypatch.setattr(app, "update_profile", lambda k, v: None)
+    monkeypatch.setattr(app.events, "emit", lambda *a, **k: None)
+    app._hud_on_save_name("Tony")
+    assert ws_mod._wizard_mode is False

@@ -9,6 +9,8 @@ import websockets
 from config.settings import (
     HUD_WS_HOST,
     HUD_WS_PORT,
+    MODEL_NAME,
+    MODEL_PULL_SIZE,
 )
 
 from core.hud import events
@@ -42,6 +44,21 @@ def set_wizard_mode(enabled):
     wizard."""
     global _wizard_mode
     _wizard_mode = bool(enabled)
+
+
+def _ready_payload():
+    """The handshake each (re)connecting HUD gets: state, theme, wizard flag and
+    the configured model (the wizard's pull button reads it)."""
+
+    return {
+        "type": "ready",
+        "version": "1.0",
+        "state": events.current_state(),
+        "theme": theme_for_hour(time.localtime().tm_hour),
+        "wizard": _wizard_mode,
+        "model": MODEL_NAME,
+        "model_size": MODEL_PULL_SIZE,
+    }
 
 
 def _origin_allowed(origin):
@@ -146,13 +163,7 @@ async def _handle_client(connection):
 
     # Send a ready handshake carrying the current state + time-of-day theme
     # so the panel re-syncs on every (re)connect, not just at process start.
-    await connection.send(json.dumps({
-        "type": "ready",
-        "version": "1.0",
-        "state": events.current_state(),
-        "theme": theme_for_hour(time.localtime().tm_hour),
-        "wizard": _wizard_mode,
-    }))
+    await connection.send(json.dumps(_ready_payload()))
 
     try:
         async for raw in connection:

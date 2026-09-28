@@ -33,10 +33,34 @@ def _post(url, json=None, timeout=None):
     return requests.post(url, json=json, timeout=timeout)
 
 
-def _warm_ollama():
-    """Prime the LLM so the first ask_llm isn't a cold model load."""
+def _free_gb():
+    """Free RAM in GiB (psutil imported lazily to keep this module cheap)."""
 
-    from config.settings import MODEL_NAME, OLLAMA_URL
+    import psutil
+
+    return psutil.virtual_memory().available / 2 ** 30
+
+
+def _warm_ollama():
+    """Prime the LLM so the first ask_llm isn't a cold model load — unless RAM
+    is short, where preloading only thrashes the machine (the first real query
+    still loads it on demand)."""
+
+    from config.settings import (
+        LLM_KEEP_ALIVE,
+        LLM_NUM_CTX,
+        MODEL_MIN_FREE_GB,
+        MODEL_NAME,
+        OLLAMA_URL,
+    )
+
+    free = _free_gb()
+
+    if free < MODEL_MIN_FREE_GB:
+
+        raise RuntimeError(
+            f"only {free:.1f} GiB free (< {MODEL_MIN_FREE_GB}); skipping the model preload"
+        )
 
     _post(
         OLLAMA_URL,
@@ -44,7 +68,8 @@ def _warm_ollama():
             "model": MODEL_NAME,
             "prompt": "hi",
             "stream": False,
-            "options": {"num_predict": 1},
+            "keep_alive": LLM_KEEP_ALIVE,
+            "options": {"num_predict": 1, "num_ctx": LLM_NUM_CTX},
         },
         timeout=WARM_TIMEOUT,
     )

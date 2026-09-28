@@ -47,6 +47,8 @@ def test_reply_generation_is_bounded(monkeypatch):
 
     # Stop at the turn markers the model invents when it starts a new dialogue.
     assert any("User:" in stop for stop in options.get("stop", []))
+    assert options.get("num_ctx") == 2048
+    assert captured.get("keep_alive") == "10m"
 
 
 def test_chitchat_skips_retrieval():

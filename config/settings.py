@@ -9,6 +9,26 @@ OLLAMA_URL = "http://localhost:11434/api/generate"
 # Ollama model-list endpoint (used by setup checks)
 OLLAMA_TAGS_URL = "http://localhost:11434/api/tags"
 
+# -------------------- #
+# LLM runtime (Ollama)
+# -------------------- #
+
+# Context window. Prompts are a few hundred tokens; Ollama's default reserves far
+# more KV cache, which is most of the RAM the model needs beyond its weights.
+LLM_NUM_CTX = 2048
+
+# Unload the model after 10 idle minutes so a busy machine gets its RAM back.
+LLM_KEEP_ALIVE = "10m"
+
+# A terse assistant should answer, not improvise.
+LLM_TEMPERATURE = 0.2
+
+# Warm-start skips preloading the model when less RAM than this (GiB) is free.
+MODEL_MIN_FREE_GB = 3.5
+
+# Download size shown on the setup wizard's pull button.
+MODEL_PULL_SIZE = "2.3 GB"
+
 # Wake-word sensitivity. 0.6 suited the old (degraded MME) capture path. With
 # clean WASAPI capture + resampling (see openwakeword_listener), ambient sits
 # near 0, but real "hey jarvis" utterances vary a lot by distance/articulation:

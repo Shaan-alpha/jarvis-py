@@ -103,3 +103,4 @@ def test_decide_tool_caps_generation(monkeypatch):
     opts = captured["json"]["options"]
     assert opts["num_predict"] <= 100      # bounded so selection returns fast
     assert opts["temperature"] == 0        # deterministic JSON
+    assert opts["num_ctx"] == 2048

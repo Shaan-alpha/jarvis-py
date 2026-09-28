@@ -114,3 +114,12 @@ def test_set_wizard_mode_toggles_flag():
     assert ws._wizard_mode is True
     ws.set_wizard_mode(0)
     assert ws._wizard_mode is False
+
+
+def test_ready_handshake_carries_the_configured_model():
+    import config.settings as settings
+    import core.hud.ws_server as ws_mod
+    payload = ws_mod._ready_payload()
+    assert payload["type"] == "ready"
+    assert payload["model"] == settings.MODEL_NAME
+    assert payload["model_size"] == settings.MODEL_PULL_SIZE
