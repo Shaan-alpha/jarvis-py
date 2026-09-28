@@ -92,3 +92,56 @@ def test_a_corrupt_cache_is_ignored(monkeypatch):
 def test_first_sentences_caps_words():
     text = "One two three four five six. Seven eight."
     assert web.first_sentences(text, max_words=4) == "One two three four…"
+
+
+from core.agent.registry import Reply
+
+_PUNE = {
+    "geocoding-api.open-meteo.com": {"results": [{"name": "Pune", "latitude": 18.5, "longitude": 73.9}]},
+    "api.open-meteo.com/v1/forecast": {
+        "current": {"temperature_2m": 27.4, "weather_code": 2},
+        "daily": {"temperature_2m_max": [31.2], "temperature_2m_min": [21.8],
+                  "precipitation_probability_max": [40]},
+    },
+}
+
+
+def test_weather_for_a_named_city(monkeypatch):
+    _route(monkeypatch, _PUNE)
+    out = web.weather("pune")
+    assert out == Reply(
+        say="In Pune it's 27 degrees and partly cloudy; high 31, low 22, 40 percent chance of rain.",
+        show="Pune: 27°C, partly cloudy · high 31° / low 22° · rain 40%",
+    )
+
+
+def test_weather_defaults_to_the_profile_city(monkeypatch):
+    _route(monkeypatch, _PUNE)
+    monkeypatch.setattr(web, "_profile_city", lambda: "pune")
+    assert web.weather().say.startswith("In Pune")
+
+
+def test_weather_without_a_city_asks_which(monkeypatch):
+    _route(monkeypatch, _PUNE)
+    monkeypatch.setattr(web, "_profile_city", lambda: None)
+    assert web.weather() == "Which city? Say 'weather in' and the city."
+
+
+def test_weather_offline_uses_the_last_report(monkeypatch):
+    _route(monkeypatch, _PUNE)
+    web.weather("pune")
+    monkeypatch.setattr(web, "is_online", lambda: False)
+    monkeypatch.setattr(web, "_now", lambda: 10 ** 12)
+    out = web.weather("pune")
+    assert out.say.startswith("I'm offline. Last I checked: In Pune")
+
+
+def test_weather_offline_with_nothing_saved(monkeypatch):
+    calls = _route(monkeypatch, _PUNE, online=False)
+    assert web.weather("pune") == "I'm offline, so I can't check the weather."
+    assert calls == []
+
+
+def test_weather_unknown_place(monkeypatch):
+    _route(monkeypatch, {"geocoding-api.open-meteo.com": {"results": []}})
+    assert web.weather("atlantis") == "I couldn't find a place called atlantis."

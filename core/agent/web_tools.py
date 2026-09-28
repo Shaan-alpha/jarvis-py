@@ -18,6 +18,7 @@ from config.settings import (
 )
 
 from core.agent.registry import (
+    Reply,
     tool
 )
 
@@ -204,3 +205,115 @@ def lookup(topic):
             return answer
 
     return None
+
+
+_GEOCODE = "https://geocoding-api.open-meteo.com/v1/search"
+
+_FORECAST = "https://api.open-meteo.com/v1/forecast"
+
+# WMO weather interpretation codes -> words.
+_WMO = {
+    0: "clear", 1: "mostly clear", 2: "partly cloudy", 3: "overcast",
+    45: "foggy", 48: "foggy", 51: "light drizzle", 53: "drizzle", 55: "heavy drizzle",
+    56: "freezing drizzle", 57: "freezing drizzle", 61: "light rain", 63: "rain",
+    65: "heavy rain", 66: "freezing rain", 67: "freezing rain", 71: "light snow",
+    73: "snow", 75: "heavy snow", 77: "snow grains", 80: "light showers",
+    81: "showers", 82: "heavy showers", 85: "snow showers", 86: "snow showers",
+    95: "thunderstorms", 96: "thunderstorms with hail", 99: "thunderstorms with hail",
+}
+
+
+def _profile_city():
+
+    from core.memory.profile_memory import load_profile
+
+    return load_profile().get("city")
+
+
+def _describe_weather(name, data):
+
+    current, daily = data["current"], data["daily"]
+
+    temp = round(current["temperature_2m"])
+
+    sky = _WMO.get(current.get("weather_code"), "")
+
+    high = round(daily["temperature_2m_max"][0])
+
+    low = round(daily["temperature_2m_min"][0])
+
+    rain = (daily.get("precipitation_probability_max") or [None])[0]
+
+    say = f"In {name} it's {temp} degrees" + (f" and {sky}" if sky else "") + f"; high {high}, low {low}"
+
+    show = f"{name}: {temp}°C" + (f", {sky}" if sky else "") + f" · high {high}° / low {low}°"
+
+    if rain is not None:
+
+        say += f", {round(rain)} percent chance of rain"
+
+        show += f" · rain {round(rain)}%"
+
+    return {"say": say + ".", "show": show}
+
+
+@tool(
+    "weather",
+    "Current weather and today's forecast",
+    params={"city": {"type": "str", "required": False, "desc": "city name; defaults to where the user lives"}},
+    llm=False,
+)
+def weather(city=None):
+
+    place = (city or "").strip() or _profile_city()
+
+    if not place:
+
+        return "Which city? Say 'weather in' and the city."
+
+    key = "weather:" + place.lower()
+
+    cached = _cache_get(key, WEATHER_TTL)
+
+    if cached:
+
+        return Reply(**cached)
+
+    if not ONLINE_LOOKUPS or not is_online():
+
+        stale = _cache_get(key, WEATHER_TTL, allow_stale=True)
+
+        if stale:
+
+            return Reply(say=f"I'm offline. Last I checked: {stale['say']}", show=stale["show"])
+
+        return "I'm offline, so I can't check the weather."
+
+    try:
+
+        results = _get_json(_GEOCODE, {"name": place, "count": 1, "language": "en", "format": "json"}).get("results")
+
+        if not results:
+
+            return f"I couldn't find a place called {place}."
+
+        location = results[0]
+
+        data = _get_json(_FORECAST, {
+            "latitude": location["latitude"],
+            "longitude": location["longitude"],
+            "current": "temperature_2m,weather_code",
+            "daily": "temperature_2m_max,temperature_2m_min,precipitation_probability_max",
+            "timezone": "auto",
+            "forecast_days": 1,
+        })
+
+        report = _describe_weather(location.get("name", place), data)
+
+    except (requests.RequestException, ValueError, KeyError, TypeError, IndexError):
+
+        return "I couldn't reach the weather service."
+
+    _cache_put(key, report)
+
+    return Reply(**report)

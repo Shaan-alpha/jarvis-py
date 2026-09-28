@@ -259,6 +259,36 @@ def _match_info(query, raw_query):
     return None
 
 
+_CITY = r"(?: in ([a-z][a-z .-]*?))?"
+
+_WEATHER_PATTERNS = tuple(re.compile(pattern) for pattern in (
+    rf"(?:(?:whats|what is|hows|how is) )?(?:the )?weather(?: like)?(?: today| now| right now)?{_CITY}"
+    rf"(?: today| now| right now)?",
+    rf"(?:whats|what is) the temperature(?: outside)?{_CITY}(?: today| now| right now)?",
+    rf"(?:will it|is it going to|is it) (?:rain|snow)(?:ing)?(?: today)?{_CITY}(?: today)?",
+    rf"(?:weather|temperature|forecast){_CITY}",
+))
+
+
+def _match_weather(query, raw_query):
+    """Today's weather only — "tomorrow" is left to the LLM, which says it
+    doesn't know rather than reading out today's forecast."""
+
+    text = _strip_fillers(query)
+
+    for pattern in _WEATHER_PATTERNS:
+
+        match = pattern.fullmatch(text)
+
+        if match:
+
+            city = (match.group(1) or "").strip()
+
+            return ToolCall("weather", {"city": city} if city else {})
+
+    return None
+
+
 # (normalized pattern, raw pattern keeping case, max topic words)
 _LOOKUP_PATTERNS = tuple(
     (re.compile(norm), re.compile(raw, re.IGNORECASE), max_words) for norm, raw, max_words in (
@@ -371,6 +401,7 @@ _MATCHERS = (
     _match_calc,
     _match_substring_tool,
     _match_search,
+    _match_weather,
     _match_lookup,
 )
 

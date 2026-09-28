@@ -238,3 +238,22 @@ def test_knowledge_questions_route_to_lookup(query, raw, topic):
 def test_non_lookups_do_not_route_to_lookup(query):
     call = resolve_keyword_tool(query)
     assert call is None or call.name != "lookup"
+
+
+@pytest.mark.parametrize("query,args", [
+    ("whats the weather", {}),
+    ("weather", {}),
+    ("what is the weather like in pune", {"city": "pune"}),
+    ("weather in new delhi", {"city": "new delhi"}),
+    ("is it going to rain", {}),
+    ("is it raining in mumbai", {"city": "mumbai"}),
+    ("whats the temperature outside", {}),
+])
+def test_weather_questions_route(query, args):
+    assert resolve_keyword_tool(query) == ToolCall("weather", args)
+
+
+@pytest.mark.parametrize("query", ["will it rain tomorrow", "i love this weather", "whether or not"])
+def test_non_weather_does_not_route(query):
+    call = resolve_keyword_tool(query)
+    assert call is None or call.name != "weather"
