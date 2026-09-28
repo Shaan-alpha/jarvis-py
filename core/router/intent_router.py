@@ -4,7 +4,9 @@ from core.agent.registry import ToolCall
 
 from core.calc import parse_math
 
-from core.text import normalize
+from core.state.conversation import conversation
+
+from core.text import normalize, spoken_filename
 
 
 _OPEN_APPS = {
@@ -246,6 +248,77 @@ def _match_memory(query, raw_query):
     return None
 
 
+_FOLDER_NAMES = "desktop|documents|downloads|pictures|music|videos|workspace"
+
+# "show my workspace" stays the spoken list_files; "open my workspace" opens it.
+_OPEN_FOLDER = re.compile(
+    rf"open(?: up)? (?:my |the )?({_FOLDER_NAMES})(?: folder)?"
+    r"|show(?: me)? (?:my |the )?(desktop|documents|downloads|pictures|music|videos)(?: folder)?"
+)
+
+_OPEN_PICK = re.compile(
+    r"open (?:the )?(first|second|third|fourth|fifth|last|1st|2nd|3rd)(?: one| file| result)?"
+    r"|open (it|that|this)(?: file)?"
+)
+
+_OPEN_MY_FILE = re.compile(r"open (?:up )?my (.+)")
+
+_OPEN_NAMED_FILE = re.compile(r"open (?:the )?(?:file )?(.+\.[a-z0-9]{1,5})")
+
+# "find my X", "find (the) file X", "find X.ext", "where is my X" — not a bare
+# "find X", which is usually a web-style request ("find a restaurant").
+_FIND_FILE = re.compile(
+    r"(?:find|locate) (?:my |the file |file )(?:called |named )?(.+?)(?: file)?"
+    r"|(?:find|locate) (.+\.[a-z0-9]{1,5})"
+    r"|where(?: is|s) my (.+?)(?: file)?"
+)
+
+_RECENT = re.compile(
+    r"(?:(?:show|list|open|what are)(?: me)? )?(?:my )?recent(?:ly opened)? files"
+    r"|what (?:files )?did i open recently"
+)
+
+
+def _first_group(match):
+
+    return next(group for group in match.groups() if group)
+
+
+def _match_files(query, raw_query):
+
+    text = spoken_filename(_strip_fillers(query))
+
+    match = _OPEN_FOLDER.fullmatch(text)
+
+    if match:
+
+        return ToolCall("open_folder", {"folder": _first_group(match)})
+
+    match = _OPEN_PICK.fullmatch(text)
+
+    if match and conversation.results():
+
+        return ToolCall("open_file", {"name": _first_group(match)})
+
+    match = _OPEN_MY_FILE.fullmatch(text) or _OPEN_NAMED_FILE.fullmatch(text)
+
+    if match:
+
+        return ToolCall("open_file", {"name": match.group(1)})
+
+    match = _FIND_FILE.fullmatch(text)
+
+    if match:
+
+        return ToolCall("find_file", {"name": _first_group(match)})
+
+    if _RECENT.fullmatch(text):
+
+        return ToolCall("recent_files", {})
+
+    return None
+
+
 def _match_info(query, raw_query):
 
     text = _strip_fillers(query)
@@ -394,6 +467,7 @@ def _match_search(query, raw_query):
 # Checked in order; first match wins.
 _MATCHERS = (
     _match_memory,
+    _match_files,
     _match_open_app,
     _match_open_google,
     _match_close_app,

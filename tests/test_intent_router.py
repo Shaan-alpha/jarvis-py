@@ -257,3 +257,30 @@ def test_weather_questions_route(query, args):
 def test_non_weather_does_not_route(query):
     call = resolve_keyword_tool(query)
     assert call is None or call.name != "weather"
+
+
+@pytest.mark.parametrize("query,expected", [
+    ("open my downloads", ToolCall("open_folder", {"folder": "downloads"})),
+    ("show documents folder", ToolCall("open_folder", {"folder": "documents"})),
+    ("find my resume", ToolCall("find_file", {"name": "resume"})),
+    ("where is my passport", ToolCall("find_file", {"name": "passport"})),
+    ("find notes dot txt", ToolCall("find_file", {"name": "notes.txt"})),
+    ("open notes dot txt", ToolCall("open_file", {"name": "notes.txt"})),
+    ("open my budget", ToolCall("open_file", {"name": "budget"})),
+    ("recent files", ToolCall("recent_files", {})),
+])
+def test_file_commands_route(query, expected):
+    assert resolve_keyword_tool(query) == expected
+
+
+def test_open_the_second_one_only_routes_after_a_search():
+    from core.state.conversation import conversation
+    assert resolve_keyword_tool("open the second one") is None
+    conversation.set_results(["a", "b"])
+    assert resolve_keyword_tool("open the second one") == ToolCall("open_file", {"name": "second"})
+
+
+@pytest.mark.parametrize("query", ["find a restaurant near me", "open calculator"])
+def test_non_file_commands_do_not_route_to_files(query):
+    call = resolve_keyword_tool(query)
+    assert call is None or call.name not in {"find_file", "open_file", "open_folder"}
