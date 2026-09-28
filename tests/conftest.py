@@ -6,6 +6,7 @@ from core.agent import registry
 from core.agent import loader
 from core.ai import llm_health
 from core import net
+from core.state.conversation import conversation
 
 
 @pytest.fixture(autouse=True)
@@ -32,3 +33,10 @@ def _no_real_network_probes(monkeypatch):
     net.reset_cache()
     yield
     net.reset_cache()
+
+
+@pytest.fixture(autouse=True)
+def _fresh_conversation():
+    conversation.clear()
+    yield
+    conversation.clear()
