@@ -41,12 +41,13 @@ def test_preview_short_returns_verbatim():
     assert fs_tools._preview("hello") == "hello"
 
 
-def test_preview_long_is_truncated():
+def test_preview_long_speaks_short_and_shows_more():
+    from core.agent.registry import Reply
     out = fs_tools._preview("x" * 3000)
-    assert out.startswith("Your file has")
-    assert "3000 characters" in out
-    assert out.endswith("(truncated).")
-    assert len(out) < 300
+    assert isinstance(out, Reply)
+    assert out.say.startswith("Your file has 3000 characters.")
+    assert len(out.say) < 180
+    assert out.show == "x" * 2000
 
 
 def test_list_files_empty(monkeypatch, tmp_path):
@@ -90,12 +91,20 @@ def test_read_file_short_returns_verbatim(monkeypatch, tmp_path):
     assert fs_tools.read_file("s.txt") == "hello world"
 
 
-def test_read_file_long_is_truncated(monkeypatch, tmp_path):
+def test_read_file_long_speaks_short(monkeypatch, tmp_path):
     _patch_workspace(monkeypatch, tmp_path)
-    (tmp_path / "big.txt").write_text("x" * 3000)
+    (tmp_path / "big.txt").write_text("y" * 3000)
     out = fs_tools.read_file("big.txt")
-    assert out.startswith("Your file has")
-    assert len(out) < 300
+    assert out.say.startswith("Your file has 3000 characters.")
+
+
+def test_many_files_speak_five_and_show_all(monkeypatch, tmp_path):
+    _patch_workspace(monkeypatch, tmp_path)
+    for i in range(12):
+        (tmp_path / f"f{i:02}.txt").write_text("x")
+    out = fs_tools.list_files()
+    assert out.say == "Your workspace has 12 files, including f00.txt, f01.txt, f02.txt, f03.txt, f04.txt."
+    assert out.show.count("\n") == 12
 
 
 def test_read_file_rejects_traversal(monkeypatch, tmp_path):

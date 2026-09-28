@@ -2,14 +2,18 @@ from pathlib import Path, PureWindowsPath
 
 from core.paths import user_data_dir
 
-from core.agent.registry import tool
+from core.agent.registry import Reply, tool
 
 from core.utils.logger import logger
 
 
-FILE_PREVIEW_LIMIT = 200
+SPOKEN_CHARS = 100
 
-FILE_LIST_LIMIT = 20
+SHOWN_CHARS = 2000
+
+SPOKEN_ITEMS = 5
+
+SHOWN_ITEMS = 50
 
 
 def _workspace():
@@ -63,18 +67,33 @@ def _resolve_in_workspace(name):
 
 
 def _preview(text):
-    """Verbatim if short; otherwise a length report + truncated preview.
+    """Verbatim if short; otherwise speak a short preview and show more.
 
     Mirrors read_clipboard so spoken output never reads a huge blob aloud.
     """
 
-    if len(text) <= FILE_PREVIEW_LIMIT:
+    if len(text) <= SPOKEN_CHARS:
 
         return text
 
-    return (
-        f"Your file has {len(text)} characters. "
-        f'It starts: "{text[:FILE_PREVIEW_LIMIT]}..." (truncated).'
+    preview = text[:SPOKEN_CHARS].rstrip()
+
+    return Reply(
+        say=f"Your file has {len(text)} characters. It starts: {preview}…",
+        show=text[:SHOWN_CHARS],
+    )
+
+
+def _listing(names, *, all_intro, some_intro):
+    """A short spoken list; the HUD gets up to SHOWN_ITEMS, one per line."""
+
+    if len(names) <= SPOKEN_ITEMS:
+
+        return f"{all_intro} " + ", ".join(names) + "."
+
+    return Reply(
+        say=f"{some_intro.format(count=len(names))} " + ", ".join(names[:SPOKEN_ITEMS]) + ".",
+        show=f"{all_intro}\n" + "\n".join(names[:SHOWN_ITEMS]),
     )
 
 
@@ -87,13 +106,11 @@ def list_files():
 
         return "Your workspace is empty."
 
-    if len(names) <= FILE_LIST_LIMIT:
-
-        return "Your workspace has: " + ", ".join(names) + "."
-
-    shown = ", ".join(names[:FILE_LIST_LIMIT])
-
-    return f"Your workspace has {len(names)} files, including: {shown}."
+    return _listing(
+        names,
+        all_intro="Your workspace has:",
+        some_intro="Your workspace has {count} files, including",
+    )
 
 
 @tool(
@@ -201,10 +218,8 @@ def search_files(query):
 
         return f"No files match {query}."
 
-    if len(matches) <= FILE_LIST_LIMIT:
-
-        return "Matches: " + ", ".join(matches) + "."
-
-    shown = ", ".join(matches[:FILE_LIST_LIMIT])
-
-    return f"{len(matches)} files match, including: {shown}."
+    return _listing(
+        matches,
+        all_intro="Matches:",
+        some_intro="{count} files match, including",
+    )
