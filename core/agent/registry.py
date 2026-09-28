@@ -39,6 +39,18 @@ class ToolCall:
     args: dict
 
 
+@dataclass(frozen=True)
+class Reply:
+    """A tool result that speaks less than it shows.
+
+    `say` is read aloud (keep it short); `show` is the full text for the HUD
+    caption. Tools may return a plain str instead when the two are the same."""
+
+    say: str
+
+    show: str = ""
+
+
 _REGISTRY = {}
 
 

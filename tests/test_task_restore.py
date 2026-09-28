@@ -54,3 +54,17 @@ def test_start_rewrites_the_file_without_the_bad_rows(tmp_path, monkeypatch):
     manager.stop()
 
     assert json.loads(path.read_text(encoding="utf-8")) == []
+
+
+def test_fired_reminder_is_announced_and_removed(monkeypatch):
+    import core.tasks.task_manager as tmod
+    announced = []
+    monkeypatch.setattr(tmod, "announce_reminder", announced.append)
+    monkeypatch.setattr(tmod, "load_tasks", lambda: [])
+    monkeypatch.setattr(tmod, "save_tasks", lambda tasks: None)
+    manager = tmod.TaskManager()
+    task = {"id": "t1", "time": "2026-01-01T00:00:00", "message": "stretch"}
+    manager.tasks = [task]
+    manager._fire(task)
+    assert announced == ["stretch"]
+    assert manager.tasks == []

@@ -31,13 +31,13 @@ class _FakeTaskManager:
 
 
 def test_sets_reminder(monkeypatch):
-    spoken = []
-    monkeypatch.setattr(app, "speak", lambda t: spoken.append(t))
+    responded = []
+    monkeypatch.setattr(app, "respond", lambda v: responded.append(v))
     monkeypatch.setattr(app, "extract_personal_info", lambda q: None)
     tm = _FakeTaskManager()
     app.process_query("remind me in 5 minutes to drink water", tm)
     assert tm.reminders == [(5, "drink water")]
-    assert any("Reminder set" in s for s in spoken)
+    assert responded == ["Reminder set for 5 minutes."]
 
 
 def test_fast_path_resolves_and_executes_tool(monkeypatch):
@@ -59,12 +59,12 @@ def test_fast_path_resolves_and_executes_tool(monkeypatch):
         return "Increasing volume."
 
     monkeypatch.setattr(app, "execute_tool", _fake_execute)
-    spoken = []
-    monkeypatch.setattr(app, "speak", lambda t: spoken.append(t))
+    responded = []
+    monkeypatch.setattr(app, "respond", lambda v: responded.append(v))
 
     app.process_query("volume up", _FakeTaskManager())
     assert ran["call"] == ToolCall("increase_volume", {})
-    assert spoken == ["Increasing volume."]
+    assert responded == ["Increasing volume."]
 
 
 def test_keyword_miss_falls_through_to_llm_tool_agent(monkeypatch):
@@ -81,7 +81,7 @@ def test_keyword_miss_falls_through_to_llm_tool_agent(monkeypatch):
         return "Opening spotify."
 
     monkeypatch.setattr(app, "execute_tool", _fake_execute)
-    monkeypatch.setattr(app, "speak", lambda t: None)
+    monkeypatch.setattr(app, "respond", lambda v: None)
 
     app.process_query("open spotify", _FakeTaskManager())
     assert ran["call"] == ToolCall("open_app", {"name": "spotify"})
@@ -95,7 +95,7 @@ def test_llm_fallback_saves_memory(monkeypatch):
     monkeypatch.setattr(app, "ask_llm", lambda q: "an answer")
     saved = {}
     monkeypatch.setattr(app, "save_memory", lambda q, r: saved.setdefault("v", (q, r)))
-    monkeypatch.setattr(app, "speak", lambda t: None)
+    monkeypatch.setattr(app, "respond", lambda v: None)
     app.process_query("what is python", _FakeTaskManager())
     assert saved["v"] == ("what is python", "an answer")
 
@@ -117,7 +117,7 @@ def test_raw_query_preserves_case_for_routers(monkeypatch):
     monkeypatch.setattr(app, "resolve_keyword_tool", _resolve)
     monkeypatch.setattr(app, "decide_tool", _decide)
     monkeypatch.setattr(app, "ask_llm", lambda q: "")
-    monkeypatch.setattr(app, "speak", lambda t: None)
+    monkeypatch.setattr(app, "respond", lambda v: None)
 
     app.process_query("copy hello world to clipboard", _FakeTaskManager(),
                       raw_query="copy Hello World to clipboard")
@@ -144,7 +144,7 @@ def test_process_query_records_latency_metrics(monkeypatch):
                         lambda q, raw=None: ToolCall("increase_volume", {}))
     monkeypatch.setattr(app, "decide_tool", lambda q, raw=None: None)
     monkeypatch.setattr(app, "execute_tool", lambda c: "ok")
-    monkeypatch.setattr(app, "speak", lambda t: None)
+    monkeypatch.setattr(app, "respond", lambda v: None)
 
     app.process_query("volume up", _FakeTaskManager())
 

@@ -3,8 +3,8 @@ import uuid
 
 from datetime import datetime, timedelta
 
-from core.speech.engine import (
-    speak
+from core.speech.reply import (
+    announce_reminder
 )
 
 from core.tasks.task_storage import (
@@ -76,7 +76,7 @@ class TaskManager:
 
         try:
 
-            speak(f"Reminder. {task['message']}")
+            announce_reminder(task["message"])
 
         finally:
 

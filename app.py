@@ -82,7 +82,12 @@ from core.tasks.task_manager import (
 )
 
 from core.tasks.task_parser import (
+    duration_words,
     parse_reminder
+)
+
+from core.speech.reply import (
+    respond
 )
 
 from core.hud import events
@@ -142,6 +147,12 @@ def _spawn(target, *args, **kwargs):
     return thread
 
 
+def _reply(raw_query, value):
+    """Speak + show one reply."""
+
+    return respond(value)
+
+
 def process_query(query, task_manager, source="voice", raw_query=None):
     """Route one recognized/typed query through the pipeline.
 
@@ -185,9 +196,9 @@ def process_query(query, task_manager, source="voice", raw_query=None):
 
             logger.info(f"Reminder Created: {reminder}")
 
-            speak(
-                f"Reminder set for "
-                f"{reminder['minutes']} minutes."
+            _reply(
+                raw_query,
+                f"Reminder set for {duration_words(reminder['minutes'])}."
             )
 
             return
@@ -207,11 +218,7 @@ def process_query(query, task_manager, source="voice", raw_query=None):
 
             logger.info(f"Executed Tool: {call.name} args={call.args}")
 
-            response = execute_tool(call)
-
-            if response:
-
-                speak(response)
+            _reply(raw_query, execute_tool(call))
 
             return
 

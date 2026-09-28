@@ -120,6 +120,14 @@ def _ends_sentence(text):
     return "." in text or "!" in text or "?" in text
 
 
+def _speak_error(message):
+    """Say a failure out loud and show it in the HUD as an error."""
+
+    events.emit("error", message=message)
+
+    add_to_queue(message)
+
+
 def _stream_response(response, my_generation):
     """Consume the streamed Ollama response: print + emit each token and queue
     complete sentences for TTS. Returns the full text, or None if a newer query
@@ -318,7 +326,7 @@ Jarvis:"""
 
                 message = "Something went wrong running the model."
 
-            add_to_queue(message)
+            _speak_error(message)
 
             return ""
 
@@ -348,6 +356,6 @@ Jarvis:"""
 
         # Already queued for speech above; return empty so the caller
         # does not speak it a second time.
-        add_to_queue(message)
+        _speak_error(message)
 
         return ""

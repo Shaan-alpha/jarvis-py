@@ -55,3 +55,14 @@ def test_parses_reversed_word_order():
 def test_short_form_minutes():
     result = parse_reminder("remind me in 5 mins to log off")
     assert result == {"minutes": 5, "message": "log off"}
+
+
+from core.tasks.task_parser import duration_words
+
+
+def test_duration_words():
+    assert duration_words(0.5) == "30 seconds"
+    assert duration_words(1) == "1 minute"
+    assert duration_words(5) == "5 minutes"
+    assert duration_words(120) == "2 hours"
+    assert duration_words(1.5) == "1.5 minutes"

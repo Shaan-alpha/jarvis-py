@@ -1,5 +1,7 @@
 import re
 
+from core.text import plural
+
 
 # How many minutes one of each spoken unit is worth.
 _UNIT_MINUTES = {
@@ -75,3 +77,23 @@ def parse_reminder(query):
         return {"minutes": _minutes(amount_raw, unit), "message": message.strip()}
 
     return None
+
+
+def duration_words(minutes):
+    """Speakable length: '30 seconds', '1 minute', '2 hours', '1.5 minutes'."""
+
+    seconds = round(minutes * 60)
+
+    if seconds < 60:
+
+        return plural(seconds, "second")
+
+    if seconds % 3600 == 0:
+
+        return plural(seconds // 3600, "hour")
+
+    if seconds % 60 == 0:
+
+        return plural(seconds // 60, "minute")
+
+    return f"{round(minutes, 1)} minutes"
