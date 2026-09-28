@@ -15,6 +15,10 @@ from core.agent.registry import (
     tool
 )
 
+from core.net import (
+    is_online
+)
+
 
 _APP_ALIASES = {
     "calculator": "calc",
@@ -81,6 +85,10 @@ def open_calculator():
 @tool("open_youtube", "Open YouTube in the browser")
 def open_youtube():
 
+    if not is_online():
+
+        return "You're offline, so I can't open YouTube."
+
     webbrowser.open("https://youtube.com")
 
     return "Opening YouTube."
@@ -88,6 +96,10 @@ def open_youtube():
 
 @tool("open_google", "Open Google in the browser")
 def open_google():
+
+    if not is_online():
+
+        return "You're offline, so I can't open Google."
 
     webbrowser.open("https://google.com")
 
@@ -210,6 +222,10 @@ def system_status():
     },
 )
 def search_web(query):
+
+    if not is_online():
+
+        return "You're offline, so I can't search the web."
 
     url = (
         "https://www.google.com/search?q="

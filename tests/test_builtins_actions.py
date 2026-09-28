@@ -56,13 +56,23 @@ def test_system_status_no_battery(monkeypatch):
 
 # --- search_web ------------------------------------------------------------
 
-def test_search_web_opens_browser(monkeypatch):
+def test_search_web_opens_browser_when_online(monkeypatch):
     opened = []
-    monkeypatch.setattr(agent_builtins.webbrowser, "open",
-                        lambda url: opened.append(url))
+    monkeypatch.setattr(agent_builtins, "is_online", lambda: True)
+    monkeypatch.setattr(agent_builtins.webbrowser, "open", lambda url: opened.append(url))
     out = agent_builtins.search_web("funny cats")
     assert opened == ["https://www.google.com/search?q=funny+cats"]
     assert out == "Searching the web for funny cats."
+
+
+def test_web_tools_say_so_when_offline(monkeypatch):
+    opened = []
+    monkeypatch.setattr(agent_builtins, "is_online", lambda: False)
+    monkeypatch.setattr(agent_builtins.webbrowser, "open", lambda url: opened.append(url))
+    assert agent_builtins.search_web("cats") == "You're offline, so I can't search the web."
+    assert agent_builtins.open_youtube() == "You're offline, so I can't open YouTube."
+    assert agent_builtins.open_google() == "You're offline, so I can't open Google."
+    assert opened == []
 
 
 # --- registration ----------------------------------------------------------
