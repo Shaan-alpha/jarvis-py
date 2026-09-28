@@ -237,3 +237,29 @@ def test_llm_turns_are_remembered_for_follow_ups(monkeypatch):
     monkeypatch.setattr(app, "save_memory", lambda q, r: None)
     app.process_query("capital of peru", _FakeTaskManager(), raw_query="Capital of Peru?")
     assert conversation.history() == [("Capital of Peru?", "Lima.")]
+
+
+def test_yes_runs_the_pending_action(monkeypatch):
+    ran, responded = [], []
+    conversation.set_pending("do it", lambda: ran.append(1) or "Done.")
+    monkeypatch.setattr(app, "respond", lambda v: responded.append(v) or None)
+    app.process_query("yes", _FakeTaskManager())
+    assert ran == [1] and responded == ["Done."]
+
+
+def test_no_cancels_the_pending_action(monkeypatch):
+    ran, responded = [], []
+    conversation.set_pending("do it", lambda: ran.append(1))
+    monkeypatch.setattr(app, "respond", lambda v: responded.append(v) or None)
+    app.process_query("cancel", _FakeTaskManager())
+    assert ran == [] and responded == ["Cancelled."]
+
+
+def test_another_command_lets_the_confirmation_lapse(monkeypatch):
+    ran = []
+    conversation.set_pending("do it", lambda: ran.append(1))
+    _quiet_routing(monkeypatch)
+    monkeypatch.setattr(app, "ask_llm", lambda q: "")
+    app.process_query("what is python", _FakeTaskManager())
+    app.process_query("yes", _FakeTaskManager())
+    assert ran == []

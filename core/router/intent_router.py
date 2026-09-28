@@ -193,6 +193,59 @@ def _strip_fillers(query):
     return re.sub(r" (?:please|jarvis)$", "", query).strip()
 
 
+_REMEMBER = re.compile(r"(?:please )?(?:remember|dont forget|do not forget)(?: that)? (.+)")
+
+_NOTE = re.compile(r"(?:please )?(?:note that|make a note(?: that)?|take a note(?: that)?) (.+)")
+
+_RAW_REMEMBER = re.compile(
+    r"^\W*(?:please\s+)?(?:remember|don'?t forget|do not forget|note that|make a note|take a note)"
+    r"(?:\s+that)?\s+(.+?)[\s.!?]*$",
+    re.IGNORECASE,
+)
+
+_RECALL = re.compile(r"what (?:else )?do you (?:remember|know)(?: about me)?|what have i told you(?: about me)?")
+
+_PROFILE_QUESTION = re.compile(
+    r"(?:whats|what is|do you know|do you remember|tell me) my "
+    r"(name|city|birthday|job|goal|favou?rite [a-z]+(?: [a-z]+)?)"
+)
+
+_FORGET = re.compile(r"(?:please )?forget (?:that |about )?(?:my )?(?!it$)(.+)")
+
+
+def _match_memory(query, raw_query):
+    """Memory commands come first: "remember to open notepad" must be saved,
+    not executed."""
+
+    text = _strip_fillers(query)
+
+    match = _REMEMBER.fullmatch(text) or _NOTE.fullmatch(text)
+
+    if match:
+
+        raw = _RAW_REMEMBER.match(raw_query or "")
+
+        return ToolCall("remember_fact", {"text": raw.group(1) if raw else match.group(1)})
+
+    if _RECALL.fullmatch(text):
+
+        return ToolCall("recall_memory", {})
+
+    match = _PROFILE_QUESTION.fullmatch(text)
+
+    if match:
+
+        return ToolCall("get_profile_value", {"key": match.group(1)})
+
+    match = _FORGET.fullmatch(text)
+
+    if match:
+
+        return ToolCall("forget_memory", {"query": match.group(1)})
+
+    return None
+
+
 def _match_info(query, raw_query):
 
     text = _strip_fillers(query)
@@ -262,6 +315,7 @@ def _match_search(query, raw_query):
 
 # Checked in order; first match wins.
 _MATCHERS = (
+    _match_memory,
     _match_open_app,
     _match_open_google,
     _match_close_app,

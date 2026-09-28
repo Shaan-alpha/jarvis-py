@@ -189,3 +189,32 @@ def test_maths_routes_to_the_calculator():
 def test_what_is_a_word_is_not_maths():
     call = resolve_keyword_tool("what is python")
     assert call is None or call.name != "calculate"
+
+
+def test_remember_keeps_the_raw_text():
+    assert resolve_keyword_tool("remember that my wifi password is tiger123",
+                                raw_query="Remember that my WiFi password is Tiger123!") == \
+        ToolCall("remember_fact", {"text": "my WiFi password is Tiger123"})
+
+
+def test_remember_beats_an_embedded_app_command():
+    call = resolve_keyword_tool("remember to open notepad at five")
+    assert call.name == "remember_fact"
+
+
+@pytest.mark.parametrize("query,expected", [
+    ("what do you remember", ToolCall("recall_memory", {})),
+    ("what do you know about me", ToolCall("recall_memory", {})),
+    ("whats my name", ToolCall("get_profile_value", {"key": "name"})),
+    ("what is my favourite food", ToolCall("get_profile_value", {"key": "favourite food"})),
+    ("forget my name", ToolCall("forget_memory", {"query": "name"})),
+    ("forget everything", ToolCall("forget_memory", {"query": "everything"})),
+])
+def test_memory_commands_route(query, expected):
+    assert resolve_keyword_tool(query) == expected
+
+
+@pytest.mark.parametrize("query", ["i remember when we went to goa", "note taking apps", "forget it"])
+def test_memory_words_in_ordinary_speech_do_not_route(query):
+    call = resolve_keyword_tool(query)
+    assert call is None or call.name not in {"remember_fact", "forget_memory"}

@@ -38,6 +38,7 @@ _BUILTIN_MODULES = (
     "core.agent.fs_tools",
     "core.agent.info_tools",
     "core.agent.calc_tools",
+    "core.agent.memory_tools",
 )
 
 
@@ -55,6 +56,7 @@ def load_builtins():
     import core.agent.fs_tools     # noqa: F401
     import core.agent.info_tools   # noqa: F401
     import core.agent.calc_tools   # noqa: F401
+    import core.agent.memory_tools   # noqa: F401
 
 
 def load_plugins(dirs):

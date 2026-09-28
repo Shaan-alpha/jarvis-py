@@ -92,6 +92,8 @@ from core.speech.reply import (
 
 from core.state.conversation import (
     conversation,
+    is_no,
+    is_yes,
     match_command
 )
 
@@ -164,6 +166,37 @@ def _reply(raw_query, value):
     return reply
 
 
+def _handle_pending(query, raw_query):
+    """A pending confirmation: 'yes' runs it, 'no' cancels it, anything else
+    lets it lapse (and the query routes normally). True when consumed."""
+
+    if not conversation.has_pending():
+
+        return False
+
+    action = conversation.take_pending()
+
+    if action is None:
+
+        return False
+
+    if is_yes(query):
+
+        _reply(raw_query, action.run())
+
+        return True
+
+    if is_no(query):
+
+        _reply(raw_query, "Cancelled.")
+
+        return True
+
+    logger.info(f"Confirmation for {action.description!r} lapsed")
+
+    return False
+
+
 def _handle_conversation(query):
     """'repeat that' / 'tell me more'. True when handled."""
 
@@ -218,6 +251,10 @@ def process_query(query, task_manager, source="voice", raw_query=None):
     metrics.start_turn(source)
 
     try:
+
+        if _handle_pending(query, raw_query):
+
+            return
 
         if _handle_conversation(query):
 

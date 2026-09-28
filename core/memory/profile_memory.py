@@ -38,6 +38,21 @@ def update_profile(
     save_profile(profile)
 
 
+def delete_profile_key(key):
+
+    profile = load_profile()
+
+    if key not in profile:
+
+        return False
+
+    profile.pop(key)
+
+    save_profile(profile)
+
+    return True
+
+
 def get_profile_context():
 
     profile = load_profile()
