@@ -32,7 +32,7 @@ from core.agent.registry import ToolCall
     ("battery percentage", ToolCall("battery_status", {})),
     ("search google for cats", ToolCall("search_web", {"query": "cats"})),
     ("search the web for cats", ToolCall("search_web", {"query": "cats"})),
-    ("search for cats", ToolCall("search_web", {"query": "cats"})),
+    ("search for cats", ToolCall("search_local", {"query": "cats"})),
     ("google cats", ToolCall("search_web", {"query": "cats"})),
 ])
 def test_resolve_returns_expected_toolcall(query, expected):
@@ -118,13 +118,13 @@ def test_read_file_falls_through_to_llm():
 def test_search_preserves_case_from_raw_query():
     raw = "search for Tony Stark"
     call = resolve_keyword_tool(raw.lower(), raw_query=raw)
-    assert call == ToolCall("search_web", {"query": "Tony Stark"})
+    assert call == ToolCall("search_local", {"query": "Tony Stark"})
 
 
 def test_search_without_raw_query_uses_normalized():
     # Backward compatible: no raw_query -> term comes from the (lowercased) query.
     assert resolve_keyword_tool("search for cats") == \
-        ToolCall("search_web", {"query": "cats"})
+        ToolCall("search_local", {"query": "cats"})
 
 
 def test_typed_apostrophes_match_like_voice():
@@ -300,3 +300,15 @@ def test_file_changes_route(query, raw, expected):
 def test_remove_in_ordinary_speech_is_not_a_delete():
     call = resolve_keyword_tool("remove the stain from my shirt")
     assert call is None or call.name != "delete_file"
+
+
+@pytest.mark.parametrize("query,expected", [
+    ("search the web for cats", ToolCall("search_web", {"query": "cats"})),
+    ("search online for cats", ToolCall("search_web", {"query": "cats"})),
+    ("look for invoices", ToolCall("search_local", {"query": "invoices"})),
+    ("search my files for budget", ToolCall("search_local", {"query": "budget"})),
+    ("search my documents for python", ToolCall("search_my_documents", {"query": "python"})),
+    ("index my documents", ToolCall("index_documents", {})),
+])
+def test_search_commands_route(query, expected):
+    assert resolve_keyword_tool(query) == expected

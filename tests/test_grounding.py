@@ -83,7 +83,16 @@ def test_request_is_low_temperature_and_short(monkeypatch):
 def test_only_relevant_remembered_facts_reach_the_prompt(monkeypatch):
     _, _, captured = _serve(monkeypatch, ["Friday."])
     monkeypatch.setattr(engine, "search_facts", lambda q, k=3: ["my exam is on the fifth"])
-    monkeypatch.setattr(engine, "search_documents", lambda q: [])
+    monkeypatch.setattr(engine, "search_chunks", lambda q: [])
     engine.ask_llm("when is my exam happening")
     assert "my exam is on the fifth" in captured["prompt"]
     assert "Relevant Memory" not in captured["prompt"]
+
+
+def test_document_snippets_name_their_file(monkeypatch):
+    _, _, captured = _serve(monkeypatch, ["Yes."])
+    monkeypatch.setattr(engine, "search_facts", lambda q, k=3: [])
+    monkeypatch.setattr(engine, "search_chunks",
+                        lambda q: [{"file": "resume.pdf", "text": "Built ETL pipelines.", "score": 0.9}])
+    engine.ask_llm("what does my resume say about pipelines")
+    assert "[resume.pdf] Built ETL pipelines." in captured["prompt"]

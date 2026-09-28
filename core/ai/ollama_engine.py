@@ -23,7 +23,7 @@ from core.memory.facts import (
 )
 
 from core.memory.document_memory import (
-    search_documents
+    search_chunks
 )
 
 from core.memory.profile_memory import (
@@ -324,7 +324,7 @@ def _build_payload(prompt, detailed):
         online=_online(),
         profile=get_profile_context(),
         facts=facts,
-        documents=search_documents(prompt) if retrieve else [],
+        documents=[f"[{chunk['file']}] {chunk['text']}" for chunk in search_chunks(prompt)] if retrieve else [],
         history=conversation.history(),
         detailed=detailed,
     )

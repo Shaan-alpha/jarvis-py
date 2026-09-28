@@ -122,7 +122,7 @@ _INFO_PATTERNS = tuple(
 _SEARCH_TRIGGERS = (
     "search google for",
     "search the web for",
-    "search for",
+    "search online for",
     "google",
 )
 
@@ -470,6 +470,48 @@ def _match_substring_tool(query, raw_query):
     return None
 
 
+_SEARCH_DOCUMENTS = re.compile(r"search (?:in )?(?:my |the )?(?:documents|docs|pdfs) for (.+)")
+
+_INDEX_DOCUMENTS = re.compile(r"(?:re ?index|index) (?:my |the )?documents|update (?:my |the )?document index")
+
+_LOCAL_SEARCH = (
+    (re.compile(r"(?:search|look) for (.+)"),
+     re.compile(r"^\W*(?:search|look)\s+for\s+(.+?)[\s?.!]*$", re.IGNORECASE)),
+    (re.compile(r"search (?:my |the )?(?:files|computer|pc) for (.+)"),
+     re.compile(r"^\W*search\s+(?:my\s+|the\s+)?(?:files|computer|pc)\s+for\s+(.+?)[\s?.!]*$", re.IGNORECASE)),
+    (re.compile(r"find (.+?) (?:in|on) my (?:files|computer|pc)"),
+     re.compile(r"^\W*find\s+(.+?)\s+(?:in|on)\s+my\s+(?:files|computer|pc)[\s?.!]*$", re.IGNORECASE)),
+)
+
+
+def _match_local_search(query, raw_query):
+    """'search for X' searches this PC; the web needs 'search the web for'."""
+
+    text = _strip_fillers(query)
+
+    match = _SEARCH_DOCUMENTS.fullmatch(text)
+
+    if match:
+
+        return ToolCall("search_my_documents", {"query": match.group(1)})
+
+    if _INDEX_DOCUMENTS.fullmatch(text):
+
+        return ToolCall("index_documents", {})
+
+    for pattern, raw_pattern in _LOCAL_SEARCH:
+
+        match = pattern.fullmatch(text)
+
+        if match:
+
+            raw = raw_pattern.match(raw_query or "")
+
+            return ToolCall("search_local", {"query": raw.group(1).strip() if raw else match.group(1)})
+
+    return None
+
+
 def _search_term(trigger_pattern, query, raw_query):
     """The text after a search trigger, from the raw utterance when it matches
     there (keeps case: "search for Tony Stark" -> "Tony Stark")."""
@@ -508,6 +550,7 @@ _MATCHERS = (
     _match_info,
     _match_calc,
     _match_substring_tool,
+    _match_local_search,
     _match_search,
     _match_weather,
     _match_lookup,
