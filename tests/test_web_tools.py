@@ -29,8 +29,12 @@ def _route(monkeypatch, table, online=True):
     return calls
 
 
+def _search(*titles):
+    return {"query": {"search": [{"title": t} for t in titles]}}
+
+
 _TURING = {
-    "w/api.php": ["alan turing", ["Alan Turing"], [""], ["https://en.wikipedia.org/wiki/Alan_Turing"]],
+    "w/api.php": _search("Alan Turing", "Turing Award"),
     "page/summary/Alan_Turing": {
         "type": "standard",
         "extract": "Alan Turing was an English mathematician. He was a pioneer of computing. He was born in 1912.",
@@ -38,19 +42,41 @@ _TURING = {
 }
 
 
-def test_lookup_speaks_the_start_of_the_wikipedia_summary(monkeypatch):
+def test_lookup_speaks_one_sentence_and_shows_more(monkeypatch):
     _route(monkeypatch, _TURING)
-    assert web.lookup("Alan Turing") == \
-        "According to Wikipedia, Alan Turing was an English mathematician. He was a pioneer of computing."
+    out = web.lookup("Alan Turing")
+    assert out.say == "According to Wikipedia, Alan Turing was an English mathematician."
+    assert out.show.endswith("He was born in 1912.")
 
 
-def test_disambiguation_falls_back_to_duckduckgo(monkeypatch):
+def test_an_ambiguous_word_takes_the_most_relevant_article(monkeypatch):
+    # Opensearch answered "Python" with the disambiguation page, and the old
+    # fallback read out a Cold War plan. Relevance search ranks the article.
     _route(monkeypatch, {
-        "w/api.php": ["mercury", ["Mercury"], [""], [""]],
+        "w/api.php": _search("Python (programming language)", "Monty Python", "Python"),
+        "page/summary/Python_%28programming_language%29": {
+            "type": "standard", "extract": "Python is a high-level programming language. It is popular.",
+        },
+    })
+    assert web.lookup("Python").say == "According to Wikipedia, Python is a high-level programming language."
+
+
+def test_a_genuinely_ambiguous_topic_asks_which_instead_of_guessing(monkeypatch):
+    calls = _route(monkeypatch, {
+        "w/api.php": _search("Mercury", "Freddie Mercury", "Mercury (element)"),
         "page/summary/Mercury": {"type": "disambiguation", "extract": "Mercury may refer to:"},
         "api.duckduckgo.com": {"AbstractText": "Mercury is the smallest planet.", "Answer": ""},
     })
-    assert web.lookup("mercury") == "Mercury is the smallest planet."
+    assert web.lookup("mercury") == "mercury can mean several things. Which one do you mean?"
+    assert not any("duckduckgo" in url for url in calls)
+
+
+def test_duckduckgo_answers_when_wikipedia_has_nothing(monkeypatch):
+    _route(monkeypatch, {
+        "w/api.php": _search(),
+        "api.duckduckgo.com": {"AbstractText": "A zorbonk is a made-up word. Nobody uses it.", "Answer": ""},
+    })
+    assert web.lookup("zorbonk").say == "A zorbonk is a made-up word."
 
 
 def test_answers_are_cached_and_reused_offline(monkeypatch):
@@ -86,7 +112,14 @@ def test_a_corrupt_cache_is_ignored(monkeypatch):
     with open(web.CACHE_PATH, "w", encoding="utf-8") as handle:
         handle.write("[not a dict")
     _route(monkeypatch, _TURING)
-    assert web.lookup("Alan Turing").startswith("According to Wikipedia")
+    assert web.lookup("Alan Turing").say.startswith("According to Wikipedia")
+
+
+def test_an_old_plain_text_cache_entry_still_works(monkeypatch):
+    calls = _route(monkeypatch, _TURING, online=False)
+    web._cache_put("lookup:alan turing", "According to Wikipedia, an older cached answer.")
+    assert web.lookup("Alan Turing").say == "According to Wikipedia, an older cached answer."
+    assert calls == []
 
 
 def test_first_sentences_caps_words():

@@ -129,13 +129,29 @@ def first_sentences(text, max_sentences=2, max_words=MAX_ANSWER_WORDS):
     return answer
 
 
+# Returned by _wikipedia when the best match is a disambiguation page: the
+# topic has several meanings, so Jarvis asks instead of guessing one.
+_AMBIGUOUS = object()
+
+
+def _spoken(text, prefix=""):
+    """Speak one sentence; show up to three."""
+
+    return {
+        "say": prefix + first_sentences(text, max_sentences=1, max_words=35),
+        "show": prefix + first_sentences(text, max_sentences=3, max_words=90),
+    }
+
+
 def _wikipedia(topic):
+    """Relevance search, not opensearch: opensearch answers "Python" with the
+    disambiguation page, relevance search with the programming language."""
 
     hits = _get_json(_WIKI_SEARCH, {
-        "action": "opensearch", "search": topic, "limit": 1, "namespace": 0, "format": "json",
+        "action": "query", "list": "search", "srsearch": topic, "srlimit": 3, "format": "json",
     })
 
-    titles = hits[1] if isinstance(hits, list) and len(hits) > 1 else []
+    titles = [hit["title"] for hit in hits.get("query", {}).get("search", [])]
 
     if not titles:
 
@@ -145,11 +161,11 @@ def _wikipedia(topic):
 
     if summary.get("type") == "disambiguation":
 
-        return None
+        return _AMBIGUOUS
 
     extract = (summary.get("extract") or "").strip()
 
-    return f"According to Wikipedia, {first_sentences(extract)}" if extract else None
+    return _spoken(extract, "According to Wikipedia, ") if extract else None
 
 
 def _duckduckgo(topic):
@@ -158,7 +174,17 @@ def _duckduckgo(topic):
 
     text = data.get("AbstractText") or data.get("Answer") or data.get("Definition") or ""
 
-    return first_sentences(text) if text.strip() else None
+    return _spoken(text) if text.strip() else None
+
+
+def _as_reply(cached):
+    """A cached answer as a Reply (older cache entries were plain text)."""
+
+    if isinstance(cached, dict):
+
+        return Reply(**cached)
+
+    return Reply(say=cached, show=cached)
 
 
 @tool(
@@ -181,12 +207,14 @@ def lookup(topic):
 
     if cached:
 
-        return cached
+        return _as_reply(cached)
 
     if not ONLINE_LOOKUPS or not is_online():
 
         # A stale answer beats a guess; with none, the LLM answers (grounded).
-        return _cache_get(key, LOOKUP_TTL, allow_stale=True)
+        stale = _cache_get(key, LOOKUP_TTL, allow_stale=True)
+
+        return _as_reply(stale) if stale else None
 
     for fetch in (_wikipedia, _duckduckgo):
 
@@ -198,11 +226,16 @@ def lookup(topic):
 
             answer = None
 
+        if answer is _AMBIGUOUS:
+
+            # DuckDuckGo would just pick one meaning; ask instead of guessing.
+            return f"{topic} can mean several things. Which one do you mean?"
+
         if answer:
 
             _cache_put(key, answer)
 
-            return answer
+            return Reply(**answer)
 
     return None
 
