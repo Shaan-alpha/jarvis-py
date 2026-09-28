@@ -183,8 +183,13 @@ html, body {
 }
 body.has-caps .stage, body.wizard-open .stage { height: 64px; }
 
+/* Absolutely centred: in the 64px compact stage the 104px box overflows, and
+   Chrome start-aligns an overflowing grid item — the orb sat 18px low. */
 #orb {
-  position: relative;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  margin: -52px 0 0 -52px;
   width: 104px;
   height: 104px;
   display: grid;
