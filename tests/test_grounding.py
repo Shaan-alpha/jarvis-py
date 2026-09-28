@@ -78,3 +78,12 @@ def test_request_is_low_temperature_and_short(monkeypatch):
     assert options["temperature"] == 0.2
     assert options["num_predict"] == engine.REPLY_TOKEN_LIMIT <= 100
     assert "\nRules:" in options["stop"]
+
+
+def test_only_relevant_remembered_facts_reach_the_prompt(monkeypatch):
+    _, _, captured = _serve(monkeypatch, ["Friday."])
+    monkeypatch.setattr(engine, "search_facts", lambda q, k=3: ["my exam is on the fifth"])
+    monkeypatch.setattr(engine, "search_documents", lambda q: [])
+    engine.ask_llm("when is my exam happening")
+    assert "my exam is on the fifth" in captured["prompt"]
+    assert "Relevant Memory" not in captured["prompt"]

@@ -87,17 +87,13 @@ def test_keyword_miss_falls_through_to_llm_tool_agent(monkeypatch):
     assert ran["call"] == ToolCall("open_app", {"name": "spotify"})
 
 
-def test_llm_fallback_saves_memory(monkeypatch):
-    monkeypatch.setattr(app, "extract_personal_info", lambda q: None)
-    monkeypatch.setattr(app, "parse_reminder", lambda q: None)
-    monkeypatch.setattr(app, "resolve_keyword_tool", lambda q, raw=None: None)
-    monkeypatch.setattr(app, "decide_tool", lambda q, raw=None: None)
+def test_llm_turns_are_not_saved_to_long_term_memory(monkeypatch):
+    from core.memory import facts
+    _quiet_routing(monkeypatch)
     monkeypatch.setattr(app, "ask_llm", lambda q: "an answer")
-    saved = {}
-    monkeypatch.setattr(app, "save_memory", lambda q, r: saved.setdefault("v", (q, r)))
-    monkeypatch.setattr(app, "respond", lambda v: None)
     app.process_query("what is python", _FakeTaskManager())
-    assert saved["v"] == ("what is python", "an answer")
+    assert facts.all_facts() == []
+    assert not hasattr(app, "save_memory")
 
 
 def test_raw_query_preserves_case_for_routers(monkeypatch):
@@ -234,7 +230,6 @@ def test_tell_me_more_reasks_the_last_question_in_detail(monkeypatch):
 def test_llm_turns_are_remembered_for_follow_ups(monkeypatch):
     _quiet_routing(monkeypatch)
     monkeypatch.setattr(app, "ask_llm", lambda q: "Lima.")
-    monkeypatch.setattr(app, "save_memory", lambda q, r: None)
     app.process_query("capital of peru", _FakeTaskManager(), raw_query="Capital of Peru?")
     assert conversation.history() == [("Capital of Peru?", "Lima.")]
 

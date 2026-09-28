@@ -18,8 +18,8 @@ from core.speech.tts_queue import (
     add_to_queue
 )
 
-from core.memory.semantic_memory import (
-    search_memory
+from core.memory.facts import (
+    search_facts
 )
 
 from core.memory.document_memory import (
@@ -316,9 +316,7 @@ def _build_payload(prompt, detailed):
 
     retrieve = _should_retrieve(prompt)
 
-    memory = search_memory(prompt) if retrieve else None
-
-    facts = [f"{memory['user']} -> {memory['assistant']}"] if memory else []
+    facts = search_facts(prompt) if retrieve else []
 
     final_prompt = build_prompt(
         prompt,

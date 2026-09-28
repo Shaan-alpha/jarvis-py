@@ -45,10 +45,6 @@ from core.ai.ollama_engine import (
     cancel_generation
 )
 
-from core.memory.semantic_memory import (
-    save_memory
-)
-
 from core.memory.profile_extractor import (
     extract_personal_info
 )
@@ -322,8 +318,6 @@ def process_query(query, task_manager, source="voice", raw_query=None):
         if response:
 
             conversation.add_turn(raw_query, response)
-
-            save_memory(query, response)
 
     finally:
 
