@@ -91,6 +91,8 @@ import config.settings as settings
 
 from core.paths import is_frozen
 
+from core.text import normalize
+
 from core.warmup import warm_start
 
 from core.setup.checks import check_microphone
@@ -267,7 +269,7 @@ def _hud_on_text_query(session, task_manager, text):
     # copy is only used for command matching.
     raw = (text or "").strip()
 
-    query = raw.lower()
+    query = normalize(raw)
 
     if not query:
 
@@ -576,9 +578,9 @@ def _voice_loop(session, task_manager):
 
             events.emit("state", state="listening")
 
-            query = command()
+            raw = command()
 
-            if query == "none":
+            if raw == "none":
 
                 if session.is_expired():
 
@@ -592,13 +594,17 @@ def _voice_loop(session, task_manager):
 
                 continue
 
-            query = query.lower().strip()
+            query = normalize(raw)
 
-            logger.info(f"User Query: {query}")
+            if not query:
 
-            print(f"\nUser: {query}")
+                continue
 
-            events.emit("transcript", role="user", text=query)
+            logger.info(f"User Query: {raw}")
+
+            print(f"\nUser: {raw}")
+
+            events.emit("transcript", role="user", text=raw)
 
             session.update_interaction()
 
@@ -616,7 +622,7 @@ def _voice_loop(session, task_manager):
 
                 continue
 
-            process_query(query, task_manager)
+            process_query(query, task_manager, raw_query=raw)
 
         except KeyboardInterrupt:
 

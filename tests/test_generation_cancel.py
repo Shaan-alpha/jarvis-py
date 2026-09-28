@@ -67,3 +67,13 @@ def test_typed_query_cancels_the_previous_answer_first(monkeypatch):
     monkeypatch.setattr(app, "_spawn", lambda target, *a, **k: calls.append("spawn"))
     app._hud_on_text_query(_Session(calls), object(), "Open Notepad")
     assert calls == ["cancel", "stop", "clear", "activate", "spawn"]
+
+
+def test_typed_query_is_normalized_but_keeps_the_raw_text(monkeypatch):
+    seen = {}
+    for name in ("cancel_generation", "stop_speaking", "clear_queue"):
+        monkeypatch.setattr(app, name, lambda: None)
+    monkeypatch.setattr(app, "_spawn", lambda target, *a, **k: seen.update(args=a, kwargs=k))
+    app._hud_on_text_query(_Session([]), "tm", "What's on my Clipboard?")
+    assert seen["args"] == ("whats on my clipboard", "tm")
+    assert seen["kwargs"] == {"source": "text", "raw_query": "What's on my Clipboard?"}

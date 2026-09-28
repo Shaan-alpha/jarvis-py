@@ -1,6 +1,5 @@
 # pyrefly: ignore [missing-import]
 
-import re
 import socket
 import threading
 import time
@@ -211,25 +210,6 @@ def stop_speaking():
         logger.warning(f"stop_speaking failed (cross-thread?): {e}")
 
 
-def clean_query(query):
-
-    query = query.lower().strip()
-
-    query = re.sub(
-        r"[^a-zA-Z0-9\s]",
-        "",
-        query
-    )
-
-    query = re.sub(
-        r"\s+",
-        " ",
-        query
-    )
-
-    return query
-
-
 def command():
 
     recognizer = sr.Recognizer()
@@ -324,4 +304,6 @@ def command():
 
         return "none"
 
-    return clean_query(result)
+    # Raw text: the caller normalizes for matching and keeps this for content
+    # (case, punctuation, "notes.txt") — stripping it here broke both.
+    return result.strip()

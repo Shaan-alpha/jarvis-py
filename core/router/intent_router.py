@@ -1,4 +1,8 @@
+import re
+
 from core.agent.registry import ToolCall
+
+from core.text import normalize
 
 
 _OPEN_APPS = {
@@ -66,20 +70,11 @@ _LIST_FILES = (
     "show my workspace",
 )
 
-# Ordered: "search google for " before "google " so the longer, more specific
-# trigger wins (otherwise "google " would swallow it and mis-extract the term).
-_SEARCH_TRIGGERS = (
-    "search google for ",
-    "search the web for ",
-    "search for ",
-    "google ",
-)
-
-# Zero-arg tools matched by substring containment, checked top to bottom (first
-# match wins). Collapsing these into one table keeps resolve_keyword_tool flat
+# Zero-arg tools matched on whole words, checked top to bottom (first match
+# wins). Collapsing these into one table keeps resolve_keyword_tool flat
 # instead of one if-branch per tool. The ToolCall instances are shared and never
-# mutated (frozen dataclass; the executor only reads call.args). "mute" is a bare
-# substring (so "commute" would also match — acceptable for a single-user setup).
+# mutated (frozen dataclass; the executor only reads call.args). Whole-word matching
+# keeps "mute" from firing on "commute".
 _SUBSTRING_TOOLS = (
     (_INCREASE_VOLUME, ToolCall("increase_volume", {})),
     (_DECREASE_VOLUME, ToolCall("decrease_volume", {})),
@@ -90,91 +85,144 @@ _SUBSTRING_TOOLS = (
 )
 
 
-def _match_named_app(query, table, tool_name):
-    """First phrase in `table` contained in `query` -> ToolCall(tool_name, name)."""
+# Ordered: the longer, more specific trigger first so "search google for x"
+# isn't swallowed by "google ".
+_SEARCH_TRIGGERS = (
+    "search google for",
+    "search the web for",
+    "search for",
+    "google",
+)
 
-    for phrase, name in table.items():
+_SEARCH_PATTERNS = tuple(
+    re.compile(rf"^\s*{re.escape(trigger)}\s+(.+?)[\s?.!]*$", re.IGNORECASE)
+    for trigger in _SEARCH_TRIGGERS
+)
 
-        if phrase in query:
+
+def _word_pattern(phrase):
+    """A regex matching `phrase` only as whole words ("mute" not "commute")."""
+
+    return re.compile(rf"(?<!\w){re.escape(normalize(phrase))}(?!\w)")
+
+
+_OPEN_APP_PATTERNS = tuple(
+    (_word_pattern(phrase), name) for phrase, name in _OPEN_APPS.items()
+)
+
+_CLOSE_APP_PATTERNS = tuple(
+    (_word_pattern(phrase), name) for phrase, name in _CLOSE_APPS.items()
+)
+
+_OPEN_GOOGLE_PATTERN = _word_pattern("open google")
+
+_SUBSTRING_PATTERNS = tuple(
+    (tuple(_word_pattern(p) for p in phrases), call)
+    for phrases, call in _SUBSTRING_TOOLS
+)
+
+
+def _first_named(query, patterns, tool_name):
+
+    for pattern, name in patterns:
+
+        if pattern.search(query):
 
             return ToolCall(tool_name, {"name": name})
 
     return None
 
 
-def _match_substring_tool(query):
-    """First zero-arg substring tool whose any trigger is contained in `query`."""
+def _match_open_app(query, raw_query):
 
-    for phrases, call in _SUBSTRING_TOOLS:
+    return _first_named(query, _OPEN_APP_PATTERNS, "open_app")
 
-        if any(p in query for p in phrases):
+
+def _match_open_google(query, raw_query):
+
+    # The zero-arg homepage tool; checked before the search triggers.
+    if _OPEN_GOOGLE_PATTERN.search(query):
+
+        return ToolCall("open_google", {})
+
+    return None
+
+
+def _match_close_app(query, raw_query):
+
+    return _first_named(query, _CLOSE_APP_PATTERNS, "close_app")
+
+
+def _match_substring_tool(query, raw_query):
+    """First zero-arg tool with a trigger phrase present as whole words."""
+
+    for patterns, call in _SUBSTRING_PATTERNS:
+
+        if any(p.search(query) for p in patterns):
 
             return call
 
     return None
 
 
-def _match_search(query, raw_query):
-    """Web search: strip the trigger prefix to get the search term.
+def _search_term(trigger_pattern, query, raw_query):
+    """The text after a search trigger, from the raw utterance when it matches
+    there (keeps case: "search for Tony Stark" -> "Tony Stark")."""
 
-    The trigger is detected on the normalized `query`, but the term is pulled
-    from `raw_query` so a typed search keeps its original case ("search for
-    Tony Stark" -> "Tony Stark", not "tony stark").
-    """
+    for text in (raw_query, query):
 
-    for trigger in _SEARCH_TRIGGERS:
+        match = trigger_pattern.match(text or "")
 
-        if query.startswith(trigger):
+        if match and match.group(1).strip():
 
-            idx = raw_query.lower().find(trigger)
-
-            if idx != -1:
-
-                term = raw_query[idx + len(trigger):].strip()
-
-            else:
-
-                term = query[len(trigger):].strip()
-
-            if term:
-
-                return ToolCall("search_web", {"query": term})
+            return match.group(1).strip()
 
     return None
+
+
+def _match_search(query, raw_query):
+
+    for pattern in _SEARCH_PATTERNS:
+
+        term = _search_term(pattern, query, raw_query)
+
+        if term:
+
+            return ToolCall("search_web", {"query": term})
+
+    return None
+
+
+# Checked in order; first match wins.
+_MATCHERS = (
+    _match_open_app,
+    _match_open_google,
+    _match_close_app,
+    _match_substring_tool,
+    _match_search,
+)
 
 
 def resolve_keyword_tool(query, raw_query=None):
     """Map a known command phrase to a registry ToolCall, or None.
 
-    Deterministic, LLM-free, stdlib + registry only (importable in CI). This is
-    the fast path: common voice commands resolve here without paying Ollama
-    latency. A miss returns None and the caller falls back to the LLM tool
-    agent. Open/close/volume/status use substring containment (so an embedded
-    keyword in a longer sentence still matches); web search uses prefix
-    extraction so the search term can be pulled off the trigger phrase. Checked
-    in order; first match wins. "open google" beats the search triggers and the
-    open_app table (it's the zero-arg homepage tool, not open_app with a name).
-    `raw_query` (the un-normalized utterance) preserves case for the search term.
+    Deterministic and LLM-free (importable in CI). The query is normalized here
+    too, so voice and typed input match the same tables. `raw_query` (the
+    un-normalized utterance) is used where an argument's case matters.
     """
 
     if raw_query is None:
 
         raw_query = query
 
-    open_call = _match_named_app(query, _OPEN_APPS, "open_app")
+    query = normalize(query)
 
-    if open_call is not None:
+    for matcher in _MATCHERS:
 
-        return open_call
+        call = matcher(query, raw_query)
 
-    # "open google" routes to the zero-arg open_google homepage tool (it's kept
-    # out of _OPEN_APPS, which passes a name arg, and beats the search triggers).
-    if "open google" in query:
+        if call is not None:
 
-        return ToolCall("open_google", {})
+            return call
 
-    return (
-        _match_named_app(query, _CLOSE_APPS, "close_app")
-        or _match_substring_tool(query)
-        or _match_search(query, raw_query)
-    )
+    return None

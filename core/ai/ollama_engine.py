@@ -28,6 +28,10 @@ from core.hud import events
 
 from core.utils import metrics
 
+from core.text import (
+    normalize
+)
+
 from core.utils.logger import (
     logger
 )
@@ -37,11 +41,13 @@ from core.utils.logger import (
 # retrieval — a vague utterance can weakly match an indexed chunk (e.g. a
 # resume) and a small model then confabulates around it.
 _CHITCHAT = {
-    "hi", "hello", "hey", "yo", "sup",
-    "how are you", "how are you doing", "how's it going",
-    "what's up", "whats up", "good morning", "good afternoon",
-    "good evening", "thanks", "thank you", "ok", "okay",
-    "cool", "nice", "bye", "goodbye", "who are you",
+    normalize(phrase) for phrase in (
+        "hi", "hello", "hey", "yo", "sup",
+        "how are you", "how are you doing", "how's it going",
+        "what's up", "good morning", "good afternoon",
+        "good evening", "thanks", "thank you", "ok", "okay",
+        "cool", "nice", "bye", "goodbye", "who are you",
+    )
 }
 
 
@@ -95,7 +101,7 @@ def _should_retrieve(prompt):
     retrieval. Skips greetings and very short utterances so RAG doesn't fire
     on chitchat like 'how are you'."""
 
-    cleaned = prompt.lower().strip().strip("?.!,")
+    cleaned = normalize(prompt)
 
     if cleaned in _CHITCHAT:
 

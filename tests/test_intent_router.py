@@ -124,3 +124,12 @@ def test_search_without_raw_query_uses_normalized():
     # Backward compatible: no raw_query -> term comes from the (lowercased) query.
     assert resolve_keyword_tool("search for cats") == \
         ToolCall("search_web", {"query": "cats"})
+
+
+def test_typed_apostrophes_match_like_voice():
+    assert resolve_keyword_tool("What's on my clipboard?") == ToolCall("read_clipboard", {})
+
+
+def test_mute_needs_a_whole_word():
+    assert resolve_keyword_tool("i commute by bus") is None
+    assert resolve_keyword_tool("please mute") == ToolCall("mute_volume", {})
