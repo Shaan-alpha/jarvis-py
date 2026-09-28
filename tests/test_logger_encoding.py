@@ -28,3 +28,10 @@ def test_non_ascii_log_line_is_written(tmp_path):
     handler.close()
 
     assert "café ☕" in path.read_text(encoding="utf-8")
+
+
+def test_log_file_rotates_instead_of_growing_forever():
+    from logging.handlers import RotatingFileHandler
+    assert isinstance(lg._file_handler, RotatingFileHandler)
+    assert lg._file_handler.maxBytes == 2 * 1024 * 1024
+    assert lg._file_handler.backupCount == 3
