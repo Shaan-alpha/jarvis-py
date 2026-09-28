@@ -26,6 +26,8 @@ from core.memory.profile_memory import (
     get_profile_context
 )
 
+from core.ai import llm_health
+
 from core.hud import events
 
 from core.utils import metrics
@@ -206,6 +208,12 @@ def ask_llm(prompt):
     # Claim a generation; a later query bumps this and supersedes us.
     my_generation = _start_generation()
 
+    if llm_health.is_down():
+
+        _speak_error(llm_health.unavailable_message())
+
+        return ""
+
     # -------------------- #
     # PROFILE CONTEXT
     # -------------------- #
@@ -319,6 +327,8 @@ Jarvis:"""
 
             logger.error(f"Ollama returned {response.status_code}: {detail}")
 
+            llm_health.mark_down(detail or f"HTTP {response.status_code}")
+
             if "memory" in detail.lower():
 
                 message = (
@@ -342,6 +352,8 @@ Jarvis:"""
 
             return ""
 
+        llm_health.mark_up()
+
         logger.info(
             "LLM response completed"
         )
@@ -355,6 +367,8 @@ Jarvis:"""
         logger.exception(
             f"Ollama Error: {e}"
         )
+
+        llm_health.mark_down(str(e))
 
         message = "I can't reach Ollama right now. Is it running?"
 

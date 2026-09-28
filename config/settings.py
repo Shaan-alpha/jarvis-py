@@ -29,6 +29,10 @@ MODEL_MIN_FREE_GB = 3.5
 # Download size shown on the setup wizard's pull button.
 MODEL_PULL_SIZE = "2.3 GB"
 
+# After an Ollama failure, skip model calls for this long (seconds) and answer at
+# once, instead of waiting out timeouts on every query.
+LLM_DOWN_SECONDS = 30
+
 # Wake-word sensitivity. 0.6 suited the old (degraded MME) capture path. With
 # clean WASAPI capture + resampling (see openwakeword_listener), ambient sits
 # near 0, but real "hey jarvis" utterances vary a lot by distance/articulation:

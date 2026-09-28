@@ -15,6 +15,8 @@ from core.agent import (
     registry
 )
 
+from core.ai import llm_health
+
 from core.utils.logger import (
     logger
 )
@@ -171,6 +173,10 @@ def decide_tool(query, raw_query=None):
 
         return None
 
+    if llm_health.is_down():
+
+        return None
+
     # Gate on the normalized query, but show the model the RAW utterance so the
     # content it extracts (e.g. write_clipboard/write_file text) keeps its
     # original case and punctuation instead of the lowercased form.
@@ -228,6 +234,12 @@ JSON:"""
             timeout=30
         )
 
+        if getattr(response, "status_code", 200) != 200:
+
+            llm_health.mark_down(f"HTTP {response.status_code}")
+
+            return None
+
         data = response.json()
 
         text = data.get("response", "")
@@ -247,5 +259,7 @@ JSON:"""
     except Exception as e:
 
         logger.exception(f"Tool Agent Error: {e}")
+
+        llm_health.mark_down(str(e))
 
         return None
