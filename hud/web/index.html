@@ -6,17 +6,22 @@
   <link rel="icon" href="logo.svg" />
   <link rel="stylesheet" href="style.css" />
   <title>Jarvis</title>
+  <!-- In <head> so the theme is applied before the first paint. -->
+  <script src="theme.js"></script>
 </head>
-<body>
+<body data-state="idle" data-link="down">
   <div id="ambient"></div>
-  <div id="grain"></div>
 
   <main id="panel">
-    <div id="titlebar">
-      <div class="brand">
-        <img class="brand-mark" src="logo.svg" alt="" width="22" height="22" />
+    <header id="titlebar">
+      <div class="brand pywebview-drag-region">
+        <img class="brand-mark" src="logo.svg" alt="" width="18" height="18" />
         <span class="brand-name">JARVIS</span>
       </div>
+      <span id="chip" class="chip pywebview-drag-region" title="">
+        <span class="chip-dot"></span><span id="chip-model">&mdash;</span>
+      </span>
+      <div class="drag-fill pywebview-drag-region"></div>
       <div class="wctrls">
         <button id="min" class="wctrl" type="button" title="Minimize" aria-label="Minimize">
           <span class="ico-min"></span>
@@ -25,9 +30,9 @@
           <span class="ico-close"></span>
         </button>
       </div>
-    </div>
+    </header>
 
-    <header class="stage">
+    <section class="stage">
       <div id="orb" data-state="idle">
         <div class="orb-glow"></div>
         <div class="orb-body">
@@ -38,40 +43,39 @@
         </div>
         <div class="orb-rim"></div>
       </div>
-      <span id="pill" class="pill state">idle</span>
+      <span id="pill" class="pill state" role="status">Connecting&hellip;</span>
       <button id="stop" class="stop" type="button" title="Stop (Esc)" aria-label="Stop speaking">
         <span class="stop-ico"></span>
       </button>
-    </header>
+    </section>
 
-    <section class="caps">
+    <section class="caps" aria-live="polite">
       <div id="cap-user" class="cap u"></div>
       <div id="cap-jarvis" class="cap j"></div>
     </section>
 
-    <div class="status">
-      <span id="st-model" class="pill mono">&mdash;</span>
-      <span id="st-cpu" class="pill mono">CPU &mdash;</span>
-      <span id="st-batt" class="pill mono">&mdash;</span>
-      <span id="st-net" class="pill mono">offline</span>
-    </div>
+    <div id="toast" class="toast" hidden></div>
 
     <form id="form">
-      <input id="input" type="text" placeholder="Ask Jarvis&hellip;" autocomplete="off" />
+      <input id="input" type="text" placeholder="Ask Jarvis&hellip;" autocomplete="off" spellcheck="false" />
       <button type="submit" class="send" aria-label="Send">&#8629;</button>
     </form>
 
     <section id="wizard" class="wizard hidden">
       <h2>Setup</h2>
       <ul id="wizard-checks"></ul>
-      <button id="wizard-pull" class="hidden">Pull phi3 (2.3 GB)</button>
+      <div class="wizard-row">
+        <button id="wizard-recheck" type="button" class="ghost">Re-check</button>
+        <button id="wizard-pull" type="button" class="hidden">Pull model</button>
+      </div>
       <pre id="wizard-pull-log" class="hidden"></pre>
-      <input id="wizard-name" type="text" placeholder="What should I call you?" />
-      <button id="wizard-start" disabled>Start Jarvis</button>
+      <form id="wizard-form">
+        <input id="wizard-name" type="text" placeholder="What should I call you?" autocomplete="off" />
+        <button id="wizard-start" type="submit" disabled>Start Jarvis</button>
+      </form>
     </section>
   </main>
 
-  <script src="theme.js"></script>
   <script src="orb.js"></script>
   <script src="wizard.js"></script>
   <script src="app.js"></script>
