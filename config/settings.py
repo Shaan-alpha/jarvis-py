@@ -126,6 +126,17 @@ HUD_WS_PORT = 8765
 
 HUD_STATS_INTERVAL = 3.0
 
+# Window size (logical px). Compact: title bar, orb, captions, input.
+HUD_WIDTH = 380
+
+HUD_HEIGHT = 360
+
+# Painted before the page loads; matches the panel so there's no flash.
+HUD_BACKGROUND = "#070d17"
+
+# Windows 11 draws the rounded corners and this 1px outline natively (RGB).
+HUD_BORDER_RGB = (46, 64, 84)
+
 # Theme schedule (24h). Day -> cyan, evening -> gold, night -> frost.
 HUD_THEME_DAY_START = 5
 
