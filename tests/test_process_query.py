@@ -258,3 +258,14 @@ def test_another_command_lets_the_confirmation_lapse(monkeypatch):
     app.process_query("what is python", _FakeTaskManager())
     app.process_query("yes", _FakeTaskManager())
     assert ran == []
+
+
+def test_a_tool_that_declines_falls_through_to_the_llm(monkeypatch):
+    monkeypatch.setattr(app, "extract_personal_info", lambda q: None)
+    monkeypatch.setattr(app, "parse_reminder", lambda q: None)
+    monkeypatch.setattr(app, "resolve_keyword_tool", lambda q, raw=None: ToolCall("lookup", {"topic": "x"}))
+    monkeypatch.setattr(app, "execute_tool", lambda call: None)
+    asked = []
+    monkeypatch.setattr(app, "ask_llm", lambda q: asked.append(q) or "An answer.")
+    app.process_query("who is x", _FakeTaskManager())
+    assert asked == ["who is x"]

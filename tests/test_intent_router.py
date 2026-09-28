@@ -57,7 +57,8 @@ def test_bare_google_with_no_term_is_not_a_search():
 
 def test_unmatched_query_returns_none():
     # Falls through to the LLM tool agent / chat in the real pipeline.
-    for query in ("what is python", "tell me a joke", "open spotify"):
+    # "what is python" now routes to lookup (Task 18).
+    for query in ("tell me a joke", "open spotify"):
         assert resolve_keyword_tool(query) is None
 
 
@@ -218,3 +219,22 @@ def test_memory_commands_route(query, expected):
 def test_memory_words_in_ordinary_speech_do_not_route(query):
     call = resolve_keyword_tool(query)
     assert call is None or call.name not in {"remember_fact", "forget_memory"}
+
+
+@pytest.mark.parametrize("query,raw,topic", [
+    ("who is alan turing", "Who is Alan Turing?", "Alan Turing"),
+    ("what is python", "What is Python?", "Python"),
+    ("tell me about the eiffel tower", "Tell me about the Eiffel Tower", "the Eiffel Tower"),
+    ("define entropy", "define entropy", "entropy"),
+])
+def test_knowledge_questions_route_to_lookup(query, raw, topic):
+    assert resolve_keyword_tool(query, raw_query=raw) == ToolCall("lookup", {"topic": topic})
+
+
+@pytest.mark.parametrize("query", [
+    "who are you", "what is it", "whats up", "what is my name",
+    "what is the best way to learn python fast", "who is he",
+])
+def test_non_lookups_do_not_route_to_lookup(query):
+    call = resolve_keyword_tool(query)
+    assert call is None or call.name != "lookup"

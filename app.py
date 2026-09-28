@@ -303,9 +303,16 @@ def process_query(query, task_manager, source="voice", raw_query=None):
 
             logger.info(f"Executed Tool: {call.name} args={call.args}")
 
-            _reply(raw_query, execute_tool(call))
+            result = execute_tool(call)
 
-            return
+            if result is not None:
+
+                _reply(raw_query, result)
+
+                return
+
+            # The tool had nothing (e.g. lookup found no page): answer with the LLM.
+            logger.info(f"Tool {call.name} had no answer; asking the LLM")
 
         events.emit("state", state="thinking")
 

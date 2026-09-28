@@ -8,6 +8,7 @@ from core.ai import llm_health
 from core import net
 from core.state.conversation import conversation
 from core.memory import facts as facts_store
+from core.agent import web_tools
 
 
 @pytest.fixture(autouse=True)
@@ -49,3 +50,8 @@ def _isolated_facts(tmp_path, monkeypatch):
     facts_store.reset_cache()
     yield
     facts_store.reset_cache()
+
+
+@pytest.fixture(autouse=True)
+def _isolated_web_cache(tmp_path, monkeypatch):
+    monkeypatch.setattr(web_tools, "CACHE_PATH", str(tmp_path / "web.json"))

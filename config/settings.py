@@ -106,6 +106,17 @@ INPUT_DEVICE_INDEX = None
 WAKE_DEVICE_INDEX = None
 
 # -------------------- #
+# Online lookups (free, keyless)
+# -------------------- #
+
+# Wikipedia / DuckDuckGo / Open-Meteo answers when online. The question text is
+# sent to those services; set False to keep every query on this PC.
+ONLINE_LOOKUPS = True
+
+# Seconds to wait for a lookup before giving up (then the LLM answers).
+WEB_TIMEOUT = 4
+
+# -------------------- #
 # HUD (desktop overlay)
 # -------------------- #
 

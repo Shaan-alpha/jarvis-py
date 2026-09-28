@@ -259,6 +259,54 @@ def _match_info(query, raw_query):
     return None
 
 
+# (normalized pattern, raw pattern keeping case, max topic words)
+_LOOKUP_PATTERNS = tuple(
+    (re.compile(norm), re.compile(raw, re.IGNORECASE), max_words) for norm, raw, max_words in (
+        (r"who (?:is|was|are|were) (.+)", r"^\W*who\s+(?:is|was|are|were)\s+(.+?)[\s?.!]*$", 5),
+        (r"(?:what is|what are|what was|whats) (?:an? |the )?(.+)",
+         r"^\W*what(?:'s|s|\s+is|\s+are|\s+was)\s+(?:an?\s+|the\s+)?(.+?)[\s?.!]*$", 3),
+        (r"tell me about (.+)", r"^\W*tell\s+me\s+about\s+(.+?)[\s?.!]*$", 5),
+        (r"define (.+)", r"^\W*define\s+(.+?)[\s?.!]*$", 3),
+        (r"what does (.+) mean", r"^\W*what\s+does\s+(.+?)\s+mean[\s?.!]*$", 3),
+    )
+)
+
+# Follow-ups and chit-chat, not topics: the LLM (with conversation history) takes them.
+_LOOKUP_STOP_WORDS = {
+    "he", "she", "it", "that", "this", "they", "him", "her", "them", "you",
+    "up", "new", "wrong", "happening", "going on", "your name",
+}
+
+_LOOKUP_STOP_FIRST = {"my", "your", "our", "this", "that", "it", "his", "her", "their"}
+
+
+def _match_lookup(query, raw_query):
+
+    text = _strip_fillers(query)
+
+    for pattern, raw_pattern, max_words in _LOOKUP_PATTERNS:
+
+        match = pattern.fullmatch(text)
+
+        if not match:
+
+            continue
+
+        topic = match.group(1).strip()
+
+        words = topic.split()
+
+        if topic in _LOOKUP_STOP_WORDS or words[0] in _LOOKUP_STOP_FIRST or len(words) > max_words:
+
+            return None
+
+        raw = raw_pattern.match(raw_query or "")
+
+        return ToolCall("lookup", {"topic": raw.group(1).strip() if raw else topic})
+
+    return None
+
+
 def _match_calc(query, raw_query):
     """Arithmetic, only when the whole utterance parses as maths (so "what is
     python" is never sent to the calculator). Uses the raw text: normalizing
@@ -323,6 +371,7 @@ _MATCHERS = (
     _match_calc,
     _match_substring_tool,
     _match_search,
+    _match_lookup,
 )
 
 
