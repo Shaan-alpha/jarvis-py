@@ -1,3 +1,77 @@
+## v3.6.0 — Grounded & Compact (2026-09-28)
+
+Jarvis now answers what it can know without guessing, keeps every reply to two
+sentences, remembers only what you ask it to, manages your real files safely,
+and has a compact, polished HUD. Spec:
+`docs/superpowers/specs/2026-09-28-v3.6-grounded-compact-design.md`.
+
+### Fixed
+- **Stop / Esc / a typed query now stop a streaming answer.** Before, only the
+  voice stopped; the stream kept queueing the rest of the reply. (`cancel_generation`)
+- **Tool replies, reminders and errors reach the HUD** through one reply path
+  (`core/speech/reply.py`); the orb no longer sticks on "thinking", and the mic
+  no longer opens while Jarvis is still speaking a tool reply.
+- **Voice and typed input match the same way** (`core/text.py`): "What's on my
+  clipboard?" typed now hits its fast path, "notes.txt" survives voice input,
+  and "i commute by bus" no longer mutes the volume.
+- **Stale document index never served**: a manifest detects added/removed PDFs;
+  chunks are stored as JSON instead of pickle.
+- **Log rotation**: `jarvis.log` rotates at 2 MB × 3 (it had grown to 28 MB).
+- **Low-RAM model settings**: `num_ctx` 2048 and `keep_alive` 10m on every
+  request; warm-start skips the model preload below `MODEL_MIN_FREE_GB`; setup
+  rejects `:cloud` models; the wizard pulls `MODEL_NAME` (not a hardcoded phi3).
+- **Model down → instant answer** instead of waiting out two timeouts per query.
+
+### Added
+- **Deterministic answers** for time, date, day, battery, RAM, disk, uptime and
+  connectivity, and an **offline calculator** that understands spoken numbers
+  ("twenty five times seventeen") — no LLM, no guessing.
+- **Grounded prompt**: the model sees the current date/time and online state,
+  is told to say "I don't know" rather than guess and never to claim actions.
+- **Hard two-sentence cap** in code (decimals no longer split sentences);
+  "tell me more" lifts it for one answer; "repeat that" replays the last reply;
+  a 3-turn in-RAM conversation buffer makes follow-ups work.
+- **Memory you control**: "remember that…", "what do you remember",
+  "what's my <name/city/…>", "forget…" (always confirmed). Profile capture now
+  learns city, birthday, job and favourites, and ignores "i like that".
+- **Online answers from free keyless sources**: Wikipedia (relevance search;
+  asks which meaning for ambiguous words), DuckDuckGo Instant Answer, and
+  Open-Meteo weather — cached so repeats work offline; `ONLINE_LOOKUPS = False`
+  keeps everything local.
+- **File management** across Desktop, Documents (OneDrive-aware), Downloads,
+  Pictures, Music, Videos and the workspace: find, open ("open the second one"),
+  open folder, recent files, move, rename, and delete — to the Recycle Bin only,
+  after a spoken or typed "yes". Programs are never opened from files.
+- **Local search**: "search for X" searches files, documents and memory;
+  "search my documents for X"; "index my documents".
+- **HUD redesign**: native Windows 11 rounded corners and outline (no more dark
+  square corners), compact 380×360 layout with the status in the title bar, an
+  orb that shrinks while captions show, captions that scroll from the first
+  line and follow streaming text, error styling, reminder toasts, a real
+  "disconnected" state, keyboard support (Esc clears then stops, ↑/↓ history),
+  drag from the title bar only (reply text is selectable), and far lower idle
+  rendering cost (no backdrop blur, transform-only orb animation, paused when
+  hidden, working reduced-motion).
+
+### Changed
+- LLM turns are **no longer saved** to long-term memory; only relevant
+  remembered facts are added to the prompt.
+- "search for X" is now a local search; the web needs "search the web for X".
+- Browser tools say "You're offline" instead of claiming success.
+- New dependency: `Send2Trash` (Recycle Bin deletes).
+
+### Removed
+- `core/memory/semantic_memory.py` (the save-every-turn store; its old JSON file
+  is left on disk, still gitignored) and `clean_query`.
+
+### Security
+- Document chunks load from JSON, not pickle.
+- `open_file` refuses executables and scripts; deletes only go to the Recycle
+  Bin behind a confirmation that expires in 30 s.
+- `pull_model` ignores the model name sent by the HUD page.
+
+Tests: 291 → 579, all CI-safe. Lint clean.
+
 ## v3.5.2 — HUD close button & app logo (2026-06-19)
 
 - **HUD close + minimize controls.** The frameless HUD now has a top title bar

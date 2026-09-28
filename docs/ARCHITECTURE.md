@@ -14,40 +14,44 @@ main loop in [`app.py`](../app.py).
 ## Request lifecycle
 
 ```text
-USER SPEAKS
+USER SPEAKS  (or types in the HUD)
     │
     ▼
 Wake-word detection (openWakeWord, ONNX)        core/speech/openwakeword_listener.py
     │  "hey jarvis" > WAKE_THRESHOLD
     ▼
-Speech-to-text                                  core/speech/engine.py
+Speech-to-text (raw text)                       core/speech/engine.py
     ├─ online?  → Google STT                    core/speech/online_recognizer.py
     └─ offline  → Vosk (auto-fallback)          core/speech/offline_recognizer.py
     │
     ▼
-clean_query() → lowercase / strip punctuation   core/speech/engine.py
+normalize() — same for voice and typed input    core/text.py
     │
     ▼
-ROUTING (first match wins)                       app.py main loop
-    ├─ exit words ("bye", "exit", ...)          → sleep
-    ├─ profile capture ("my name is ...")       core/memory/profile_extractor.py
+process_query (first match wins)                app.py
+    ├─ pending confirmation? yes / no           core/state/conversation.py
+    ├─ "repeat that" / "tell me more"           core/state/conversation.py
+    ├─ profile capture ("i live in ...")        core/memory/profile_extractor.py
     ├─ reminder ("remind me in N minutes ...")  core/tasks/task_parser.py
-    ├─ fast keyword router → registry ToolCall  core/router/intent_router.py
-    │    (instant, deterministic fast path)
+    ├─ deterministic router → registry ToolCall core/router/intent_router.py
+    │    memory · files · apps · info · maths · system · local search ·
+    │    web search · weather · lookup           (router-only tools: llm=False)
     ├─ action-verb gate → LLM tool agent        core/agent/tool_agent.py
     │    └─ both converge on execute_tool()     core/agent/tool_executor.py
-    └─ LLM chat fallback (Ollama, streaming)    core/ai/ollama_engine.py
+    │       (a tool returning None, e.g. a lookup miss, falls through)
+    └─ grounded LLM chat (Ollama, streaming,    core/ai/ollama_engine.py
+         date/time + online state + relevant facts/documents + last 3 turns,
+         hard two-sentence cap; skipped at once while llm_health says down)
     │
     ▼
-Streaming sentence-level TTS queue (serialized)  core/speech/tts_queue.py
+respond(): HUD caption + TTS queue               core/speech/reply.py
     │
     ▼
-pyttsx3 speak                                    core/speech/engine.py
+Serialized sentence-level TTS queue → pyttsx3    core/speech/tts_queue.py, engine.py
     ▲
-    │  barge-in: a HUD Stop button / Esc / a newly typed query cancels the
-    │  current utterance + clears the queue (ask_llm carries a generation token
-    │  so a superseded stream aborts). "hey jarvis" mid-speech also works but is
-    └─ unreliable over the speakers (no echo cancellation).  tts_queue / app.py
+    │  barge-in: Stop / Esc / a newly typed query → cancel_generation() +
+    │  stop_speaking() + clear_queue(). "hey jarvis" mid-speech also works but is
+    └─ unreliable over the speakers (no echo cancellation).
 ```
 
 ---
@@ -56,14 +60,15 @@ pyttsx3 speak                                    core/speech/engine.py
 
 | Package | Responsibility |
 |---|---|
-| `core/speech/` | Wake-word detection, online/offline STT, TTS engine + serialized queue, online/offline connectivity check |
-| `core/ai/` | Ollama LLM client with streaming token output and prompt assembly |
-| `core/router/` | Fast keyword routing — `resolve_keyword_tool()` maps a known phrase to a registry `ToolCall` (the cheap, deterministic path) |
-| `core/agent/` | Tool registry + `@tool` decorator (`registry.py`), the `builtins` tool catalog, the plugin loader (`loader.py`), the LLM tool agent that selects a tool (`tool_agent.py`), and the generic executor that runs it (`tool_executor.py`) |
-| `core/memory/` | fastembed embedder, semantic conversation memory, document RAG (FAISS), user-profile store + extractor |
+| `core/speech/` | Wake-word detection, online/offline STT, TTS engine + serialized queue, `reply.respond()` (one path for every spoken + shown reply) |
+| `core/ai/` | Ollama client: grounded `build_prompt`, streaming with a hard sentence cap, `cancel_generation`; `llm_health` (fast path while the model is down) |
+| `core/router/` | Deterministic routing — `resolve_keyword_tool()` runs an ordered list of matchers (memory, files, apps, info, maths, system, search, weather, lookup) and returns a registry `ToolCall` |
+| `core/agent/` | Tool registry + `@tool(..., llm=False)` decorator, tool modules (`builtins`, `fs_tools` + `known_folders`, `info_tools`, `calc_tools`, `memory_tools`, `web_tools`, `search_tools`), plugin loader, LLM tool agent, executor |
+| `core/memory/` | fastembed embedder, explicit facts store (`facts.py`), document RAG (FAISS + manifest, JSON chunks), user-profile store + extractor |
 | `core/tasks/` | Reminder parsing, `threading.Timer`-backed scheduling, JSON persistence |
-| `core/state/` | Session lifecycle + silence timeout |
+| `core/state/` | Session lifecycle + silence timeout; in-RAM `conversation` (last 3 turns, last file results, pending confirmations) |
 | `core/utils/` | Structured logger, greeting/date helpers |
+| `core/text.py`, `core/calc.py`, `core/net.py` | Stdlib helpers: input normalizer + spoken times/filenames; offline arithmetic (AST whitelist); connectivity check |
 | `core/paths.py` | Path resolver: `resource_dir()` (bundled assets, → `sys._MEIPASS` when frozen) / `user_data_dir()` (writable, → `%APPDATA%\JarvisAI` when frozen). Stdlib-only |
 | `core/setup/` | First-run checks (Ollama/model/mic/WebView2), mic auto-detect, streamed `pull_model`, `is_first_run()` — backs the HUD setup wizard |
 | `core/hud/` + `hud/` | **Optional** desktop HUD — event bus, WebSocket server, stats/theme emitter (Python) + a pywebview-hosted vanilla-web panel (fluid-blob orb, captions, Stop button). Auto-opens on first run; otherwise active only with `python app.py --hud`. The core is untouched without it |

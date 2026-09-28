@@ -44,16 +44,21 @@ platform (SAPI5 / NSSpeechSynthesizer / espeak).
 - **Interruptible replies** — a **Stop** button, `Esc`, or typing a new query cuts Jarvis off mid-sentence (interrupting by *speaking* isn't reliable — the mic hears Jarvis's own voice, no echo cancellation)
 
 ### Brain
-- Local LLM via Ollama (default `phi3`)
-- Streaming token output
-- Semantic memory retrieval (fastembed ONNX + numpy cosine)
-- Document RAG over PDFs (FAISS, similarity-thresholded — your résumé won't leak into unrelated answers)
-- User profile context injected into every prompt
+- Local LLM via Ollama (default `phi3`), grounded: it sees the current date/time and online state, says "I don't know" rather than guessing, and never claims actions it didn't take
+- **Replies capped at two sentences in code** ("tell me more" for the long version)
+- Deterministic answers for time, date, battery, RAM, disk, uptime, connectivity and arithmetic — no LLM, no guessing
+- Memory you control: only what you ask it to remember, plus profile facts
+- Document RAG over PDFs (FAISS, similarity-thresholded, stale-index safe, cites the file)
+- Free online answers (Wikipedia, DuckDuckGo, Open-Meteo weather), cached for offline use
 
 ### Routing
-- Fast keyword router for app / media / browser / system intents
+- Deterministic router for memory, files, info, maths, apps, search, weather and lookups — instant, no LLM
 - LLM tool agent fallback for fuzzy matches (action-verb gated to skip unnecessary LLM hops)
 - LLM chat as final fallback
+
+### Files
+- Find, open, move, rename and delete (to the Recycle Bin, after a "yes") across Desktop, Documents (OneDrive-aware), Downloads, Pictures, Music, Videos and the Jarvis workspace
+- Local search across files, documents and memory
 
 ### Tasks
 - Voice-set reminders (*"remind me in 10 minutes to ..."*)
@@ -188,20 +193,45 @@ Speak the wake phrase **"hey jarvis"**, wait for *"Yes Boss?"*, then issue your 
 
 ---
 
+## What you can say
+
+| Ask | What happens |
+|---|---|
+| "what time is it", "what's the date", "battery", "how much RAM am I using", "disk space", "uptime", "am I online" | Instant answer from the system — no model |
+| "what's 25 times 17", "square root of 144", "15 percent of 200" | Offline calculator (spoken numbers work too) |
+| "who is Alan Turing", "what is entropy", "tell me about the Eiffel Tower" | One-sentence answer from Wikipedia / DuckDuckGo when online (cached for offline) |
+| "weather", "weather in Pune", "is it going to rain" | Today's weather from Open-Meteo (your city from "I live in …") |
+| "remember that my exam is on the 5th", "what do you remember", "what's my name", "forget my city" | Long-term memory you control; forgetting asks first |
+| "find my resume", "open my budget", "open the second one", "open my downloads", "recent files" | Files across your folders |
+| "move my report to documents", "rename draft to final", "delete my old notes" | Changes files; delete goes to the Recycle Bin after you say **yes** |
+| "search for invoices", "search my documents for python", "index my documents" | Local search; "search the web for …" opens the browser |
+| "repeat that", "tell me more" | Replays the last reply / answers again in more detail |
+| "remind me in 10 minutes to stretch" | Reminder |
+| "open notepad", "volume up", "read my clipboard" | Apps and system controls |
+
+### Online lookups
+
+When online, "who is / what is / tell me about" questions and weather go to free,
+keyless public services: Wikipedia, DuckDuckGo Instant Answer and Open-Meteo. The
+question text is sent to them. Set `ONLINE_LOOKUPS = False` in
+`config/settings.py` to keep every query on this PC; offline, Jarvis says so or
+answers from its local model.
+
 ## Desktop HUD (optional)
 
-Launch an always-on-top **HUD panel** — a **fluid glassmorphism orb** (a flowing,
-audio-reactive blob that pulses with your voice and shifts by state), streaming
-captions (your speech *and* Jarvis's reply), a type-to-Jarvis text box, a **Stop**
-button (or `Esc`) to cut Jarvis off mid-sentence, and a live status row (CPU /
-battery / model / online). The theme adapts to the time of day: **cyan** by day,
-**gold** in the evening, **frosted** at night.
+Launch a compact, always-on-top **HUD panel** (380×360) with native Windows 11
+rounded corners — a **fluid glass orb** that reacts to state and shrinks while a
+reply is showing, streaming captions (your words *and* Jarvis's reply, selectable
+and scrollable from the first line), a type-to-Jarvis box with ↑/↓ history, a
+**Stop** button (or `Esc`) to cut Jarvis off, reminder toasts, and a status chip
+in the title bar (model + online; CPU and battery on hover). The theme adapts to
+the time of day: **cyan** by day, **gold** in the evening, **frosted** at night.
 
 ```bash
 python app.py --hud
 ```
 
-![The Jarvis HUD — a fluid glassmorphism orb, streaming captions, a live status row (model / CPU / battery / online), and a type-to-Jarvis box](assets/hud.png)
+![The compact Jarvis HUD — title bar with a model/online chip, a small glass orb with a Speaking pill and Stop button, a readable reply caption, and a type-to-Jarvis box](assets/hud.png)
 
 The HUD is a separate [pywebview](https://pywebview.flowrl.com/) window that talks
 to the voice core over a local WebSocket — fully free and local. Without `--hud`,
@@ -280,9 +310,14 @@ All config in [config/settings.py](config/settings.py):
 | `WAKE_CONSECUTIVE` | `1` | Frames over threshold required to fire (raise to debounce false wakes) |
 | `SESSION_TIMEOUT` | `20` | Seconds of silence before returning to sleep |
 | `VOSK_MODEL_PATH` | `models/vosk/vosk-model-small-en-us-0.15` | Project-local Vosk model |
-| `MEMORY_SIMILARITY_THRESHOLD` | `0.45` | Min cosine for conversation-memory recall |
-| `DOCUMENT_SIMILARITY_THRESHOLD` | `0.45` | Min cosine for doc-RAG injection |
-| `ONLINE_CHECK_*` | `8.8.8.8:53`, 1 s timeout, 5 s cache | Online/offline auto-detection |
+| `MEMORY_SIMILARITY_THRESHOLD` | `0.55` | Min cosine for a remembered fact to reach the prompt |
+| `DOCUMENT_SIMILARITY_THRESHOLD` | `0.6` | Min cosine for doc-RAG injection |
+| `LLM_NUM_CTX` | `2048` | Context window — keeps the model's RAM use down |
+| `LLM_KEEP_ALIVE` | `10m` | Unload the model after this long idle |
+| `LLM_TEMPERATURE` | `0.2` | Low: answer, don't improvise |
+| `MODEL_MIN_FREE_GB` | `3.5` | Warm-start skips the model preload below this much free RAM |
+| `ONLINE_LOOKUPS` | `True` | Wikipedia / DuckDuckGo / Open-Meteo answers when online |
+| `ONLINE_CHECK_*` | `8.8.8.8:53` then `1.1.1.1:53`, 1 s timeout, 5 s cache | Online/offline auto-detection |
 
 ---
 

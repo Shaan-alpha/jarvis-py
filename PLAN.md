@@ -37,24 +37,16 @@ Architecture first. No giant single files.
 
 ## Current Status
 
-> Latest release: **v3.4.0 "Agent Capabilities & Hardening"** — shipped, tagged,
-> GitHub Release published. It bundled the Layer-1 tool foundation (PR #4),
-> routing unification (PR #6), clipboard tools (PR #7), sandboxed file-system
-> tools (PR #9), and the deep audit-hardening pass (findings F1–F15: security,
-> crash-safe persistence, memory perf, NLU, content fidelity, TTS, cleanup).
+> Latest release: **v3.5.2** (HUD close/minimize + logo). **v3.6.0 "Grounded &
+> Compact" is complete on branch `feat/v3.6-grounded-compact` (not yet merged)**:
+> deterministic answers (time/date/system/maths), a grounded prompt with a hard
+> two-sentence cap, explicit memory ("remember / forget"), free online answers
+> (Wikipedia, DuckDuckGo, Open-Meteo), file management across the user's folders
+> (Recycle-Bin deletes behind a "yes"), local search, and a compact HUD with native
+> Windows 11 corners. 579 tests pass; lint clean. See the v3.6 section below.
 >
-> **v3.5 — Responsiveness & Efficiency is underway on `main` (unreleased).**
-> Merged: latency instrumentation + `decide_tool` generation cap (PR #11),
-> persistent-engine TTS reuse (PR #12), the model bake-off benchmark script
-> (PR #13), and warm-start preload of the LLM + embedder (PR #14). **258 tests
-> pass; lint clean.** Remaining v3.5 work: STT/wake stage marks + a HUD latency
-> readout, wider deterministic keyword routing, STT tuning, and picking a faster
-> default model from the bake-off (needs a run on the user's machine).
->
-> **Roadmap direction: speed-first.** The guiding motto is *offline + online, but
-> efficient and fast to respond*. v3.5 establishes a measured baseline; agent
-> capabilities, smarter memory, the UI panels, and distribution each follow on
-> top of a faster, measured core. See the sequenced milestones below.
+> **Roadmap direction: speed-first, grounded.** Offline + online, fast, and never
+> guessing: deterministic tools first, the local model last.
 
 ### v3.2.0 — Desktop HUD (shipped)
 
@@ -182,7 +174,32 @@ offline. This is the motto milestone.
 
 ---
 
-## v3.6 — Agent Capabilities II
+## v3.6 — Grounded & Compact (complete, unmerged)
+
+Goal: answer only what Jarvis can know, keep replies short, remember only what the
+user asks, manage real files safely, and ship a compact HUD. Spec:
+`docs/superpowers/specs/2026-09-28-v3.6-grounded-compact-design.md`.
+
+- [x] Reliability: Stop cancels streams; one reply path to TTS + HUD; one input
+      normalizer; stale-index guard; log rotation; low-RAM model settings; LLM-down
+      fast path
+- [x] Grounding: info tools, offline calculator, grounded prompt, two-sentence cap,
+      "repeat that" / "tell me more", 3-turn conversation buffer
+- [x] Memory: explicit facts store + remember/recall/forget; stricter profile capture;
+      no more per-turn saving
+- [x] Online: Wikipedia / DuckDuckGo lookups (asks when ambiguous), Open-Meteo weather,
+      offline cache, offline-honest browser tools
+- [x] Files & search: known folders, find/open/move/rename/delete (Recycle Bin, confirmed),
+      recent files, local + document search, "index my documents"
+- [x] HUD: native corners/outline, compact 380×360 layout, caption fixes, disconnected
+      state, keyboard, cheaper animation, wizard fit
+- Deferred: SQLite content index, Start-Menu app index, organise Downloads, undo journal,
+  unit conversions, reminders v2 (list/cancel/absolute times), HUD mini mode,
+  click-to-talk, remembered window position, theme picker.
+
+---
+
+## v3.7 — Agent Capabilities II
 
 Goal: the rest of the agent toolset, riding v3.5's faster routing.
 
@@ -193,7 +210,7 @@ Goal: the rest of the agent toolset, riding v3.5's faster routing.
 
 ---
 
-## v3.7 — Smarter Memory
+## v3.8 — Smarter Memory
 
 Goal: memory that gets better over time (groundwork already laid — saves now
 extend the embedding cache incrementally instead of re-encoding all).
