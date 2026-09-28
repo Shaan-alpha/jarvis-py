@@ -101,3 +101,53 @@ def test_recent_files_newest_first(monkeypatch, tmp_path):
         os.utime(recent / name, (stamp, stamp))
     monkeypatch.setattr(fs_tools, "_recent_dir", lambda: recent)
     assert fs_tools.recent_files().say == "Recently opened: new.pdf, mid.txt, old.docx."
+
+
+def test_move_file_into_a_known_folder(roots):
+    src = roots["downloads"] / "report.pdf"
+    src.write_text("x")
+    assert fs_tools.move_file("report", "documents") == "Moved report.pdf to Documents."
+    assert (roots["documents"] / "report.pdf").exists() and not src.exists()
+
+
+def test_move_to_an_unknown_folder(roots):
+    (roots["downloads"] / "report.pdf").write_text("x")
+    assert fs_tools.move_file("report", "garage") == "I don't know a folder called garage."
+
+
+def test_rename_keeps_the_extension(roots):
+    (roots["documents"] / "draft.txt").write_text("x")
+    assert fs_tools.rename_file("draft", "final") == "Renamed draft.txt to final.txt."
+    assert (roots["documents"] / "final.txt").exists()
+
+
+def test_rename_refuses_to_overwrite(roots):
+    (roots["documents"] / "a.txt").write_text("x")
+    (roots["documents"] / "b.txt").write_text("y")
+    assert fs_tools.rename_file("a", "b") == "b.txt already exists there."
+
+
+@pytest.mark.parametrize("bad", ["../evil", "..\\evil", "con:x", ""])
+def test_rename_rejects_path_tricks(roots, bad):
+    (roots["documents"] / "draft.txt").write_text("x")
+    assert fs_tools.rename_file("draft", bad) == "That isn't a valid file name."
+
+
+def test_delete_asks_first_and_recycles_only_on_yes(roots, monkeypatch):
+    trashed = []
+    monkeypatch.setattr(fs_tools, "send2trash", trashed.append)
+    src = roots["downloads"] / "report.pdf"
+    src.write_text("x")
+    assert fs_tools.delete_file("report") == \
+        "Move report.pdf from Downloads to the Recycle Bin? Say yes to confirm."
+    assert trashed == [] and src.exists()
+    assert conversation.take_pending().run() == "Moved report.pdf to the Recycle Bin."
+    assert trashed == [str(src)]
+
+
+def test_delete_with_two_matches_asks_which_and_sets_no_confirmation(roots):
+    (roots["downloads"] / "report.pdf").write_text("x")
+    (roots["documents"] / "report.pdf").write_text("x")
+    out = fs_tools.delete_file("report")
+    assert isinstance(out, Reply) and "2 files" in out.say
+    assert conversation.has_pending() is False

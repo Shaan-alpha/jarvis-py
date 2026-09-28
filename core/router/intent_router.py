@@ -279,6 +279,18 @@ _RECENT = re.compile(
 )
 
 
+_MOVE = re.compile(rf"move (?:my |the )?(?:file )?(.+?) (?:to|into) (?:my |the )?({_FOLDER_NAMES})(?: folder)?")
+
+_RENAME = re.compile(r"rename (?:my |the )?(?:file )?(.+?) (?:to|as) (.+)")
+
+_RAW_RENAME = re.compile(
+    r"^\W*rename\s+(?:my\s+|the\s+)?(?:file\s+)?(.+?)\s+(?:to|as)\s+(.+?)[\s!?]*$", re.IGNORECASE
+)
+
+# "remove" only with "file" — "remove the stain" must never delete anything.
+_DELETE = re.compile(r"(?:delete|trash) (?:my |the )?(?:file )?(.+?)(?: file)?|remove (?:my |the )?file (.+?)")
+
+
 def _first_group(match):
 
     return next(group for group in match.groups() if group)
@@ -287,6 +299,28 @@ def _first_group(match):
 def _match_files(query, raw_query):
 
     text = spoken_filename(_strip_fillers(query))
+
+    match = _MOVE.fullmatch(text)
+
+    if match:
+
+        return ToolCall("move_file", {"name": match.group(1), "folder": match.group(2)})
+
+    match = _RENAME.fullmatch(text)
+
+    if match:
+
+        raw = _RAW_RENAME.match(raw_query or "")
+
+        new_name = spoken_filename(raw.group(2)) if raw else match.group(2)
+
+        return ToolCall("rename_file", {"name": match.group(1), "new_name": new_name})
+
+    match = _DELETE.fullmatch(text)
+
+    if match:
+
+        return ToolCall("delete_file", {"name": _first_group(match)})
 
     match = _OPEN_FOLDER.fullmatch(text)
 

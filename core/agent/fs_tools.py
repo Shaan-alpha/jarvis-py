@@ -1,6 +1,7 @@
 import difflib
 import os
 import re
+import shutil
 import time
 
 from pathlib import Path, PureWindowsPath
@@ -20,6 +21,8 @@ from core.text import (
 )
 
 from core.utils.logger import logger
+
+from send2trash import send2trash
 
 
 SPOKEN_CHARS = 100
@@ -420,6 +423,156 @@ def open_folder(folder):
     _startfile(str(path))
 
     return f"Opening {key.capitalize()}."
+
+
+_BAD_NAME_CHARS = set('\\/:*?"<>|')
+
+
+def _unique(name, roots):
+    """(path, None) for one clear match, else (None, what to say)."""
+
+    found = find_paths(name, roots)
+
+    target = _match_key(name)
+
+    choices = [p for p in found if target in (_match_key(p.name), _match_key(p.stem))] or found
+
+    if not choices:
+
+        return None, f"I couldn't find {name}."
+
+    if len(choices) > 1:
+
+        conversation.set_results([str(path) for path in choices])
+
+        return None, Reply(
+            say=f"I found {len(choices)} files called {name}. Be more specific.",
+            show=_numbered(choices),
+        )
+
+    return choices[0], None
+
+
+@tool(
+    "move_file",
+    "Move a file into one of your folders",
+    params={
+        "name": {"type": "str", "required": True, "desc": "the file to move"},
+        "folder": {"type": "str", "required": True, "desc": "desktop, documents, downloads, ..."},
+    },
+    llm=False,
+)
+def move_file(name, folder):
+
+    roots = user_roots()
+
+    key = normalize(folder).replace(" folder", "").strip()
+
+    destination = roots.get(key)
+
+    if destination is None:
+
+        return f"I don't know a folder called {folder}."
+
+    source, problem = _unique(name, roots)
+
+    if problem:
+
+        return problem
+
+    target = destination / source.name
+
+    if source.parent == destination:
+
+        return f"{source.name} is already in {key.capitalize()}."
+
+    if target.exists():
+
+        return f"{source.name} already exists in {key.capitalize()}."
+
+    shutil.move(str(source), str(target))
+
+    return f"Moved {source.name} to {key.capitalize()}."
+
+
+@tool(
+    "rename_file",
+    "Rename a file (keeps its extension unless you give one)",
+    params={
+        "name": {"type": "str", "required": True, "desc": "the file to rename"},
+        "new_name": {"type": "str", "required": True, "desc": "the new name"},
+    },
+    llm=False,
+)
+def rename_file(name, new_name):
+
+    new = spoken_filename(new_name or "").strip().strip(".")
+
+    if not new or any(ch in _BAD_NAME_CHARS for ch in new) or ".." in new:
+
+        return "That isn't a valid file name."
+
+    source, problem = _unique(name, user_roots())
+
+    if problem:
+
+        return problem
+
+    if not Path(new).suffix:
+
+        new += source.suffix
+
+    target = source.with_name(new)
+
+    if target.exists():
+
+        return f"{new} already exists there."
+
+    source.rename(target)
+
+    return f"Renamed {source.name} to {new}."
+
+
+def _recycle(path):
+
+    if not path.exists():
+
+        return f"{path.name} is already gone."
+
+    try:
+
+        send2trash(str(path))
+
+    except OSError:
+
+        return f"I couldn't delete {path.name}."
+
+    return f"Moved {path.name} to the Recycle Bin."
+
+
+@tool(
+    "delete_file",
+    "Move a file to the Recycle Bin (asks for confirmation first)",
+    params={"name": {"type": "str", "required": True, "desc": "the file to delete"}},
+    llm=False,
+)
+def delete_file(name):
+
+    roots = user_roots()
+
+    source, problem = _unique(name, roots)
+
+    if problem:
+
+        return problem
+
+    if not source.is_file():
+
+        return "I only delete files, not folders."
+
+    conversation.set_pending(f"recycle {source}", lambda: _recycle(source))
+
+    return f"Move {source.name} from {folder_label(source, roots)} to the Recycle Bin? Say yes to confirm."
 
 
 @tool("recent_files", "List recently opened files", llm=False)

@@ -284,3 +284,19 @@ def test_open_the_second_one_only_routes_after_a_search():
 def test_non_file_commands_do_not_route_to_files(query):
     call = resolve_keyword_tool(query)
     assert call is None or call.name not in {"find_file", "open_file", "open_folder"}
+
+
+@pytest.mark.parametrize("query,raw,expected", [
+    ("move my report to documents", None, ToolCall("move_file", {"name": "report", "folder": "documents"})),
+    ("rename draft to final notes", "rename draft to Final Notes",
+     ToolCall("rename_file", {"name": "draft", "new_name": "Final Notes"})),
+    ("delete my report", None, ToolCall("delete_file", {"name": "report"})),
+    ("remove the file old notes", None, ToolCall("delete_file", {"name": "old notes"})),
+])
+def test_file_changes_route(query, raw, expected):
+    assert resolve_keyword_tool(query, raw_query=raw) == expected
+
+
+def test_remove_in_ordinary_speech_is_not_a_delete():
+    call = resolve_keyword_tool("remove the stain from my shirt")
+    assert call is None or call.name != "delete_file"
