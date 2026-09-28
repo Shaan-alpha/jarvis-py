@@ -50,6 +50,7 @@ from core.memory.profile_extractor import (
 )
 
 from core.memory.profile_memory import (
+    remember_profile,
     update_profile
 )
 
@@ -162,6 +163,17 @@ def _reply(raw_query, value):
     return reply
 
 
+def _capture_profile(query):
+
+    info = extract_personal_info(query)
+
+    if info:
+
+        remember_profile(info["key"], info["value"])
+
+        logger.info(f"Profile Updated: {info}")
+
+
 def _handle_pending(query, raw_query):
     """A pending confirmation: 'yes' runs it, 'no' cancels it, anything else
     lets it lapse (and the query routes normally). True when consumed."""
@@ -256,16 +268,7 @@ def process_query(query, task_manager, source="voice", raw_query=None):
 
             return
 
-        personal_info = extract_personal_info(query)
-
-        if personal_info:
-
-            update_profile(
-                personal_info["key"],
-                personal_info["value"]
-            )
-
-            logger.info(f"Profile Updated: {personal_info}")
+        _capture_profile(query)
 
         reminder = parse_reminder(query)
 

@@ -10,7 +10,7 @@ def test_extracts_favorite_language():
     result = extract_personal_info(
         "my favorite programming language is python"
     )
-    assert result == {"key": "favorite_language", "value": "python"}
+    assert result == {"key": "favourite_language", "value": "python"}
 
 
 def test_extracts_goal():
@@ -37,3 +37,29 @@ def test_value_is_length_capped():
     result = extract_personal_info(f"i like {long_tail}")
     assert result["key"] == "likes"
     assert len(result["value"]) <= 60
+
+
+import pytest
+
+
+@pytest.mark.parametrize("query,expected", [
+    ("call me tony", {"key": "name", "value": "tony"}),
+    ("i live in pune", {"key": "city", "value": "pune"}),
+    ("my birthday is on 5 june", {"key": "birthday", "value": "5 june"}),
+    ("i work as a data engineer", {"key": "job", "value": "data engineer"}),
+    ("my favorite food is biryani", {"key": "favourite_food", "value": "biryani"}),
+    ("i love cricket", {"key": "likes", "value": "cricket"}),
+])
+def test_extracts_more_profile_facts(query, expected):
+    assert extract_personal_info(query) == expected
+
+
+@pytest.mark.parametrize("query", [
+    "i like that",
+    "i like to know the time",
+    "what is my name",
+    "do you like pizza",
+    "i like it",
+])
+def test_rejects_non_facts(query):
+    assert extract_personal_info(query) is None
