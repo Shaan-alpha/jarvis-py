@@ -2,6 +2,8 @@ import re
 
 from core.agent.registry import ToolCall
 
+from core.calc import parse_math
+
 from core.text import normalize
 
 
@@ -204,6 +206,20 @@ def _match_info(query, raw_query):
     return None
 
 
+def _match_calc(query, raw_query):
+    """Arithmetic, only when the whole utterance parses as maths (so "what is
+    python" is never sent to the calculator). Uses the raw text: normalizing
+    strips '*', '+', '^' and '1,000'."""
+
+    expression = parse_math(raw_query) or parse_math(query)
+
+    if expression is None:
+
+        return None
+
+    return ToolCall("calculate", {"expression": expression})
+
+
 def _match_substring_tool(query, raw_query):
     """First zero-arg tool with a trigger phrase present as whole words."""
 
@@ -250,6 +266,7 @@ _MATCHERS = (
     _match_open_google,
     _match_close_app,
     _match_info,
+    _match_calc,
     _match_substring_tool,
     _match_search,
 )

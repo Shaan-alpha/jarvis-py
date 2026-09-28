@@ -177,3 +177,15 @@ def test_ordinary_sentences_do_not_hit_info_tools(query):
     assert call is None or call.name not in {
         "get_time", "get_date", "get_day", "battery_status",
         "memory_usage", "disk_space", "uptime", "network_status"}
+
+
+def test_maths_routes_to_the_calculator():
+    assert resolve_keyword_tool("whats 25 times 17", raw_query="What's 25 times 17?") == \
+        ToolCall("calculate", {"expression": "25 * 17"})
+    assert resolve_keyword_tool("twenty five times seventeen") == \
+        ToolCall("calculate", {"expression": "25 * 17"})
+
+
+def test_what_is_a_word_is_not_maths():
+    call = resolve_keyword_tool("what is python")
+    assert call is None or call.name != "calculate"
