@@ -1,8 +1,6 @@
 # pyrefly: ignore [missing-import]
 
-import socket
 import threading
-import time
 
 # pyrefly: ignore [missing-import]
 import pyttsx3
@@ -12,12 +10,12 @@ import speech_recognition as sr
 import config.settings as settings
 
 from config.settings import (
-    ONLINE_CACHE_TTL,
-    ONLINE_CHECK_HOST,
-    ONLINE_CHECK_PORT,
-    ONLINE_CHECK_TIMEOUT,
     VOICE_RATE,
     VOICE_VOLUME
+)
+
+from core.net import (  # noqa: F401  (re-exported: callers import it from here)
+    is_online
 )
 
 from core.speech.online_recognizer import (
@@ -38,45 +36,6 @@ speech_lock = threading.Lock()
 current_engine = None
 
 speech_thread = None
-
-
-_online_cache = {
-    "value": None,
-    "checked_at": 0.0
-}
-
-
-def is_online():
-
-    now = time.time()
-
-    cached = _online_cache["value"]
-
-    if (
-        cached is not None
-        and now - _online_cache["checked_at"]
-        < ONLINE_CACHE_TTL
-    ):
-
-        return cached
-
-    try:
-
-        with socket.create_connection(
-            (ONLINE_CHECK_HOST, ONLINE_CHECK_PORT),
-            timeout=ONLINE_CHECK_TIMEOUT
-        ):
-
-            online = True
-
-    except OSError:
-
-        online = False
-
-    _online_cache["value"] = online
-    _online_cache["checked_at"] = now
-
-    return online
 
 
 def create_engine():

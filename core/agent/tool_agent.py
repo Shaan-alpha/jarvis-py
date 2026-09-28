@@ -64,7 +64,7 @@ def _looks_like_action(query):
 
         return False
 
-    for spec in registry.all_tools():
+    for spec in registry.llm_tools():
 
         if words & set(spec.name.lower().split("_")):
 
@@ -77,7 +77,7 @@ def _tool_list_text():
 
     lines = []
 
-    for index, spec in enumerate(registry.all_tools(), start=1):
+    for index, spec in enumerate(registry.llm_tools(), start=1):
 
         if spec.params:
 

@@ -85,6 +85,9 @@ WAKE_MODEL_PATH = os.path.join(
 
 ONLINE_CHECK_HOST = "8.8.8.8"
 
+# Second resolver probed when the first doesn't answer (some networks block one).
+ONLINE_CHECK_FALLBACK_HOST = "1.1.1.1"
+
 ONLINE_CHECK_PORT = 53
 
 ONLINE_CHECK_TIMEOUT = 1.0

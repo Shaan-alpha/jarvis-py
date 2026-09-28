@@ -54,3 +54,15 @@ def plural(count, unit):
     """'1 minute', '5 minutes'."""
 
     return f"{count} {unit}" if count == 1 else f"{count} {unit}s"
+
+
+def spoken_time(moment):
+    """'4:05 PM' — no leading zero."""
+
+    return moment.strftime("%I:%M %p").lstrip("0")
+
+
+def spoken_date(moment):
+    """'Monday, 28 September 2026'."""
+
+    return f"{moment.strftime('%A')}, {moment.day} {moment.strftime('%B %Y')}"

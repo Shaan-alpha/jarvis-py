@@ -28,8 +28,8 @@ from core.agent.registry import ToolCall
     ("system status", ToolCall("system_status", {})),
     ("system info", ToolCall("system_status", {})),
     ("cpu usage", ToolCall("system_status", {})),
-    ("battery level", ToolCall("system_status", {})),
-    ("battery percentage", ToolCall("system_status", {})),
+    ("battery level", ToolCall("battery_status", {})),
+    ("battery percentage", ToolCall("battery_status", {})),
     ("search google for cats", ToolCall("search_web", {"query": "cats"})),
     ("search the web for cats", ToolCall("search_web", {"query": "cats"})),
     ("search for cats", ToolCall("search_web", {"query": "cats"})),
@@ -133,3 +133,47 @@ def test_typed_apostrophes_match_like_voice():
 def test_mute_needs_a_whole_word():
     assert resolve_keyword_tool("i commute by bus") is None
     assert resolve_keyword_tool("please mute") == ToolCall("mute_volume", {})
+
+
+@pytest.mark.parametrize("query,tool", [
+    ("what time is it", "get_time"),
+    ("whats the time", "get_time"),
+    ("What's the time?", "get_time"),
+    ("hey jarvis what time is it please", "get_time"),
+    ("tell me the time", "get_time"),
+    ("what is todays date", "get_date"),
+    ("whats the date today", "get_date"),
+    ("what day is it", "get_day"),
+    ("which day is today", "get_day"),
+    ("battery", "battery_status"),
+    ("whats my battery", "battery_status"),
+    ("how much battery is left", "battery_status"),
+    ("battery level", "battery_status"),
+    ("battery percentage", "battery_status"),
+    ("is my laptop charging", "battery_status"),
+    ("how much ram am i using", "memory_usage"),
+    ("memory usage", "memory_usage"),
+    ("how much disk space do i have", "disk_space"),
+    ("free space", "disk_space"),
+    ("uptime", "uptime"),
+    ("how long has my pc been on", "uptime"),
+    ("am i online", "network_status"),
+    ("is the internet working", "network_status"),
+])
+def test_info_questions_route_to_deterministic_tools(query, tool):
+    assert resolve_keyword_tool(query) == ToolCall(tool, {})
+
+
+@pytest.mark.parametrize("query", [
+    "what is the time complexity of quicksort",
+    "what time is it in london",
+    "last time i checked it was fine",
+    "what day is christmas",
+    "my phone battery died",
+    "what do you remember",
+])
+def test_ordinary_sentences_do_not_hit_info_tools(query):
+    call = resolve_keyword_tool(query)
+    assert call is None or call.name not in {
+        "get_time", "get_date", "get_day", "battery_status",
+        "memory_usage", "disk_space", "uptime", "network_status"}

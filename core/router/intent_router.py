@@ -41,9 +41,6 @@ _SYSTEM_STATUS = (
     "system info",
     "system information",
     "cpu usage",
-    "battery status",
-    "battery level",
-    "battery percentage",
 )
 
 # Read-specific phrases. A "copy ... to clipboard" command matches NONE of these,
@@ -84,6 +81,37 @@ _SUBSTRING_TOOLS = (
     (_LIST_FILES, ToolCall("list_files", {})),
 )
 
+
+# Whole-utterance (fullmatch) question shapes for the deterministic info tools,
+# so "what is the time complexity of quicksort" never answers with the clock.
+_INFO_PATTERNS = tuple(
+    (re.compile(pattern), tool_name) for pattern, tool_name in (
+        (r"(?:whats|what is) (?:the )?(?:current )?time(?: now| right now)?"
+         r"|what time is it(?: now| right now)?|(?:tell me|give me) the time"
+         r"|(?:the )?current time|time now|the time|time", "get_time"),
+        (r"(?:whats|what is) (?:the |todays )?date(?: today)?|todays date"
+         r"|what date is it(?: today)?|date today|the date", "get_date"),
+        (r"(?:what|which) day (?:is it|is today|of the week is it)(?: today)?"
+         r"|(?:whats|what is) (?:the )?day(?: today)?", "get_day"),
+        (r"(?:(?:whats|what is|check|show|tell me)(?: my| the)? )?battery"
+         r"(?: level| status| percentage| life| left| charge)?"
+         r"|how much battery(?: do i have| is left)?(?: left)?"
+         r"|(?:is|am) (?:my |the )?(?:laptop|pc|computer|i) charging", "battery_status"),
+        (r"(?:how much )?(?:ram|memory) (?:usage|use|is used|am i using|left|is left|is free|free)"
+         r"|how much (?:ram|memory)(?: am i using| is used| is free| is left| do i have(?: left)?)?"
+         r"|(?:check|show)(?: my)? (?:ram|memory)(?: usage)?"
+         r"|(?:whats|what is)(?: my| the)? (?:ram|memory) usage", "memory_usage"),
+        (r"(?:how much )?(?:free )?(?:disk|storage|drive) space(?: do i have| is left| left)?"
+         r"|how much (?:disk|storage)(?: space)?(?: do i have| is left| left)?"
+         r"|(?:check|show)(?: my)? (?:disk|storage)(?: space)?|free space"
+         r"|(?:whats|what is)(?: my| the)? (?:free )?(?:disk|storage) space", "disk_space"),
+        (r"(?:(?:whats|what is) )?(?:my |the )?uptime"
+         r"|how long (?:has|have) (?:my |the |this )?(?:pc|computer|system|laptop) been (?:on|running|up)",
+         "uptime"),
+        (r"am i (?:online|connected)(?: to the internet)?|is (?:the )?internet (?:working|on|connected|up)"
+         r"|do i have (?:internet|a connection|an internet connection)|are we online", "network_status"),
+    )
+)
 
 # Ordered: the longer, more specific trigger first so "search google for x"
 # isn't swallowed by "google ".
@@ -153,6 +181,29 @@ def _match_close_app(query, raw_query):
     return _first_named(query, _CLOSE_APP_PATTERNS, "close_app")
 
 
+def _strip_fillers(query):
+    """Drop a leading 'hey jarvis' / 'please' and a trailing 'please'."""
+
+    query = re.sub(r"^(?:(?:hey|ok|okay) )?jarvis ", "", query)
+
+    query = re.sub(r"^please ", "", query)
+
+    return re.sub(r" (?:please|jarvis)$", "", query).strip()
+
+
+def _match_info(query, raw_query):
+
+    text = _strip_fillers(query)
+
+    for pattern, tool_name in _INFO_PATTERNS:
+
+        if pattern.fullmatch(text):
+
+            return ToolCall(tool_name, {})
+
+    return None
+
+
 def _match_substring_tool(query, raw_query):
     """First zero-arg tool with a trigger phrase present as whole words."""
 
@@ -198,6 +249,7 @@ _MATCHERS = (
     _match_open_app,
     _match_open_google,
     _match_close_app,
+    _match_info,
     _match_substring_tool,
     _match_search,
 )

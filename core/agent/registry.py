@@ -30,6 +30,9 @@ class ToolSpec:
 
     handler: Callable
 
+    # False = router-only: hidden from the LLM tool selector's prompt.
+    llm: bool = True
+
 
 @dataclass(frozen=True)
 class ToolCall:
@@ -73,12 +76,19 @@ def all_tools():
     return list(_REGISTRY.values())
 
 
+def llm_tools():
+    """Tools the LLM tool selector may pick. Router-only tools (llm=False) are
+    left out so the selector prompt stays small and fits the context window."""
+
+    return [spec for spec in _REGISTRY.values() if spec.llm]
+
+
 def clear():
 
     _REGISTRY.clear()
 
 
-def tool(name, description, params=None):
+def tool(name, description, params=None, llm=True):
 
     param_specs = {}
 
@@ -99,6 +109,7 @@ def tool(name, description, params=None):
                 description=description,
                 params=param_specs,
                 handler=func,
+                llm=llm,
             )
         )
 

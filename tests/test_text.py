@@ -33,3 +33,14 @@ def test_plural():
     assert plural(1, "minute") == "1 minute"
     assert plural(5, "minute") == "5 minutes"
     assert plural(0, "file") == "0 files"
+
+
+from datetime import datetime
+
+from core.text import spoken_date, spoken_time
+
+
+def test_spoken_time_and_date():
+    moment = datetime(2026, 9, 28, 16, 5)
+    assert spoken_time(moment) == "4:05 PM"
+    assert spoken_date(moment) == "Monday, 28 September 2026"
