@@ -12,6 +12,7 @@ def test_document_paths_under_user_data():
     assert base in dm.DOCS_PATH
     assert base in dm.INDEX_PATH
     assert base in dm.CHUNKS_PATH
+    assert base in dm.MANIFEST_PATH
 
 
 def test_profile_path_under_user_data():
