@@ -37,12 +37,12 @@ Architecture first. No giant single files.
 
 ## Current Status
 
-> Latest release: **v3.5.2** (HUD close/minimize + logo). **v3.6.0 "Grounded &
-> Compact" is complete on branch `feat/v3.6-grounded-compact` (not yet merged)**:
-> deterministic answers (time/date/system/maths), a grounded prompt with a hard
-> two-sentence cap, explicit memory ("remember / forget"), free online answers
-> (Wikipedia, DuckDuckGo, Open-Meteo), file management across the user's folders
-> (Recycle-Bin deletes behind a "yes"), local search, and a compact HUD with native
+> Latest release: **v3.6.0 "Grounded & Compact"** (2026-09-29, tagged + GitHub
+> Release): deterministic answers (time/date/system/maths), a grounded prompt with
+> a hard two-sentence cap, explicit memory ("remember / forget"), free online
+> answers (Wikipedia, DuckDuckGo, Open-Meteo), file management across the user's
+> folders (Recycle-Bin deletes behind a "yes"), local search, faster voice turns
+> with "hey Jarvis" interrupting while thinking, and a compact HUD with native
 > Windows 11 corners. 617 tests pass; lint clean. See the v3.6 section below.
 >
 > **Roadmap direction: speed-first, grounded.** Offline + online, fast, and never
@@ -95,6 +95,7 @@ goals — see v4.0 below for what remains.
 | v3.5.0 | Responsiveness & Efficiency — latency instrumentation, TTS engine reuse, warm-start preload |
 | v3.5.1 | Audio capture fixes for Windows multi-device setups |
 | v3.5.2 | HUD close button, app logo & glass orb |
+| v3.6.0 | Grounded & Compact — deterministic answers, two-sentence cap, explicit memory, online answers, file management, compact HUD |
 
 ---
 
@@ -178,7 +179,7 @@ offline. This is the motto milestone.
 
 ---
 
-## v3.6 — Grounded & Compact (complete, unmerged)
+## v3.6 — Grounded & Compact (shipped as v3.6.0)
 
 Goal: answer only what Jarvis can know, keep replies short, remember only what the
 user asks, manage real files safely, and ship a compact HUD. Spec:

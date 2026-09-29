@@ -1,4 +1,4 @@
-## v3.6.0 — Grounded & Compact (2026-09-28)
+## v3.6.0 — Grounded & Compact (2026-09-29)
 
 Jarvis now answers what it can know without guessing, keeps every reply to two
 sentences, remembers only what you ask it to, manages your real files safely,

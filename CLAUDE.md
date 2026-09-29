@@ -27,9 +27,9 @@ psutil, PyAutoGUI.
 
 ## 2. Where we are right now (2026-09-28)
 
-**v3.6.0 "Grounded & Compact" is complete on branch `feat/v3.6-grounded-compact`**
-(stacked on `fix/audit-bugfixes`; not yet merged, tagged or released — latest
-release is still v3.5.2). Spec: `docs/superpowers/specs/2026-09-28-v3.6-grounded-compact-design.md`,
+**v3.6.0 "Grounded & Compact" is released** (2026-09-29: merged to `main`,
+tagged `v3.6.0`, GitHub Release published). No feature branch is active; cut a
+fresh one per task. Spec: `docs/superpowers/specs/2026-09-28-v3.6-grounded-compact-design.md`,
 plan: `docs/superpowers/plans/2026-09-28-v3.6-grounded-compact.md`. **617 tests
 pass; build-breaking lint 0.** What changed, in one breath: one input normalizer
 (`core/text.py`) → pending-confirmation / conversation commands → a deterministic
@@ -42,7 +42,8 @@ the old save-every-turn `semantic_memory.py` is gone). Online answers come from
 Wikipedia / DuckDuckGo / Open-Meteo behind `ONLINE_LOOKUPS`. Files: known folders
 (OneDrive-aware) with Recycle-Bin-only deletes behind a spoken "yes". HUD:
 380×360, native Windows 11 corners/outline via DWM, drag from the title bar only.
-Not yet done: a live HUD run with mic + TTS on the user's machine.
+First live voice run (2026-09-29) drove the voice-latency fix: run from the venv
+(`.\venv\Scripts\python.exe app.py --hud`); tune `STT_PAUSE_SECONDS` if speech gets cut off.
 
 ### History (2026-06-03)
 
