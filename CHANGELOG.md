@@ -21,6 +21,14 @@ and has a compact, polished HUD. Spec:
   request; warm-start skips the model preload below `MODEL_MIN_FREE_GB`; setup
   rejects `:cloud` models; the wizard pulls `MODEL_NAME` (not a hardcoded phi3).
 - **Model down → instant answer** instead of waiting out two timeouts per query.
+- **Faster voice turns** (a live "how are you" took ~26 s): "Yes Boss?" finishes
+  before the mic calibrates (it had measured Jarvis's own voice as room noise,
+  so end-of-speech was never detected); end-of-speech after 0.9 s of silence
+  (was 1.2 s), utterances capped at 8 s (was 12 s), calibration once per wake;
+  the model starts loading the moment the wake word fires, and warm-start's
+  RAM guard is 1.5 GiB (was 3.5, which skipped the preload).
+- **"Hey Jarvis" interrupts while Jarvis is thinking**, not only while it speaks.
+- The test suite no longer writes into the real `jarvis.log`.
 
 ### Added
 - **Deterministic answers** for time, date, day, battery, RAM, disk, uptime and
@@ -70,7 +78,7 @@ and has a compact, polished HUD. Spec:
   Bin behind a confirmation that expires in 30 s.
 - `pull_model` ignores the model name sent by the HUD page.
 
-Tests: 291 → 608, all CI-safe. Lint clean.
+Tests: 291 → 617, all CI-safe. Lint clean.
 
 ## v3.5.2 — HUD close button & app logo (2026-06-19)
 

@@ -30,7 +30,7 @@ psutil, PyAutoGUI.
 **v3.6.0 "Grounded & Compact" is complete on branch `feat/v3.6-grounded-compact`**
 (stacked on `fix/audit-bugfixes`; not yet merged, tagged or released — latest
 release is still v3.5.2). Spec: `docs/superpowers/specs/2026-09-28-v3.6-grounded-compact-design.md`,
-plan: `docs/superpowers/plans/2026-09-28-v3.6-grounded-compact.md`. **608 tests
+plan: `docs/superpowers/plans/2026-09-28-v3.6-grounded-compact.md`. **617 tests
 pass; build-breaking lint 0.** What changed, in one breath: one input normalizer
 (`core/text.py`) → pending-confirmation / conversation commands → a deterministic
 router of ordered matchers (memory, files, apps, info, maths, system, search,

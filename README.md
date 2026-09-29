@@ -41,7 +41,8 @@ platform (SAPI5 / NSSpeechSynthesizer / espeak).
 - **STT offline**: Vosk (local model, auto-fallback when offline)
 - **TTS**: pyttsx3 (SAPI5 / NSSpeechSynthesizer / espeak)
 - **Streaming sentence-level TTS queue** — each sentence speaks fully before the next, no cut-offs
-- **Interruptible replies** — a **Stop** button, `Esc`, or typing a new query cuts Jarvis off mid-sentence (interrupting by *speaking* isn't reliable — the mic hears Jarvis's own voice, no echo cancellation)
+- **Interruptible replies** — a **Stop** button, `Esc`, typing a new query, or saying "hey Jarvis" cuts Jarvis off. "Hey Jarvis" is reliable while it's still thinking; mid-speech it can be missed, because the mic also hears Jarvis's voice (no echo cancellation)
+- **Snappy turns** — answers start about 0.9 s after you stop talking; the model starts loading the moment you say "hey Jarvis"
 
 ### Brain
 - Local LLM via Ollama (default `phi3`), grounded: it sees the current date/time and online state, says "I don't know" rather than guessing, and never claims actions it didn't take
@@ -309,13 +310,15 @@ All config in [config/settings.py](config/settings.py):
 | `WAKE_THRESHOLD` | `0.3` | Wake-word confidence cutoff |
 | `WAKE_CONSECUTIVE` | `1` | Frames over threshold required to fire (raise to debounce false wakes) |
 | `SESSION_TIMEOUT` | `20` | Seconds of silence before returning to sleep |
+| `STT_PAUSE_SECONDS` | `0.9` | Silence that ends what you're saying (raise if you get cut off) |
+| `STT_PHRASE_LIMIT` | `8` | Longest utterance, in seconds |
 | `VOSK_MODEL_PATH` | `models/vosk/vosk-model-small-en-us-0.15` | Project-local Vosk model |
 | `MEMORY_SIMILARITY_THRESHOLD` | `0.55` | Min cosine for a remembered fact to reach the prompt |
 | `DOCUMENT_SIMILARITY_THRESHOLD` | `0.6` | Min cosine for doc-RAG injection |
 | `LLM_NUM_CTX` | `2048` | Context window — keeps the model's RAM use down |
 | `LLM_KEEP_ALIVE` | `10m` | Unload the model after this long idle |
 | `LLM_TEMPERATURE` | `0.2` | Low: answer, don't improvise |
-| `MODEL_MIN_FREE_GB` | `3.5` | Warm-start skips the model preload below this much free RAM |
+| `MODEL_MIN_FREE_GB` | `1.5` | Warm-start skips the model preload below this much free RAM |
 | `ONLINE_LOOKUPS` | `True` | Wikipedia / DuckDuckGo / Open-Meteo answers when online |
 | `ONLINE_CHECK_*` | `8.8.8.8:53` then `1.1.1.1:53`, 1 s timeout, 5 s cache | Online/offline auto-detection |
 

@@ -43,7 +43,7 @@ Architecture first. No giant single files.
 > two-sentence cap, explicit memory ("remember / forget"), free online answers
 > (Wikipedia, DuckDuckGo, Open-Meteo), file management across the user's folders
 > (Recycle-Bin deletes behind a "yes"), local search, and a compact HUD with native
-> Windows 11 corners. 608 tests pass; lint clean. See the v3.6 section below.
+> Windows 11 corners. 617 tests pass; lint clean. See the v3.6 section below.
 >
 > **Roadmap direction: speed-first, grounded.** Offline + online, fast, and never
 > guessing: deterministic tools first, the local model last.
