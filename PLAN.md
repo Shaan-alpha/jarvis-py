@@ -91,6 +91,10 @@ goals — see v4.0 below for what remains.
 | v3.1.0 | Wake-word barge-in, doc-RAG threshold, repo privacy |
 | v3.2.0 | Desktop HUD (pywebview + local WebSocket); audit hardening |
 | v3.3.0 | Polish & Packaging — Windows one-folder build, setup wizard, crash-recovery |
+| v3.4.0 | Agent Capabilities & Hardening — tool foundation, routing unification, audit F1–F15 |
+| v3.5.0 | Responsiveness & Efficiency — latency instrumentation, TTS engine reuse, warm-start preload |
+| v3.5.1 | Audio capture fixes for Windows multi-device setups |
+| v3.5.2 | HUD close button, app logo & glass orb |
 
 ---
 

@@ -26,10 +26,80 @@ JARVIS-PY is a Python voice assistant built for:
 
 JARVIS-PY is **developed and tested on Windows**. The voice/LLM/memory core
 (wake word, STT, TTS, Ollama, semantic + document memory) is portable, but the
-built-in OS automation — app launch/close and system status — currently targets
+built-in OS automation (app launch/close and system status) currently targets
 Windows (`os.startfile`, `taskkill`, SAPI5 voices). macOS/Linux parity is on the
 [roadmap](PLAN.md). TTS uses `pyttsx3.init()` and will pick the native driver per
 platform (SAPI5 / NSSpeechSynthesizer / espeak).
+
+---
+
+## How it fits together
+
+Three routing tiers, cheapest first: a keyword match never pays for a model call, and the
+LLM tool-agent only runs when the phrasing is fuzzy *and* an action verb is present.
+
+```mermaid
+flowchart TD
+    MIC(["🎙️ microphone"])
+    WAKE{"<b>openWakeWord</b><br/>hey_jarvis · ONNX, ~1 MB"}
+
+    subgraph STT ["Speech in"]
+        direction TB
+        ON["<b>online</b> · Google recognize_google"]
+        OFF["<b>offline</b> · Vosk, local model"]
+        ON -.->|"no network"| OFF
+    end
+
+    subgraph ROUTE ["Routing — cheapest tier that can answer wins"]
+        direction TB
+        R1["<b>1 · deterministic router</b><br/>memory · files · time · maths · apps<br/>search · weather · Wikipedia<br/><i>no model call</i>"]
+        R2["<b>2 · LLM tool agent</b><br/>action-verb gated, so idle chat<br/>never pays for a tool hop"]
+        R3["<b>3 · grounded LLM chat</b> · final fallback<br/>knows the time, says I don't know,<br/>two sentences max"]
+        R1 -->|"no match"| R2 -->|"no tool fits"| R3
+    end
+
+    subgraph CTX ["Context assembled into every prompt"]
+        direction TB
+        SEM[("<b>remembered facts</b><br/>only what you ask it to remember")]
+        RAG[("<b>PDF RAG</b> · FAISS, similarity-thresholded<br/><i>your résumé won't leak<br/>into unrelated answers</i>")]
+        PROF[("<b>user profile</b>")]
+    end
+
+    LLM["<b>Ollama</b> · local, default phi3<br/>streaming token output"]
+    REG["<b>@tool registry</b><br/>drop a .py in plugins/, decorate,<br/>auto-discovered at startup<br/>registered with router <i>and</i> agent"]
+
+    TTS["<b>Streaming sentence-level TTS queue</b><br/>pyttsx3 · SAPI5 / NSSpeech / espeak<br/>each sentence completes before the next"]
+    STOP{"<b>Stop</b> · Esc · new query<br/>hey Jarvis"}
+    SPK(["🔊 speech out"])
+    HUD["<b>HUD panel</b> · always-on-top<br/>glassmorphism orb, audio-reactive<br/>cyan by day, warmer by night"]
+    TIMER["<b>reminders</b> · threading.Timer<br/>persisted across restarts"]
+
+    MIC --> WAKE -->|"woken"| ON
+    STT --> R1
+    R2 <--> REG
+    R1 <--> REG
+    R3 --> LLM
+    R2 --> LLM
+    CTX --> LLM
+    LLM -->|"tokens"| TTS
+    R1 -->|"direct action"| TTS
+    TTS --> SPK
+    STOP -->|"cuts off mid-sentence"| TTS
+    HUD --> STOP
+    TIMER --> TTS
+
+    classDef cheap fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#d1fae5
+    classDef model fill:#312e81,stroke:#818cf8,stroke-width:2px,color:#e2e8f0
+    classDef store fill:#1e293b,stroke:#475569,stroke-width:1.5px,color:#cbd5e1
+    class R1,WAKE cheap
+    class R2,R3,LLM model
+    class SEM,RAG,PROF,REG store
+```
+
+Everything above runs on your machine; online lookups are optional. Saying "hey Jarvis"
+interrupts reliably while Jarvis is still thinking. Mid-speech it can be missed, because the
+mic also hears Jarvis's voice (no echo cancellation), so the sure interrupts are the Stop
+button, Esc, or the next typed question.
 
 ---
 
@@ -47,13 +117,13 @@ platform (SAPI5 / NSSpeechSynthesizer / espeak).
 ### Brain
 - Local LLM via Ollama (default `phi3`), grounded: it sees the current date/time and online state, says "I don't know" rather than guessing, and never claims actions it didn't take
 - **Replies capped at two sentences in code** ("tell me more" for the long version)
-- Deterministic answers for time, date, battery, RAM, disk, uptime, connectivity and arithmetic — no LLM, no guessing
+- Deterministic answers for time, date, battery, RAM, disk, uptime, connectivity and arithmetic, with no LLM and no guessing
 - Memory you control: only what you ask it to remember, plus profile facts
 - Document RAG over PDFs (FAISS, similarity-thresholded, stale-index safe, cites the file)
 - Free online answers (Wikipedia, DuckDuckGo, Open-Meteo weather), cached for offline use
 
 ### Routing
-- Deterministic router for memory, files, info, maths, apps, search, weather and lookups — instant, no LLM
+- Deterministic router for memory, files, info, maths, apps, search, weather and lookups: instant, no LLM
 - LLM tool agent fallback for fuzzy matches (action-verb gated to skip unnecessary LLM hops)
 - LLM chat as final fallback
 
@@ -129,7 +199,10 @@ jarvis-py/
 │   ├── state/              # session
 │   ├── setup/              # first-run checks + mic auto-detect + model pull
 │   ├── hud/                # HUD event bus, WebSocket server, stats/theme
-│   └── utils/              # logger, greetings, paths
+│   ├── paths.py            # resource_dir() / user_data_dir()
+│   └── utils/              # logger, helpers/greeting, jsonio, metrics
+├── hud/                    # pywebview HUD web assets
+├── plugins/                # drop-in @tool plugins
 ├── data/                   # runtime data (gitignored, READMEs in each folder)
 │   ├── documents/          # drop PDFs here
 │   ├── profile/            # user_profile.json
@@ -170,11 +243,11 @@ Auto-downloaded into the openWakeWord package on first run (one-time, ~1 MB). Fo
 
 ### User profile
 
-Optional — see [data/profile/README.md](data/profile/README.md) to pre-populate `user_profile.json` so Jarvis greets you by name.
+Optional, see [data/profile/README.md](data/profile/README.md) to pre-populate `user_profile.json` so Jarvis greets you by name.
 
 ### Documents (PDF RAG)
 
-Optional — drop PDFs in `data/documents/` and run `python build_memory.py`. See [data/documents/README.md](data/documents/README.md).
+Optional; drop PDFs in `data/documents/` and run `python build_memory.py`. See [data/documents/README.md](data/documents/README.md).
 
 ---
 
@@ -186,11 +259,11 @@ python app.py
 
 Speak the wake phrase **"hey jarvis"**, wait for *"Yes Boss?"*, then issue your command.
 
-**Interrupting:** saying *"hey jarvis"* again while Jarvis is talking *can* cut the current sentence off, but it's unreliable — the mic hears Jarvis's own voice (no echo cancellation). For reliable interruption, run the HUD (`--hud`) and use the **Stop** button, `Esc`, or type a new query.
+**Interrupting:** saying *"hey jarvis"* again while Jarvis is talking *can* cut the current sentence off, but it's unreliable; the mic hears Jarvis's own voice (no echo cancellation). For reliable interruption, run the HUD (`--hud`) and use the **Stop** button, `Esc`, or type a new query.
 
 **Exit / sleep:** say *"bye"*, *"goodbye"*, *"exit"*, *"shutdown"*, or *"stop listening"*. Or wait 20 s in silence.
 
-**Diagnostics:** if the wake word never fires, run `python debug_wake.py` — it lists your input devices and prints live wake-word confidence scores.
+**Diagnostics:** if the wake word never fires, run `python debug_wake.py`; it lists your input devices and prints live wake-word confidence scores.
 
 ---
 
@@ -198,7 +271,7 @@ Speak the wake phrase **"hey jarvis"**, wait for *"Yes Boss?"*, then issue your 
 
 | Ask | What happens |
 |---|---|
-| "what time is it", "what's the date", "battery", "how much RAM am I using", "disk space", "uptime", "am I online" | Instant answer from the system — no model |
+| "what time is it", "what's the date", "battery", "how much RAM am I using", "disk space", "uptime", "am I online" | Instant answer from the system, no model |
 | "what's 25 times 17", "square root of 144", "15 percent of 200" | Offline calculator (spoken numbers work too) |
 | "who is Alan Turing", "what is entropy", "tell me about the Eiffel Tower" | One-sentence answer from Wikipedia / DuckDuckGo when online (cached for offline) |
 | "weather", "weather in Pune", "is it going to rain" | Today's weather from Open-Meteo (your city from "I live in …") |
@@ -221,7 +294,7 @@ answers from its local model.
 ## Desktop HUD (optional)
 
 Launch a compact, always-on-top **HUD panel** (380×360) with native Windows 11
-rounded corners — a **fluid glass orb** that reacts to state and shrinks while a
+rounded corners: a **fluid glass orb** that reacts to state and shrinks while a
 reply is showing, streaming captions (your words *and* Jarvis's reply, selectable
 and scrollable from the first line), a type-to-Jarvis box with ↑/↓ history, a
 **Stop** button (or `Esc`) to cut Jarvis off, reminder toasts, and a status chip
@@ -232,19 +305,19 @@ the time of day: **cyan** by day, **gold** in the evening, **frosted** at night.
 python app.py --hud
 ```
 
-![The compact Jarvis HUD — title bar with a model/online chip, a small glass orb with a Speaking pill and Stop button, a readable reply caption, and a type-to-Jarvis box](assets/hud.png)
+![The compact Jarvis HUD: title bar with a model/online chip, a small glass orb with a Speaking pill and Stop button, a readable reply caption, and a type-to-Jarvis box](assets/hud.png)
 
 The HUD is a separate [pywebview](https://pywebview.flowrl.com/) window that talks
-to the voice core over a local WebSocket — fully free and local. Without `--hud`,
+to the voice core over a local WebSocket; fully free and local. Without `--hud`,
 the assistant behaves exactly as above. (Note: interrupting by *speaking* while
-Jarvis talks isn't supported — the mic would hear its own voice — so use the Stop
+Jarvis talks isn't supported (the mic would hear its own voice) so use the Stop
 button, `Esc`, or just type the next question to interrupt.)
 
 ---
 
 ## Extend with plugins
 
-Drop a `.py` file in `plugins/` and decorate a function with `@tool` — the loader
+Drop a `.py` file in `plugins/` and decorate a function with `@tool`; the loader
 auto-discovers it at startup and registers it with **both** the fast keyword router
 and the LLM tool-agent. No wiring, no restart of the architecture:
 
@@ -292,7 +365,7 @@ launches are voice-only (`--hud` to show the HUD).
 model pulled (`ollama pull phi3`) and the Microsoft **WebView2 runtime** (for the
 HUD). User data lives in `%APPDATA%\JarvisAI`.
 
-To sanity-check a build, run `dist\JarvisAI\Jarvis.exe --check-paths` — it prints
+To sanity-check a build, run `dist\JarvisAI\Jarvis.exe --check-paths`; it prints
 where the bundled models and HUD assets resolve and exits, without needing a mic
 or Ollama.
 
@@ -315,7 +388,7 @@ All config in [config/settings.py](config/settings.py):
 | `VOSK_MODEL_PATH` | `models/vosk/vosk-model-small-en-us-0.15` | Project-local Vosk model |
 | `MEMORY_SIMILARITY_THRESHOLD` | `0.55` | Min cosine for a remembered fact to reach the prompt |
 | `DOCUMENT_SIMILARITY_THRESHOLD` | `0.6` | Min cosine for doc-RAG injection |
-| `LLM_NUM_CTX` | `2048` | Context window — keeps the model's RAM use down |
+| `LLM_NUM_CTX` | `2048` | Context window; keeps the model's RAM use down |
 | `LLM_KEEP_ALIVE` | `10m` | Unload the model after this long idle |
 | `LLM_TEMPERATURE` | `0.2` | Low: answer, don't improvise |
 | `MODEL_MIN_FREE_GB` | `1.5` | Warm-start skips the model preload below this much free RAM |
@@ -328,7 +401,7 @@ All config in [config/settings.py](config/settings.py):
 
 We welcome contributions, bug reports, and feature requests! Check out our new interactive issue forms if you have ideas for new tool agents or integrations. If you find Jarvis helpful, consider giving it a star or sponsoring the project!
 
-[![Star History Chart](https://api.star-history.com/svg?repos=Shaan-alpha/jarvis-py&type=Date)](https://star-history.com/#Shaan-alpha/jarvis-py&Date)
+[![GitHub stars](https://img.shields.io/github/stars/Shaan-alpha/jarvis-py?style=for-the-badge&logo=github)](https://github.com/Shaan-alpha/jarvis-py/stargazers) [![Star History](https://img.shields.io/badge/%F0%9F%93%88_Star_History-view-1F6FEB?style=for-the-badge)](https://star-history.com/#Shaan-alpha/jarvis-py&Date)
 
 ---
 
