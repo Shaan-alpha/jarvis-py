@@ -1,4 +1,54 @@
+import json
+
 import core.ai.ollama_engine as engine
+
+
+class _StreamedReply:
+    """Stand-in for a streamed Ollama 200 that yields two tokens."""
+
+    ok = True
+
+    status_code = 200
+
+    def iter_lines(self):
+        for token in ("hello", " there."):
+            yield json.dumps({"response": token}).encode("utf-8")
+
+    def close(self):
+        pass
+
+
+def _capture_payload(monkeypatch):
+    captured = {}
+
+    def fake_post(url, json=None, **kwargs):
+        captured.update(json or {})
+        return _StreamedReply()
+
+    monkeypatch.setattr(engine.requests, "post", fake_post)
+    monkeypatch.setattr(engine, "add_to_queue", lambda text: None)
+    monkeypatch.setattr(engine, "get_profile_context", lambda: "")
+
+    return captured
+
+
+def test_reply_generation_is_bounded(monkeypatch):
+    # phi3 ignores "two sentences max" in the prompt: an unbounded generation ran
+    # for minutes and invented a whole new conversation ("Instruction:", a fresh
+    # "User Profile:"). Every token of that is read aloud, so the request itself
+    # has to carry the ceiling.
+    captured = _capture_payload(monkeypatch)
+
+    engine.ask_llm("say hello in five words")
+
+    options = captured.get("options", {})
+
+    assert options.get("num_predict", 0) > 0
+
+    # Stop at the turn markers the model invents when it starts a new dialogue.
+    assert any("User:" in stop for stop in options.get("stop", []))
+    assert options.get("num_ctx") == 2048
+    assert captured.get("keep_alive") == "10m"
 
 
 def test_chitchat_skips_retrieval():

@@ -1,5 +1,4 @@
 import os
-import pickle
 import threading
 
 # pyrefly: ignore [missing-import]
@@ -19,21 +18,39 @@ from core.memory.embedder import (
 
 from core.paths import user_data_dir
 
+from core.utils.jsonio import (
+    read_json,
+    write_json_atomic,
+)
+
+from core.utils.logger import (
+    logger
+)
+
 
 DOCS_PATH = os.path.join(str(user_data_dir()), "data", "documents")
 
 INDEX_PATH = os.path.join(str(user_data_dir()), "data", "vector.index")
 
-CHUNKS_PATH = os.path.join(str(user_data_dir()), "data", "chunks.pkl")
+# JSON, not pickle: loading a pickle from a user-writable folder runs whatever
+# code it contains.
+CHUNKS_PATH = os.path.join(str(user_data_dir()), "data", "chunks.json")
+
+# {pdf name: [size, mtime]} of what the index was built from. A folder that no
+# longer matches means the index is stale and must not be injected.
+MANIFEST_PATH = os.path.join(str(user_data_dir()), "data", "documents_manifest.json")
 
 
 _cache = {
     "index": None,
-    "chunks": None
+    "chunks": None,
+    "manifest": None,
 }
 
 # Guards _cache against concurrent access (HUD text-query thread vs voice loop).
 _cache_lock = threading.Lock()
+
+_warned_stale = {"value": False}
 
 
 def _invalidate_cache():
@@ -42,6 +59,7 @@ def _invalidate_cache():
 
         _cache["index"] = None
         _cache["chunks"] = None
+        _cache["manifest"] = None
 
 
 def _encode_matrix(texts):
@@ -74,30 +92,65 @@ def chunk_text(text, chunk_size=500):
     ]
 
 
+def _pdf_manifest():
+    """{name: [size, mtime]} for every PDF in the documents folder."""
+
+    if not os.path.isdir(DOCS_PATH):
+
+        return {}
+
+    manifest = {}
+
+    for name in sorted(os.listdir(DOCS_PATH)):
+
+        if name.lower().endswith(".pdf"):
+
+            stat = os.stat(os.path.join(DOCS_PATH, name))
+
+            manifest[name] = [stat.st_size, int(stat.st_mtime)]
+
+    return manifest
+
+
+def _clear_index():
+
+    for path in (INDEX_PATH, CHUNKS_PATH, MANIFEST_PATH):
+
+        if os.path.exists(path):
+
+            os.remove(path)
+
+    _invalidate_cache()
+
+
 def build_index():
+    """Index every PDF in DOCS_PATH. Returns (files, chunks); (0, 0) clears
+    any old index so nothing stale is served."""
 
-    documents = []
-
-    # The documents folder may not exist yet on a fresh install; create it so
-    # listdir doesn't raise FileNotFoundError (an empty dir -> "no PDFs").
+    # The documents folder may not exist yet on a fresh install.
     os.makedirs(DOCS_PATH, exist_ok=True)
 
-    for file in os.listdir(DOCS_PATH):
+    manifest = _pdf_manifest()
 
-        path = os.path.join(DOCS_PATH, file)
+    chunks = []
 
-        if file.endswith(".pdf"):
+    for name in manifest:
 
-            text = read_pdf(path)
+        text = read_pdf(os.path.join(DOCS_PATH, name))
 
-            documents.extend(chunk_text(text))
+        chunks.extend(
+            {"file": name, "text": piece}
+            for piece in chunk_text(text)
+            if piece.strip()
+        )
 
-    if not documents:
+    if not chunks:
 
-        print("No PDFs found to index.")
-        return
+        _clear_index()
 
-    matrix = _encode_matrix(documents)
+        return 0, 0
+
+    matrix = _encode_matrix([chunk["text"] for chunk in chunks])
 
     index = faiss.IndexFlatIP(matrix.shape[1])
 
@@ -107,51 +160,75 @@ def build_index():
 
     faiss.write_index(index, INDEX_PATH)
 
-    with open(CHUNKS_PATH, "wb") as file:
+    write_json_atomic(CHUNKS_PATH, chunks)
 
-        pickle.dump(documents, file)
+    write_json_atomic(MANIFEST_PATH, manifest)
 
     _invalidate_cache()
 
-    print(f"Indexed {len(documents)} chunks.")
+    return len(manifest), len(chunks)
+
+
+def index_state():
+    """'missing' (never built), 'stale' (folder changed) or 'ready'."""
+
+    if not (os.path.exists(INDEX_PATH) and os.path.exists(CHUNKS_PATH)):
+
+        return "missing"
+
+    if read_json(MANIFEST_PATH, default=None) != _pdf_manifest():
+
+        return "stale"
+
+    return "ready"
 
 
 def _load_index_and_chunks():
 
+    manifest = _pdf_manifest()
+
     with _cache_lock:
 
-        if _cache["index"] is not None:
+        if _cache["index"] is not None and _cache["manifest"] == manifest:
 
             return _cache["index"], _cache["chunks"]
 
-        if not os.path.exists(INDEX_PATH):
+        _cache["index"] = _cache["chunks"] = _cache["manifest"] = None
 
-            return None, None
+        state = index_state()
 
-        if not os.path.exists(CHUNKS_PATH):
+        if state != "ready":
+
+            if state == "stale" and not _warned_stale["value"]:
+
+                logger.warning(
+                    "Document index is stale (documents changed); not using it. "
+                    "Say 'index my documents' or run build_memory.py."
+                )
+
+                _warned_stale["value"] = True
 
             return None, None
 
         _cache["index"] = faiss.read_index(INDEX_PATH)
 
-        with open(CHUNKS_PATH, "rb") as file:
+        _cache["chunks"] = read_json(CHUNKS_PATH, default=[])
 
-            _cache["chunks"] = pickle.load(file)
+        _cache["manifest"] = manifest
 
         return _cache["index"], _cache["chunks"]
 
 
-def search_documents(query, top_k=3):
+def search_chunks(query, top_k=3):
+    """Best-matching chunks above the threshold: [{file, text, score}]."""
 
     index, chunks = _load_index_and_chunks()
 
-    if index is None:
+    if index is None or not chunks:
 
         return []
 
-    query_matrix = _encode_matrix([query])
-
-    scores, indices = index.search(query_matrix, top_k)
+    scores, indices = index.search(_encode_matrix([query]), top_k)
 
     results = []
 
@@ -165,6 +242,11 @@ def search_documents(query, top_k=3):
 
             continue
 
-        results.append(chunks[idx])
+        results.append({**chunks[idx], "score": float(score)})
 
     return results
+
+
+def search_documents(query, top_k=3):
+
+    return [chunk["text"] for chunk in search_chunks(query, top_k)]

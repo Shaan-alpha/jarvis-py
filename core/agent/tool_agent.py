@@ -5,6 +5,8 @@ import re
 import requests
 
 from config.settings import (
+    LLM_KEEP_ALIVE,
+    LLM_NUM_CTX,
     MODEL_NAME,
     OLLAMA_URL
 )
@@ -12,6 +14,8 @@ from config.settings import (
 from core.agent import (
     registry
 )
+
+from core.ai import llm_health
 
 from core.utils.logger import (
     logger
@@ -60,7 +64,7 @@ def _looks_like_action(query):
 
         return False
 
-    for spec in registry.all_tools():
+    for spec in registry.llm_tools():
 
         if words & set(spec.name.lower().split("_")):
 
@@ -73,7 +77,7 @@ def _tool_list_text():
 
     lines = []
 
-    for index, spec in enumerate(registry.all_tools(), start=1):
+    for index, spec in enumerate(registry.llm_tools(), start=1):
 
         if spec.params:
 
@@ -169,6 +173,10 @@ def decide_tool(query, raw_query=None):
 
         return None
 
+    if llm_health.is_down():
+
+        return None
+
     # Gate on the normalized query, but show the model the RAW utterance so the
     # content it extracts (e.g. write_clipboard/write_file text) keeps its
     # original case and punctuation instead of the lowercased form.
@@ -206,12 +214,14 @@ JSON:"""
         "model": MODEL_NAME,
         "prompt": prompt,
         "stream": False,
+        "keep_alive": LLM_KEEP_ALIVE,
         # Tool selection only emits a tiny JSON object, so cap generation and pin
         # temperature: the model returns fast and deterministically instead of
         # rambling before we parse the first {...}. A real tail-latency win on the
         # action path (this call blocks before ask_llm even starts).
         "options": {
             "num_predict": 80,
+            "num_ctx": LLM_NUM_CTX,
             "temperature": 0,
         },
     }
@@ -223,6 +233,12 @@ JSON:"""
             json=payload,
             timeout=30
         )
+
+        if getattr(response, "status_code", 200) != 200:
+
+            llm_health.mark_down(f"HTTP {response.status_code}")
+
+            return None
 
         data = response.json()
 
@@ -243,5 +259,7 @@ JSON:"""
     except Exception as e:
 
         logger.exception(f"Tool Agent Error: {e}")
+
+        llm_health.mark_down(str(e))
 
         return None

@@ -11,7 +11,12 @@ import psutil
 import pyperclip
 
 from core.agent.registry import (
+    Reply,
     tool
+)
+
+from core.net import (
+    is_online
 )
 
 
@@ -80,6 +85,10 @@ def open_calculator():
 @tool("open_youtube", "Open YouTube in the browser")
 def open_youtube():
 
+    if not is_online():
+
+        return "You're offline, so I can't open YouTube."
+
     webbrowser.open("https://youtube.com")
 
     return "Opening YouTube."
@@ -87,6 +96,10 @@ def open_youtube():
 
 @tool("open_google", "Open Google in the browser")
 def open_google():
+
+    if not is_online():
+
+        return "You're offline, so I can't open Google."
 
     webbrowser.open("https://google.com")
 
@@ -210,6 +223,10 @@ def system_status():
 )
 def search_web(query):
 
+    if not is_online():
+
+        return "You're offline, so I can't search the web."
+
     url = (
         "https://www.google.com/search?q="
         + urllib.parse.quote_plus(query)
@@ -220,7 +237,9 @@ def search_web(query):
     return f"Searching the web for {query}."
 
 
-CLIPBOARD_PREVIEW_LIMIT = 200
+CLIPBOARD_SPOKEN_LIMIT = 100
+
+CLIPBOARD_SHOWN_LIMIT = 2000
 
 
 @tool("read_clipboard", "Read the current text contents of the system clipboard")
@@ -232,13 +251,15 @@ def read_clipboard():
 
         return "The clipboard is empty."
 
-    if len(text) <= CLIPBOARD_PREVIEW_LIMIT:
+    if len(text) <= CLIPBOARD_SPOKEN_LIMIT:
 
         return text
 
-    return (
-        f"Your clipboard has {len(text)} characters. "
-        f'It starts: "{text[:CLIPBOARD_PREVIEW_LIMIT]}..." (truncated).'
+    preview = text[:CLIPBOARD_SPOKEN_LIMIT].rstrip()
+
+    return Reply(
+        say=f"Your clipboard has {len(text)} characters. It starts: {preview}…",
+        show=text[:CLIPBOARD_SHOWN_LIMIT],
     )
 
 

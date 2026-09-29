@@ -42,6 +42,14 @@ def check_ollama_running(get=requests.get):
 def check_model_present(name=MODEL_NAME, get=requests.get):
     """True when an Ollama model whose tag starts with `name` is installed."""
 
+    if name.endswith(":cloud") or "-cloud" in name:
+
+        return _result(
+            False,
+            f"Model '{name}' runs in the cloud; Jarvis only uses local models. "
+            f"Set MODEL_NAME in config/settings.py to a local model."
+        )
+
     try:
 
         resp = get(OLLAMA_TAGS_URL, timeout=2)

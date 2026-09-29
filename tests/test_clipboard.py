@@ -17,14 +17,14 @@ def test_read_clipboard_short_returns_verbatim(monkeypatch):
     assert agent_builtins.read_clipboard() == "hello"
 
 
-def test_read_clipboard_long_is_truncated(monkeypatch):
+def test_read_clipboard_long_speaks_a_preview_and_shows_more(monkeypatch):
+    from core.agent.registry import Reply
     monkeypatch.setattr(agent_builtins.pyperclip, "paste", lambda: "x" * 3000)
     out = agent_builtins.read_clipboard()
-    assert out.startswith("Your clipboard has")
-    assert "3000 characters" in out
-    assert out.endswith("(truncated).")
-    # Preview is capped at the limit, not the full 3000-char blob.
-    assert len(out) < 300
+    assert isinstance(out, Reply)
+    assert out.say.startswith("Your clipboard has 3000 characters.")
+    assert len(out.say) < 180
+    assert out.show == "x" * 2000
 
 
 def test_write_clipboard_copies_and_confirms(monkeypatch):

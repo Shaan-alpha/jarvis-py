@@ -103,3 +103,14 @@ def test_decide_tool_caps_generation(monkeypatch):
     opts = captured["json"]["options"]
     assert opts["num_predict"] <= 100      # bounded so selection returns fast
     assert opts["temperature"] == 0        # deterministic JSON
+    assert opts["num_ctx"] == 2048
+
+
+def test_deterministic_tools_are_hidden_from_the_llm_selector():
+    @registry.tool("router_only_probe", "x", llm=False)
+    def _probe():
+        return "x"
+
+    assert registry.get("router_only_probe") is not None
+    assert "router_only_probe" not in tool_agent._tool_list_text()
+    assert all(spec.llm for spec in registry.llm_tools())

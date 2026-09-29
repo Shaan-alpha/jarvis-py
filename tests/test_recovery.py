@@ -148,3 +148,16 @@ def test_offline_returns_none_when_model_load_fails(monkeypatch):
     monkeypatch.setattr(off, "_get_model", boom)
     result = off.recognize_offline(recognizer=None, audio=None)
     assert result == "none"
+
+
+def test_model_error_is_shown_in_the_hud(monkeypatch):
+    emitted = []
+
+    def boom(*a, **k):
+        raise oe.requests.exceptions.ConnectionError("refused")
+
+    monkeypatch.setattr(oe.requests, "post", boom)
+    monkeypatch.setattr(oe, "add_to_queue", lambda text: None)
+    monkeypatch.setattr(oe.events, "emit", lambda evt, **kw: emitted.append((evt, kw)))
+    oe.ask_llm("hello")
+    assert any(evt == "error" and "Ollama" in kw["message"] for evt, kw in emitted)

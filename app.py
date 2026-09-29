@@ -1,5 +1,6 @@
 import argparse
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -15,6 +16,7 @@ from core.speech.engine import (
     speak,
     speak_sync,
     command,
+    request_calibration,
     stop_speaking
 )
 
@@ -40,11 +42,8 @@ from core.utils.logger import (
 from core.utils import metrics
 
 from core.ai.ollama_engine import (
-    ask_llm
-)
-
-from core.memory.semantic_memory import (
-    save_memory
+    ask_llm,
+    cancel_generation
 )
 
 from core.memory.profile_extractor import (
@@ -52,6 +51,7 @@ from core.memory.profile_extractor import (
 )
 
 from core.memory.profile_memory import (
+    remember_profile,
     update_profile
 )
 
@@ -80,7 +80,19 @@ from core.tasks.task_manager import (
 )
 
 from core.tasks.task_parser import (
+    duration_words,
     parse_reminder
+)
+
+from core.speech.reply import (
+    respond
+)
+
+from core.state.conversation import (
+    conversation,
+    is_no,
+    is_yes,
+    match_command
 )
 
 from core.hud import events
@@ -89,7 +101,12 @@ import config.settings as settings
 
 from core.paths import is_frozen
 
-from core.warmup import warm_start
+from core.text import normalize
+
+from core.warmup import (
+    prime_model,
+    warm_start
+)
 
 from core.setup.checks import check_microphone
 
@@ -107,6 +124,123 @@ EXIT_WORDS = [
     "shutdown",
     "stop listening",
 ]
+
+
+# Whole words only. Plain substring containment ended the session on ordinary
+# speech that merely contains an exit word ("i exited the app" -> "exit"), so
+# Jarvis went quiet mid-conversation instead of answering.
+_EXIT_PATTERN = re.compile(
+    r"\b(?:" + "|".join(re.escape(word) for word in EXIT_WORDS) + r")\b"
+)
+
+
+def is_exit_command(query):
+    """True when the utterance explicitly ends the session."""
+
+    return _EXIT_PATTERN.search(query) is not None
+
+
+def _spawn(target, *args, **kwargs):
+    """Run `target` on a daemon thread. A seam, so tests can run it inline."""
+
+    thread = threading.Thread(
+        target=target,
+        args=args,
+        kwargs=kwargs,
+        daemon=True,
+    )
+
+    thread.start()
+
+    return thread
+
+
+def _reply(raw_query, value):
+    """Speak + show one reply and remember it for follow-ups."""
+
+    reply = respond(value)
+
+    if reply is not None:
+
+        conversation.add_turn(raw_query, reply.say)
+
+    return reply
+
+
+def _capture_profile(query):
+
+    info = extract_personal_info(query)
+
+    if info:
+
+        remember_profile(info["key"], info["value"])
+
+        logger.info(f"Profile Updated: {info}")
+
+
+def _handle_pending(query, raw_query):
+    """A pending confirmation: 'yes' runs it, 'no' cancels it, anything else
+    lets it lapse (and the query routes normally). True when consumed."""
+
+    if not conversation.has_pending():
+
+        return False
+
+    action = conversation.take_pending()
+
+    if action is None:
+
+        return False
+
+    if is_yes(query):
+
+        _reply(raw_query, action.run())
+
+        return True
+
+    if is_no(query):
+
+        _reply(raw_query, "Cancelled.")
+
+        return True
+
+    logger.info(f"Confirmation for {action.description!r} lapsed")
+
+    return False
+
+
+def _handle_conversation(query):
+    """'repeat that' / 'tell me more'. True when handled."""
+
+    command = match_command(query)
+
+    if command == "repeat":
+
+        respond(conversation.last_reply or "I haven't said anything yet.")
+
+        return True
+
+    if command != "more":
+
+        return False
+
+    last = conversation.last_query
+
+    if not last:
+
+        respond("Tell me more about what?")
+
+        return True
+
+    events.emit("state", state="thinking")
+
+    response = ask_llm(last, detailed=True)
+
+    if response:
+
+        conversation.add_turn(last, response)
+
+    return True
 
 
 def process_query(query, task_manager, source="voice", raw_query=None):
@@ -130,16 +264,15 @@ def process_query(query, task_manager, source="voice", raw_query=None):
 
     try:
 
-        personal_info = extract_personal_info(query)
+        if _handle_pending(query, raw_query):
 
-        if personal_info:
+            return
 
-            update_profile(
-                personal_info["key"],
-                personal_info["value"]
-            )
+        if _handle_conversation(query):
 
-            logger.info(f"Profile Updated: {personal_info}")
+            return
+
+        _capture_profile(query)
 
         reminder = parse_reminder(query)
 
@@ -152,9 +285,9 @@ def process_query(query, task_manager, source="voice", raw_query=None):
 
             logger.info(f"Reminder Created: {reminder}")
 
-            speak(
-                f"Reminder set for "
-                f"{reminder['minutes']} minutes."
+            _reply(
+                raw_query,
+                f"Reminder set for {duration_words(reminder['minutes'])}."
             )
 
             return
@@ -174,27 +307,31 @@ def process_query(query, task_manager, source="voice", raw_query=None):
 
             logger.info(f"Executed Tool: {call.name} args={call.args}")
 
-            response = execute_tool(call)
+            result = execute_tool(call)
 
-            if response:
+            if result is not None:
 
-                speak(response)
+                _reply(raw_query, result)
 
-            return
+                return
+
+            # The tool had nothing (e.g. lookup found no page): answer with the LLM.
+            logger.info(f"Tool {call.name} had no answer; asking the LLM")
+
+        events.emit("state", state="thinking")
 
         logger.info("Generating LLM response")
 
-        response = ask_llm(query)
+        # The raw text: case and punctuation help the model understand.
+        response = ask_llm(raw_query)
 
         logger.info("LLM response generated")
 
         # ask_llm returns "" when it was superseded by a newer query (barge-in)
-        # or could not reach Ollama; don't persist an empty turn.
+        # or could not reach Ollama; don't record an empty turn.
         if response:
 
-            save_memory(query, response)
-
-            logger.info("Conversation saved to memory")
+            conversation.add_turn(raw_query, response)
 
     finally:
 
@@ -236,7 +373,7 @@ def _hud_on_text_query(session, task_manager, text):
     # copy is only used for command matching.
     raw = (text or "").strip()
 
-    query = raw.lower()
+    query = normalize(raw)
 
     if not query:
 
@@ -245,7 +382,9 @@ def _hud_on_text_query(session, task_manager, text):
     # Barge-in: a new typed query interrupts whatever Jarvis is currently
     # saying. Stop the current utterance and drop anything still queued so the
     # new answer doesn't play behind the old one.
-    logger.info("Barge-in: stop_speaking + clear_queue")
+    logger.info("Barge-in: cancel generation + stop_speaking + clear_queue")
+
+    cancel_generation()
 
     stop_speaking()
 
@@ -253,15 +392,9 @@ def _hud_on_text_query(session, task_manager, text):
 
     session.activate()
 
-    # Run off the WS thread so a slow generation doesn't block the socket (and
-    # so the next typed query can interrupt this one). ask_llm's generation
-    # token ensures a superseded stream abandons itself.
-    threading.Thread(
-        target=process_query,
-        args=(query, task_manager),
-        kwargs={"source": "text", "raw_query": raw},
-        daemon=True,
-    ).start()
+    # Off the WS thread so a slow generation doesn't block the socket (and so
+    # the next typed query can interrupt this one).
+    _spawn(process_query, query, task_manager, source="text", raw_query=raw)
 
 
 def _hud_on_wake(session):
@@ -272,6 +405,10 @@ def _hud_on_wake(session):
 
 
 def _hud_on_stop():
+
+    # Cancel first: stopping the voice alone let the stream keep queueing the
+    # rest of the answer, which then played on.
+    cancel_generation()
 
     stop_speaking()
 
@@ -313,11 +450,14 @@ def _hud_on_run_checks():
         events.emit("check", **result)
 
 
-def _hud_on_pull_model(model):
+def _hud_on_pull_model(_requested=None):
 
-    # `ollama pull` runs for minutes; doing it inline would block the WS asyncio
-    # loop (and the broadcaster), so the queued pull_progress events would not
-    # stream live. Run it off-thread and signal completion.
+    # Always the configured model: the page's value is only a label, and
+    # trusting it would let any WS client choose what gets downloaded.
+    model = settings.MODEL_NAME
+
+    # `ollama pull` runs for minutes; off-thread so progress streams live
+    # instead of blocking the WS asyncio loop.
     def _pull():
 
         try:
@@ -333,12 +473,17 @@ def _hud_on_pull_model(model):
             # wizard's pull log strands with no "done" transition.
             events.emit("pull_done")
 
-    threading.Thread(target=_pull, daemon=True).start()
+    _spawn(_pull)
 
 
 def _hud_on_save_name(name):
 
+    from core.hud import ws_server
+
     update_profile("name", name or "Boss")
+
+    # Setup is done: a reconnecting or reloaded HUD must not reopen the wizard.
+    ws_server.set_wizard_mode(False)
 
     events.emit("setup_complete")
 
@@ -515,78 +660,141 @@ def main():
     _voice_loop(session, task_manager)
 
 
+def _on_wake(session):
+    """The wake word fired: start loading the model, then say "Yes Boss?" to the
+    end before listening — calibrating while it still played measured Jarvis's
+    own voice as room noise, and end-of-speech was then never detected."""
+
+    logger.info("Wake word activated")
+
+    stop_speaking()
+
+    prime_model()
+
+    request_calibration()
+
+    speak_sync("Yes Boss?")
+
+    session.activate()
+
+    events.emit("wake")
+
+
+def _process_with_barge_in(query, task_manager, raw_query):
+    """Answer `query` while listening for "hey jarvis": saying it while Jarvis is
+    still thinking cancels the answer and goes back to listening. (While it's
+    thinking nothing is playing, so the mic isn't fooled by Jarvis's voice.)"""
+
+    stop = threading.Event()
+
+    def _watch():
+
+        try:
+
+            if detect_wake_word(stop_event=stop, verbose=False):
+
+                logger.info("Barge-in while thinking: cancelling the answer")
+
+                cancel_generation()
+
+                stop_speaking()
+
+                clear_queue()
+
+        except Exception:
+
+            logger.exception("Wake watcher failed")
+
+    watcher = threading.Thread(target=_watch, daemon=True)
+
+    watcher.start()
+
+    try:
+
+        process_query(query, task_manager, raw_query=raw_query)
+
+    finally:
+
+        stop.set()
+
+        watcher.join(timeout=1.5)
+
+
+def _go_to_sleep(session, reason):
+    """End the voice session: say so, forget the short-term conversation."""
+
+    logger.info(reason)
+
+    stop_speaking()
+
+    speak("Going back to sleep.")
+
+    session.deactivate()
+
+    conversation.clear()
+
+    events.emit("state", state="idle")
+
+
+def _voice_turn(session, task_manager):
+    """One pass of the voice loop: wait for the wake word, or listen and answer."""
+
+    if not session.active:
+
+        detect_wake_word()
+
+        _on_wake(session)
+
+        return
+
+    if wait_until_done_or_barge_in():
+
+        logger.info("Barge-in: user interrupted")
+
+        cancel_generation()
+
+    events.emit("state", state="listening")
+
+    raw = command()
+
+    if raw == "none":
+
+        if session.is_expired():
+
+            _go_to_sleep(session, "Session expired")
+
+        return
+
+    query = normalize(raw)
+
+    if not query:
+
+        return
+
+    logger.info(f"User Query: {raw}")
+
+    print(f"\nUser: {raw}")
+
+    events.emit("transcript", role="user", text=raw)
+
+    session.update_interaction()
+
+    if is_exit_command(query):
+
+        _go_to_sleep(session, "Session manually ended")
+
+        return
+
+    _process_with_barge_in(query, task_manager, raw)
+
+
 def _voice_loop(session, task_manager):
 
     while True:
 
         try:
 
-            if not session.active:
-
-                detect_wake_word()
-
-                logger.info("Wake word activated")
-
-                stop_speaking()
-
-                speak("Yes Boss?")
-
-                session.activate()
-
-                events.emit("wake")
-
-                continue
-
-            if wait_until_done_or_barge_in():
-
-                logger.info("Barge-in: user interrupted")
-
-            events.emit("state", state="listening")
-
-            query = command()
-
-            if query == "none":
-
-                if session.is_expired():
-
-                    logger.info("Session expired")
-
-                    speak("Going back to sleep.")
-
-                    session.deactivate()
-
-                    events.emit("state", state="idle")
-
-                continue
-
-            query = query.lower().strip()
-
-            logger.info(f"User Query: {query}")
-
-            print(f"\nUser: {query}")
-
-            events.emit("transcript", role="user", text=query)
-
-            session.update_interaction()
-
-            if any(
-                word in query
-                for word in EXIT_WORDS
-            ):
-
-                logger.info("Session manually ended")
-
-                stop_speaking()
-
-                speak("Going back to sleep.")
-
-                session.deactivate()
-
-                events.emit("state", state="idle")
-
-                continue
-
-            process_query(query, task_manager)
+            _voice_turn(session, task_manager)
 
         except KeyboardInterrupt:
 

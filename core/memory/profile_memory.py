@@ -38,20 +38,60 @@ def update_profile(
     save_profile(profile)
 
 
+LIKES_MAX = 10
+
+
+def remember_profile(key, value):
+    """Store one captured detail. 'likes' accumulates (newest last)."""
+
+    profile = load_profile()
+
+    if key == "likes":
+
+        likes = profile.get("likes", [])
+
+        if isinstance(likes, str):
+
+            likes = [likes]
+
+        likes = [like for like in likes if like != value] + [value]
+
+        profile["likes"] = likes[-LIKES_MAX:]
+
+    else:
+
+        profile[key] = value
+
+    save_profile(profile)
+
+
+def delete_profile_key(key):
+
+    profile = load_profile()
+
+    if key not in profile:
+
+        return False
+
+    profile.pop(key)
+
+    save_profile(profile)
+
+    return True
+
+
 def get_profile_context():
 
     profile = load_profile()
 
-    if not profile:
-
-        return ""
-
-    context = []
+    lines = []
 
     for key, value in profile.items():
 
-        context.append(
-            f"{key}: {value}"
-        )
+        if isinstance(value, list):
 
-    return "\n".join(context)
+            value = ", ".join(value)
+
+        lines.append(f"{key.replace('_', ' ')}: {value}")
+
+    return "\n".join(lines)

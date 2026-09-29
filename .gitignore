@@ -34,6 +34,10 @@ data/tasks/*
 !data/tasks/README.md
 data/vector.index
 data/chunks.pkl
+data/chunks.json
+data/documents_manifest.json
+data/memory/
+data/cache/
 
 # Memory — conversation history is private
 core/memory/semantic_memory.json

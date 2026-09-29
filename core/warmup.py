@@ -17,23 +17,98 @@ import threading
 from core.utils.logger import logger
 
 
-def _warm_ollama():
-    """Prime the LLM so the first ask_llm isn't a cold model load."""
+# A cold load of a multi-GB model — on a machine that has to page it in — takes
+# minutes, not seconds. At 30s the warmup timed out on every start, so the first
+# real query paid the model load anyway and the preload bought nothing. This runs
+# on a daemon thread off the critical path, so the long wait costs nothing.
+WARM_TIMEOUT = 180
+
+
+def _post(url, json=None, timeout=None):
+    """Seam for the warmup request. requests is imported here, not at module
+    level, so importing this module stays cheap."""
 
     import requests
 
-    from config.settings import MODEL_NAME, OLLAMA_URL
+    return requests.post(url, json=json, timeout=timeout)
 
-    requests.post(
+
+def _free_gb():
+    """Free RAM in GiB (psutil imported lazily to keep this module cheap)."""
+
+    import psutil
+
+    return psutil.virtual_memory().available / 2 ** 30
+
+
+def _warm_ollama():
+    """Prime the LLM so the first ask_llm isn't a cold model load — unless RAM
+    is short, where preloading only thrashes the machine (the first real query
+    still loads it on demand)."""
+
+    from config.settings import (
+        LLM_KEEP_ALIVE,
+        LLM_NUM_CTX,
+        MODEL_MIN_FREE_GB,
+        MODEL_NAME,
+        OLLAMA_URL,
+    )
+
+    free = _free_gb()
+
+    if free < MODEL_MIN_FREE_GB:
+
+        raise RuntimeError(
+            f"only {free:.1f} GiB free (< {MODEL_MIN_FREE_GB}); skipping the model preload"
+        )
+
+    _post(
         OLLAMA_URL,
         json={
             "model": MODEL_NAME,
             "prompt": "hi",
             "stream": False,
-            "options": {"num_predict": 1},
+            "keep_alive": LLM_KEEP_ALIVE,
+            "options": {"num_predict": 1, "num_ctx": LLM_NUM_CTX},
         },
-        timeout=30,
+        timeout=WARM_TIMEOUT,
     )
+
+
+def _prime_request():
+    """One-token request that makes Ollama load the model (errors ignored)."""
+
+    from config.settings import LLM_KEEP_ALIVE, LLM_NUM_CTX, MODEL_NAME, OLLAMA_URL
+
+    try:
+
+        _post(
+            OLLAMA_URL,
+            json={
+                "model": MODEL_NAME,
+                "prompt": "hi",
+                "stream": False,
+                "keep_alive": LLM_KEEP_ALIVE,
+                "options": {"num_predict": 1, "num_ctx": LLM_NUM_CTX},
+            },
+            timeout=WARM_TIMEOUT,
+        )
+
+    except Exception as e:
+
+        logger.info(f"prime_model: {e}")
+
+
+def prime_model():
+    """Load the model in the background the moment the wake word fires, so the
+    load overlaps with the user speaking instead of delaying the first answer
+    (a cold load measured 13.5s). No RAM guard: a query is coming anyway."""
+
+    thread = threading.Thread(target=_prime_request, daemon=True)
+
+    thread.start()
+
+    return thread
 
 
 def _warm_embedder():

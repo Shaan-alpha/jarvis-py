@@ -1,4 +1,12 @@
+import re
+
 from core.agent.registry import ToolCall
+
+from core.calc import parse_math
+
+from core.state.conversation import conversation
+
+from core.text import normalize, spoken_filename
 
 
 _OPEN_APPS = {
@@ -37,9 +45,6 @@ _SYSTEM_STATUS = (
     "system info",
     "system information",
     "cpu usage",
-    "battery status",
-    "battery level",
-    "battery percentage",
 )
 
 # Read-specific phrases. A "copy ... to clipboard" command matches NONE of these,
@@ -66,20 +71,11 @@ _LIST_FILES = (
     "show my workspace",
 )
 
-# Ordered: "search google for " before "google " so the longer, more specific
-# trigger wins (otherwise "google " would swallow it and mis-extract the term).
-_SEARCH_TRIGGERS = (
-    "search google for ",
-    "search the web for ",
-    "search for ",
-    "google ",
-)
-
-# Zero-arg tools matched by substring containment, checked top to bottom (first
-# match wins). Collapsing these into one table keeps resolve_keyword_tool flat
+# Zero-arg tools matched on whole words, checked top to bottom (first match
+# wins). Collapsing these into one table keeps resolve_keyword_tool flat
 # instead of one if-branch per tool. The ToolCall instances are shared and never
-# mutated (frozen dataclass; the executor only reads call.args). "mute" is a bare
-# substring (so "commute" would also match — acceptable for a single-user setup).
+# mutated (frozen dataclass; the executor only reads call.args). Whole-word matching
+# keeps "mute" from firing on "commute".
 _SUBSTRING_TOOLS = (
     (_INCREASE_VOLUME, ToolCall("increase_volume", {})),
     (_DECREASE_VOLUME, ToolCall("decrease_volume", {})),
@@ -90,91 +86,537 @@ _SUBSTRING_TOOLS = (
 )
 
 
-def _match_named_app(query, table, tool_name):
-    """First phrase in `table` contained in `query` -> ToolCall(tool_name, name)."""
+# Whole-utterance (fullmatch) question shapes for the deterministic info tools,
+# so "what is the time complexity of quicksort" never answers with the clock.
+_INFO_PATTERNS = tuple(
+    (re.compile(pattern), tool_name) for pattern, tool_name in (
+        (r"(?:whats|what is) (?:the )?(?:current )?time(?: now| right now)?"
+         r"|what time is it(?: now| right now)?|(?:tell me|give me) the time"
+         r"|(?:the )?current time|time now|the time|time", "get_time"),
+        (r"(?:whats|what is) (?:the |todays )?date(?: today)?|todays date"
+         r"|what date is it(?: today)?|date today|the date|(?:whats|what is) today", "get_date"),
+        (r"(?:what|which) day (?:is it|is today|of the week is it)(?: today)?"
+         r"|(?:whats|what is) (?:the )?day(?: today)?", "get_day"),
+        (r"(?:(?:whats|what is|check|show|tell me)(?: my| the)? )?battery"
+         r"(?: level| status| percentage| life| left| charge)?"
+         r"|how much battery(?: do i have| is left)?(?: left)?"
+         r"|(?:is|am) (?:my |the )?(?:laptop|pc|computer|i) charging", "battery_status"),
+        (r"(?:how much )?(?:ram|memory) (?:usage|use|is used|am i using|left|is left|is free|free)"
+         r"|how much (?:ram|memory)(?: am i using| is used| is free| is left| do i have(?: left)?)?"
+         r"|(?:check|show)(?: my)? (?:ram|memory)(?: usage)?"
+         r"|(?:whats|what is)(?: my| the)? (?:ram|memory) usage", "memory_usage"),
+        (r"(?:how much )?(?:free )?(?:disk|storage|drive) space(?: do i have| is left| left)?"
+         r"|how much (?:disk|storage)(?: space)?(?: do i have| is left| left)?"
+         r"|(?:check|show)(?: my)? (?:disk|storage)(?: space)?|free space"
+         r"|(?:whats|what is)(?: my| the)? (?:free )?(?:disk|storage) space", "disk_space"),
+        (r"(?:(?:whats|what is) )?(?:my |the )?uptime"
+         r"|how long (?:has|have) (?:my |the |this )?(?:pc|computer|system|laptop) been (?:on|running|up)",
+         "uptime"),
+        (r"am i (?:online|connected)(?: to the internet)?|is (?:the )?internet (?:working|on|connected|up)"
+         r"|do i have (?:internet|a connection|an internet connection)|are we online", "network_status"),
+    )
+)
 
-    for phrase, name in table.items():
+# Ordered: the longer, more specific trigger first so "search google for x"
+# isn't swallowed by "google ".
+_SEARCH_TRIGGERS = (
+    "search google for",
+    "search the web for",
+    "search online for",
+    "google",
+)
 
-        if phrase in query:
+_SEARCH_PATTERNS = tuple(
+    re.compile(rf"^\s*{re.escape(trigger)}\s+(.+?)[\s?.!]*$", re.IGNORECASE)
+    for trigger in _SEARCH_TRIGGERS
+)
+
+
+def _word_pattern(phrase):
+    """A regex matching `phrase` only as whole words ("mute" not "commute")."""
+
+    return re.compile(rf"(?<!\w){re.escape(normalize(phrase))}(?!\w)")
+
+
+_OPEN_APP_PATTERNS = tuple(
+    (_word_pattern(phrase), name) for phrase, name in _OPEN_APPS.items()
+)
+
+_CLOSE_APP_PATTERNS = tuple(
+    (_word_pattern(phrase), name) for phrase, name in _CLOSE_APPS.items()
+)
+
+_OPEN_GOOGLE_PATTERN = _word_pattern("open google")
+
+_SUBSTRING_PATTERNS = tuple(
+    (tuple(_word_pattern(p) for p in phrases), call)
+    for phrases, call in _SUBSTRING_TOOLS
+)
+
+
+def _first_named(query, patterns, tool_name):
+
+    for pattern, name in patterns:
+
+        if pattern.search(query):
 
             return ToolCall(tool_name, {"name": name})
 
     return None
 
 
-def _match_substring_tool(query):
-    """First zero-arg substring tool whose any trigger is contained in `query`."""
+def _match_open_app(query, raw_query):
 
-    for phrases, call in _SUBSTRING_TOOLS:
+    return _first_named(query, _OPEN_APP_PATTERNS, "open_app")
 
-        if any(p in query for p in phrases):
+
+def _match_open_google(query, raw_query):
+
+    # The zero-arg homepage tool; checked before the search triggers.
+    if _OPEN_GOOGLE_PATTERN.search(query):
+
+        return ToolCall("open_google", {})
+
+    return None
+
+
+def _match_close_app(query, raw_query):
+
+    return _first_named(query, _CLOSE_APP_PATTERNS, "close_app")
+
+
+def _strip_fillers(query):
+    """Drop a leading 'hey jarvis' / 'please' and a trailing 'please'."""
+
+    query = re.sub(r"^(?:(?:hey|ok|okay) )?jarvis ", "", query)
+
+    query = re.sub(r"^please ", "", query)
+
+    return re.sub(r" (?:please|jarvis)$", "", query).strip()
+
+
+_REMEMBER = re.compile(r"(?:please )?(?:remember|dont forget|do not forget)(?: that)? (.+)")
+
+_NOTE = re.compile(r"(?:please )?(?:note that|make a note(?: that)?|take a note(?: that)?) (.+)")
+
+_RAW_REMEMBER = re.compile(
+    r"^\W*(?:please\s+)?(?:remember|don'?t forget|do not forget|note that|make a note|take a note)"
+    r"(?:\s+that)?\s+(.+?)[\s.!?]*$",
+    re.IGNORECASE,
+)
+
+_RECALL = re.compile(r"what (?:else )?do you (?:remember|know)(?: about me)?|what have i told you(?: about me)?")
+
+_PROFILE_QUESTION = re.compile(
+    r"(?:whats|what is|do you know|do you remember|tell me) my "
+    r"(name|city|birthday|job|goal|favou?rite [a-z]+(?: [a-z]+)?)"
+)
+
+_FORGET = re.compile(r"(?:please )?forget (?:that |about )?(?:my )?(?!it$)(.+)")
+
+
+def _match_memory(query, raw_query):
+    """Memory commands come first: "remember to open notepad" must be saved,
+    not executed."""
+
+    text = _strip_fillers(query)
+
+    match = _REMEMBER.fullmatch(text) or _NOTE.fullmatch(text)
+
+    if match:
+
+        raw = _RAW_REMEMBER.match(raw_query or "")
+
+        return ToolCall("remember_fact", {"text": raw.group(1) if raw else match.group(1)})
+
+    if _RECALL.fullmatch(text):
+
+        return ToolCall("recall_memory", {})
+
+    match = _PROFILE_QUESTION.fullmatch(text)
+
+    if match:
+
+        return ToolCall("get_profile_value", {"key": match.group(1)})
+
+    match = _FORGET.fullmatch(text)
+
+    if match:
+
+        return ToolCall("forget_memory", {"query": match.group(1)})
+
+    return None
+
+
+_FOLDER_NAMES = "desktop|documents|downloads|pictures|music|videos|workspace"
+
+# "show my workspace" stays the spoken list_files; "open my workspace" opens it.
+_OPEN_FOLDER = re.compile(
+    rf"open(?: up)? (?:my |the )?({_FOLDER_NAMES})(?: folder)?"
+    r"|show(?: me)? (?:my |the )?(desktop|documents|downloads|pictures|music|videos)(?: folder)?"
+)
+
+_OPEN_PICK = re.compile(
+    r"open (?:the )?(first|second|third|fourth|fifth|last|1st|2nd|3rd)(?: one| file| result)?"
+    r"|open (it|that|this)(?: file)?"
+)
+
+_OPEN_MY_FILE = re.compile(r"open (?:up )?my (.+)")
+
+_OPEN_NAMED_FILE = re.compile(r"open (?:the )?(?:file )?(.+\.[a-z0-9]{1,5})")
+
+# "find my X", "find (the) file X", "find X.ext", "where is my X" — not a bare
+# "find X", which is usually a web-style request ("find a restaurant").
+_FIND_FILE = re.compile(
+    r"(?:find|locate) (?:my |the file |file )(?:called |named )?(.+?)(?: file)?"
+    r"|(?:find|locate) (.+\.[a-z0-9]{1,5})"
+    r"|where(?: is|s) my (.+?)(?: file)?"
+)
+
+_RECENT = re.compile(
+    r"(?:(?:show|list|open|what are)(?: me)? )?(?:my )?recent(?:ly opened)? files"
+    r"|what (?:files )?did i open recently"
+)
+
+
+_MOVE = re.compile(rf"move (?:my |the )?(?:file )?(.+?) (?:to|into) (?:my |the )?({_FOLDER_NAMES})(?: folder)?")
+
+_RENAME = re.compile(r"rename (?:my |the )?(?:file )?(.+?) (?:to|as) (.+)")
+
+_RAW_RENAME = re.compile(
+    r"^\W*rename\s+(?:my\s+|the\s+)?(?:file\s+)?(.+?)\s+(?:to|as)\s+(.+?)[\s!?]*$", re.IGNORECASE
+)
+
+# "remove" only with "file" — "remove the stain" must never delete anything.
+_DELETE = re.compile(r"(?:delete|trash) (?:my |the )?(?:file )?(.+?)(?: file)?|remove (?:my |the )?file (.+?)")
+
+
+# "open my calculator" / "open youtube.com" are apps and websites, not files:
+# they fall through to the app / LLM tool path as before.
+_APP_WORDS = {
+    "calculator", "calc", "notepad", "paint", "explorer", "files", "cmd", "command prompt",
+    "terminal", "spotify", "chrome", "edge", "browser", "settings", "camera", "clock",
+    "calendar", "mail", "photos", "store", "word", "excel", "powerpoint", "outlook",
+    "teams", "vs code", "vscode", "code", "discord", "whatsapp", "telegram", "steam",
+}
+
+_WEB_ADDRESS = re.compile(r"\.(?:com|org|net|io|in|co|dev|app|ai|edu|gov|uk|me|tv)$")
+
+
+def _is_app_or_site(name):
+
+    return name in _APP_WORDS or _WEB_ADDRESS.search(name) is not None
+
+
+def _first_group(match):
+
+    return next(group for group in match.groups() if group)
+
+
+def _match_files(query, raw_query):
+
+    text = spoken_filename(_strip_fillers(query))
+
+    match = _MOVE.fullmatch(text)
+
+    if match:
+
+        return ToolCall("move_file", {"name": match.group(1), "folder": match.group(2)})
+
+    match = _RENAME.fullmatch(text)
+
+    if match:
+
+        raw = _RAW_RENAME.match(raw_query or "")
+
+        new_name = spoken_filename(raw.group(2)) if raw else match.group(2)
+
+        return ToolCall("rename_file", {"name": match.group(1), "new_name": new_name})
+
+    match = _DELETE.fullmatch(text)
+
+    if match:
+
+        return ToolCall("delete_file", {"name": _first_group(match)})
+
+    match = _OPEN_FOLDER.fullmatch(text)
+
+    if match:
+
+        return ToolCall("open_folder", {"folder": _first_group(match)})
+
+    match = _OPEN_PICK.fullmatch(text)
+
+    if match and conversation.results():
+
+        return ToolCall("open_file", {"name": _first_group(match)})
+
+    match = _OPEN_MY_FILE.fullmatch(text) or _OPEN_NAMED_FILE.fullmatch(text)
+
+    if match and not _is_app_or_site(match.group(1)):
+
+        return ToolCall("open_file", {"name": match.group(1)})
+
+    match = _FIND_FILE.fullmatch(text)
+
+    if match:
+
+        return ToolCall("find_file", {"name": _first_group(match)})
+
+    if _RECENT.fullmatch(text):
+
+        return ToolCall("recent_files", {})
+
+    return None
+
+
+def _match_info(query, raw_query):
+
+    text = _strip_fillers(query)
+
+    for pattern, tool_name in _INFO_PATTERNS:
+
+        if pattern.fullmatch(text):
+
+            return ToolCall(tool_name, {})
+
+    return None
+
+
+_CITY = r"(?: in ([a-z][a-z .-]*?))?"
+
+# Only today's forecast is fetched, so any other day goes to the LLM (which says
+# it doesn't know) instead of reading today's weather as tomorrow's.
+_NOT_TODAY = re.compile(r"\b(?:tomorrow|yesterday|tonight|next week|weekend)\b")
+
+_WEATHER_PATTERNS = tuple(re.compile(pattern) for pattern in (
+    rf"(?:(?:whats|what is|hows|how is) )?(?:the )?weather(?: like)?(?: today| now| right now)?{_CITY}"
+    rf"(?: today| now| right now)?",
+    rf"(?:whats|what is) the temperature(?: outside)?{_CITY}(?: today| now| right now)?",
+    rf"(?:will it|is it going to|is it) (?:rain|snow)(?:ing)?(?: today)?{_CITY}(?: today)?",
+    rf"(?:weather|temperature|forecast){_CITY}",
+))
+
+
+def _match_weather(query, raw_query):
+    """Today's weather only — "tomorrow" is left to the LLM, which says it
+    doesn't know rather than reading out today's forecast."""
+
+    text = _strip_fillers(query)
+
+    if _NOT_TODAY.search(text):
+
+        return None
+
+    for pattern in _WEATHER_PATTERNS:
+
+        match = pattern.fullmatch(text)
+
+        if match:
+
+            city = (match.group(1) or "").strip()
+
+            return ToolCall("weather", {"city": city} if city else {})
+
+    return None
+
+
+# (normalized pattern, raw pattern keeping case, max topic words)
+_LOOKUP_PATTERNS = tuple(
+    (re.compile(norm), re.compile(raw, re.IGNORECASE), max_words) for norm, raw, max_words in (
+        (r"who (?:is|was|are|were) (.+)", r"^\W*who\s+(?:is|was|are|were)\s+(.+?)[\s?.!]*$", 5),
+        (r"(?:what is|what are|what was|whats) (?:an? |the )?(.+)",
+         r"^\W*what(?:'s|s|\s+is|\s+are|\s+was)\s+(?:an?\s+|the\s+)?(.+?)[\s?.!]*$", 3),
+        (r"tell me about (.+)", r"^\W*tell\s+me\s+about\s+(.+?)[\s?.!]*$", 5),
+        (r"define (.+)", r"^\W*define\s+(.+?)[\s?.!]*$", 3),
+        (r"what does (.+) mean", r"^\W*what\s+does\s+(.+?)\s+mean[\s?.!]*$", 3),
+    )
+)
+
+# Follow-ups and chit-chat, not topics: the LLM (with conversation history)
+# takes them. Any pronoun or relative day in the topic means it isn't a
+# thing to look up ("what are you doing", "who is he married to").
+_LOOKUP_STOP_ANY = {
+    "i", "me", "my", "mine", "you", "your", "yours", "yourself", "he", "him", "his",
+    "she", "her", "hers", "it", "its", "we", "us", "our", "they", "them", "their",
+    "there", "this", "that", "these", "those", "today", "tomorrow", "yesterday", "tonight",
+}
+
+_LOOKUP_STOP_TOPICS = {
+    "up", "new", "wrong", "matter", "happening", "going on", "calling", "winning",
+    "the plan", "the problem", "the deal", "the point",
+}
+
+
+def _is_lookup_topic(topic, max_words):
+
+    words = topic.split()
+
+    return (
+        0 < len(words) <= max_words
+        and topic not in _LOOKUP_STOP_TOPICS
+        and not any(word in _LOOKUP_STOP_ANY for word in words)
+    )
+
+
+def _match_lookup(query, raw_query):
+
+    text = _strip_fillers(query)
+
+    for pattern, raw_pattern, max_words in _LOOKUP_PATTERNS:
+
+        match = pattern.fullmatch(text)
+
+        if not match:
+
+            continue
+
+        topic = match.group(1).strip()
+
+        if not _is_lookup_topic(topic, max_words):
+
+            return None
+
+        raw = raw_pattern.match(raw_query or "")
+
+        return ToolCall("lookup", {"topic": raw.group(1).strip() if raw else topic})
+
+    return None
+
+
+def _match_calc(query, raw_query):
+    """Arithmetic, only when the whole utterance parses as maths (so "what is
+    python" is never sent to the calculator). Uses the raw text: normalizing
+    strips '*', '+', '^' and '1,000'."""
+
+    expression = parse_math(raw_query) or parse_math(query)
+
+    if expression is None:
+
+        return None
+
+    return ToolCall("calculate", {"expression": expression})
+
+
+def _match_substring_tool(query, raw_query):
+    """First zero-arg tool with a trigger phrase present as whole words."""
+
+    for patterns, call in _SUBSTRING_PATTERNS:
+
+        if any(p.search(query) for p in patterns):
 
             return call
 
     return None
 
 
-def _match_search(query, raw_query):
-    """Web search: strip the trigger prefix to get the search term.
+_SEARCH_DOCUMENTS = re.compile(r"search (?:in )?(?:my |the )?(?:documents|docs|pdfs) for (.+)")
 
-    The trigger is detected on the normalized `query`, but the term is pulled
-    from `raw_query` so a typed search keeps its original case ("search for
-    Tony Stark" -> "Tony Stark", not "tony stark").
-    """
+_INDEX_DOCUMENTS = re.compile(r"(?:re ?index|index) (?:my |the )?documents|update (?:my |the )?document index")
 
-    for trigger in _SEARCH_TRIGGERS:
+_LOCAL_SEARCH = (
+    (re.compile(r"(?:search|look) for (.+)"),
+     re.compile(r"^\W*(?:search|look)\s+for\s+(.+?)[\s?.!]*$", re.IGNORECASE)),
+    (re.compile(r"search (?:my |the )?(?:files|computer|pc) for (.+)"),
+     re.compile(r"^\W*search\s+(?:my\s+|the\s+)?(?:files|computer|pc)\s+for\s+(.+?)[\s?.!]*$", re.IGNORECASE)),
+    (re.compile(r"find (.+?) (?:in|on) my (?:files|computer|pc)"),
+     re.compile(r"^\W*find\s+(.+?)\s+(?:in|on)\s+my\s+(?:files|computer|pc)[\s?.!]*$", re.IGNORECASE)),
+)
 
-        if query.startswith(trigger):
 
-            idx = raw_query.lower().find(trigger)
+def _match_local_search(query, raw_query):
+    """'search for X' searches this PC; the web needs 'search the web for'."""
 
-            if idx != -1:
+    text = _strip_fillers(query)
 
-                term = raw_query[idx + len(trigger):].strip()
+    match = _SEARCH_DOCUMENTS.fullmatch(text)
 
-            else:
+    if match:
 
-                term = query[len(trigger):].strip()
+        return ToolCall("search_my_documents", {"query": match.group(1)})
 
-            if term:
+    if _INDEX_DOCUMENTS.fullmatch(text):
 
-                return ToolCall("search_web", {"query": term})
+        return ToolCall("index_documents", {})
+
+    for pattern, raw_pattern in _LOCAL_SEARCH:
+
+        match = pattern.fullmatch(text)
+
+        if match:
+
+            raw = raw_pattern.match(raw_query or "")
+
+            return ToolCall("search_local", {"query": raw.group(1).strip() if raw else match.group(1)})
 
     return None
+
+
+def _search_term(trigger_pattern, query, raw_query):
+    """The text after a search trigger, from the raw utterance when it matches
+    there (keeps case: "search for Tony Stark" -> "Tony Stark")."""
+
+    for text in (raw_query, query):
+
+        match = trigger_pattern.match(text or "")
+
+        if match and match.group(1).strip():
+
+            return match.group(1).strip()
+
+    return None
+
+
+def _match_search(query, raw_query):
+
+    for pattern in _SEARCH_PATTERNS:
+
+        term = _search_term(pattern, query, raw_query)
+
+        if term:
+
+            return ToolCall("search_web", {"query": term})
+
+    return None
+
+
+# Checked in order; first match wins.
+_MATCHERS = (
+    _match_memory,
+    _match_files,
+    _match_open_app,
+    _match_open_google,
+    _match_close_app,
+    _match_info,
+    _match_calc,
+    _match_substring_tool,
+    _match_local_search,
+    _match_search,
+    _match_weather,
+    _match_lookup,
+)
 
 
 def resolve_keyword_tool(query, raw_query=None):
     """Map a known command phrase to a registry ToolCall, or None.
 
-    Deterministic, LLM-free, stdlib + registry only (importable in CI). This is
-    the fast path: common voice commands resolve here without paying Ollama
-    latency. A miss returns None and the caller falls back to the LLM tool
-    agent. Open/close/volume/status use substring containment (so an embedded
-    keyword in a longer sentence still matches); web search uses prefix
-    extraction so the search term can be pulled off the trigger phrase. Checked
-    in order; first match wins. "open google" beats the search triggers and the
-    open_app table (it's the zero-arg homepage tool, not open_app with a name).
-    `raw_query` (the un-normalized utterance) preserves case for the search term.
+    Deterministic and LLM-free (importable in CI). The query is normalized here
+    too, so voice and typed input match the same tables. `raw_query` (the
+    un-normalized utterance) is used where an argument's case matters.
     """
 
     if raw_query is None:
 
         raw_query = query
 
-    open_call = _match_named_app(query, _OPEN_APPS, "open_app")
+    query = normalize(query)
 
-    if open_call is not None:
+    for matcher in _MATCHERS:
 
-        return open_call
+        call = matcher(query, raw_query)
 
-    # "open google" routes to the zero-arg open_google homepage tool (it's kept
-    # out of _OPEN_APPS, which passes a name arg, and beats the search triggers).
-    if "open google" in query:
+        if call is not None:
 
-        return ToolCall("open_google", {})
+            return call
 
-    return (
-        _match_named_app(query, _CLOSE_APPS, "close_app")
-        or _match_substring_tool(query)
-        or _match_search(query, raw_query)
-    )
+    return None

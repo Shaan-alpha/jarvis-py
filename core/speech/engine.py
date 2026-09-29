@@ -1,9 +1,6 @@
 # pyrefly: ignore [missing-import]
 
-import re
-import socket
 import threading
-import time
 
 # pyrefly: ignore [missing-import]
 import pyttsx3
@@ -13,12 +10,12 @@ import speech_recognition as sr
 import config.settings as settings
 
 from config.settings import (
-    ONLINE_CACHE_TTL,
-    ONLINE_CHECK_HOST,
-    ONLINE_CHECK_PORT,
-    ONLINE_CHECK_TIMEOUT,
     VOICE_RATE,
     VOICE_VOLUME
+)
+
+from core.net import (  # noqa: F401  (re-exported: callers import it from here)
+    is_online
 )
 
 from core.speech.online_recognizer import (
@@ -39,45 +36,6 @@ speech_lock = threading.Lock()
 current_engine = None
 
 speech_thread = None
-
-
-_online_cache = {
-    "value": None,
-    "checked_at": 0.0
-}
-
-
-def is_online():
-
-    now = time.time()
-
-    cached = _online_cache["value"]
-
-    if (
-        cached is not None
-        and now - _online_cache["checked_at"]
-        < ONLINE_CACHE_TTL
-    ):
-
-        return cached
-
-    try:
-
-        with socket.create_connection(
-            (ONLINE_CHECK_HOST, ONLINE_CHECK_PORT),
-            timeout=ONLINE_CHECK_TIMEOUT
-        ):
-
-            online = True
-
-    except OSError:
-
-        online = False
-
-    _online_cache["value"] = online
-    _online_cache["checked_at"] = now
-
-    return online
 
 
 def create_engine():
@@ -211,23 +169,57 @@ def stop_speaking():
         logger.warning(f"stop_speaking failed (cross-thread?): {e}")
 
 
-def clean_query(query):
+# Ambient calibration is done once per wake, not before every turn: it cost
+# 0.5s of listening each time and could swallow the start of what you said.
+_calibration = {
+    "needed": True,
+    "threshold": None,
+}
 
-    query = query.lower().strip()
 
-    query = re.sub(
-        r"[^a-zA-Z0-9\s]",
-        "",
-        query
-    )
+def request_calibration():
+    """Re-measure room noise on the next listen (called on each wake)."""
 
-    query = re.sub(
-        r"\s+",
-        " ",
-        query
-    )
+    _calibration["needed"] = True
 
-    return query
+
+def _prepare_listen(recognizer, source):
+    """Tune phrase detection and set the energy threshold for one listen."""
+
+    recognizer.dynamic_energy_threshold = True
+
+    # Silence that ends an utterance; non_speaking_duration must stay <=
+    # pause_threshold (it's the trailing silence kept with the phrase).
+    recognizer.pause_threshold = settings.STT_PAUSE_SECONDS
+
+    recognizer.non_speaking_duration = min(0.5, settings.STT_PAUSE_SECONDS)
+
+    recognizer.phrase_threshold = 0.2
+
+    recognizer.operation_timeout = 8
+
+    if _calibration["needed"] or _calibration["threshold"] is None:
+
+        recognizer.adjust_for_ambient_noise(source, duration=0.5)
+
+        calibrated = recognizer.energy_threshold
+
+        # Calibration can over-raise the threshold (noisy room / TTS tail),
+        # making Jarvis ignore normal speech. Cap it so quiet speech is heard.
+        recognizer.energy_threshold = min(calibrated, settings.MAX_ENERGY_THRESHOLD)
+
+        _calibration["needed"] = False
+
+        logger.info(
+            f"STT energy_threshold: calibrated={calibrated:.0f} "
+            f"using={recognizer.energy_threshold:.0f}"
+        )
+
+    else:
+
+        recognizer.energy_threshold = _calibration["threshold"]
+
+    _calibration["threshold"] = recognizer.energy_threshold
 
 
 def command():
@@ -238,46 +230,14 @@ def command():
 
         print("Listening...")
 
-        recognizer.dynamic_energy_threshold = True
-
-        # Phrase-end detection. The previous 0.8s pause cut short multi-word
-        # phrases ("how are you" -> "how") because the natural gap between
-        # spoken words exceeded it. 1.2s tolerates inter-word pauses so the
-        # whole utterance is captured; non_speaking_duration must stay <=
-        # pause_threshold (it's the trailing silence kept with the phrase).
-        recognizer.pause_threshold = 1.2
-
-        recognizer.non_speaking_duration = 0.6
-
-        recognizer.phrase_threshold = 0.2
-
-        recognizer.operation_timeout = 8
-
-        recognizer.adjust_for_ambient_noise(
-            source,
-            duration=0.5
-        )
-
-        # Ambient calibration can over-raise the threshold (noisy room / TTS
-        # tail), making Jarvis ignore normal speech. Cap it so quiet speech is
-        # still heard; dynamic_energy_threshold keeps adapting from here.
-        calibrated = recognizer.energy_threshold
-
-        if calibrated > settings.MAX_ENERGY_THRESHOLD:
-
-            recognizer.energy_threshold = settings.MAX_ENERGY_THRESHOLD
-
-        logger.info(
-            f"STT energy_threshold: calibrated={calibrated:.0f} "
-            f"using={recognizer.energy_threshold:.0f}"
-        )
+        _prepare_listen(recognizer, source)
 
         try:
 
             audio = recognizer.listen(
                 source,
                 timeout=6,
-                phrase_time_limit=12
+                phrase_time_limit=settings.STT_PHRASE_LIMIT
             )
 
         except sr.WaitTimeoutError:
@@ -285,6 +245,10 @@ def command():
             logger.info("STT: no speech detected (listen timed out)")
 
             return "none"
+
+        # Keep the threshold the dynamic adjustment settled on for next turn,
+        # still capped so quiet speech stays audible.
+        _calibration["threshold"] = min(recognizer.energy_threshold, settings.MAX_ENERGY_THRESHOLD)
 
     online = is_online()
 
@@ -324,4 +288,6 @@ def command():
 
         return "none"
 
-    return clean_query(result)
+    # Raw text: the caller normalizes for matching and keeps this for content
+    # (case, punctuation, "notes.txt") — stripping it here broke both.
+    return result.strip()

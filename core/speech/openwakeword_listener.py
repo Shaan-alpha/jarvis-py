@@ -164,6 +164,46 @@ def _frame_stream(stream, src_rate, read_size, channels):
         pending = pending[CHUNK:]
 
 
+def _open_capture(audio, device_index):
+    """Open the wake-word input stream at the device's native format.
+
+    Returns (stream, src_rate, channels, read_size). Capture at the device's
+    native rate and resample to 16kHz in software: force-opening a 44.1/48kHz
+    mic at 16kHz (PyAudio + MME on Windows) corrupts the audio so openWakeWord
+    never crosses threshold.
+
+    A failure here (mic held by another app, device unplugged) releases the
+    PyAudio instance before propagating. The caller's try/finally isn't armed
+    yet, and the voice loop retries every second forever — so each failed
+    attempt otherwise stranded a PortAudio instance and its device handles for
+    the life of the process. The error still propagates: the loop ignores the
+    return value, so swallowing it would announce a wake that never happened.
+    """
+
+    try:
+
+        src_rate, channels = _device_format(audio, device_index)
+
+        read_size = max(1, int(src_rate * 0.08))   # ~80ms native blocks
+
+        stream = audio.open(
+            format=FORMAT,
+            channels=channels,
+            rate=src_rate,
+            input=True,
+            input_device_index=device_index,
+            frames_per_buffer=read_size
+        )
+
+    except Exception:
+
+        audio.terminate()
+
+        raise
+
+    return stream, src_rate, channels, read_size
+
+
 def detect_wake_word(stop_event=None, verbose=True):
 
     model = _get_model()
@@ -172,10 +212,6 @@ def detect_wake_word(stop_event=None, verbose=True):
 
     audio = pyaudio.PyAudio()
 
-    # Capture at the device's native rate, then resample to 16kHz in software.
-    # Force-opening a 44.1/48kHz mic at 16kHz (PyAudio + MME on Windows) corrupts
-    # the audio so openWakeWord never crosses threshold; native capture +
-    # _resample_to_16k restores detection.
     # Wake word listens on its own (WASAPI-preferred) device; falls back to the
     # STT/default device when no separate wake device was chosen.
     device_index = settings.WAKE_DEVICE_INDEX
@@ -184,18 +220,7 @@ def detect_wake_word(stop_event=None, verbose=True):
 
         device_index = settings.INPUT_DEVICE_INDEX
 
-    src_rate, channels = _device_format(audio, device_index)
-
-    read_size = max(1, int(src_rate * 0.08))   # ~80ms native blocks
-
-    stream = audio.open(
-        format=FORMAT,
-        channels=channels,
-        rate=src_rate,
-        input=True,
-        input_device_index=device_index,
-        frames_per_buffer=read_size
-    )
+    stream, src_rate, channels, read_size = _open_capture(audio, device_index)
 
     if verbose:
 

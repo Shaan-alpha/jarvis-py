@@ -1,9 +1,11 @@
 import core.paths as paths
 
 
-def test_memory_path_under_user_data():
-    import core.memory.semantic_memory as sm
-    assert str(paths.user_data_dir()) in sm.MEMORY_PATH
+def test_facts_path_under_user_data(monkeypatch):
+    import core.memory.facts as facts
+    # The autouse fixture points FACTS_PATH at a temp dir; check the real default.
+    monkeypatch.undo()
+    assert str(paths.user_data_dir()) in facts.FACTS_PATH
 
 
 def test_document_paths_under_user_data():
@@ -12,6 +14,7 @@ def test_document_paths_under_user_data():
     assert base in dm.DOCS_PATH
     assert base in dm.INDEX_PATH
     assert base in dm.CHUNKS_PATH
+    assert base in dm.MANIFEST_PATH
 
 
 def test_profile_path_under_user_data():

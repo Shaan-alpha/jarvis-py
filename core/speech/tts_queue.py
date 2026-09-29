@@ -15,6 +15,28 @@ tts_queue = queue.Queue()
 is_running = False
 
 
+def _play(text):
+    """Speak one queued item and report state. The queue draining means
+    Jarvis is done talking: `idle`. The voice loop emits `listening` itself,
+    right before it actually listens."""
+
+    try:
+
+        if text:
+
+            events.emit("state", state="speaking")
+
+            speak_sync(text)
+
+    finally:
+
+        tts_queue.task_done()
+
+        if tts_queue.empty():
+
+            events.emit("state", state="idle")
+
+
 def tts_worker():
 
     while is_running:
@@ -27,21 +49,7 @@ def tts_worker():
 
             continue
 
-        try:
-
-            if text:
-
-                events.emit("state", state="speaking")
-
-                speak_sync(text)
-
-        finally:
-
-            tts_queue.task_done()
-
-            if tts_queue.empty():
-
-                events.emit("state", state="listening")
+        _play(text)
 
 
 def start_tts_queue():

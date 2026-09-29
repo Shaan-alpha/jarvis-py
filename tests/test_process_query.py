@@ -5,6 +5,23 @@ import app
 from core.agent.registry import ToolCall
 
 
+@pytest.mark.parametrize("query,ends_session", [
+    ("bye", True),
+    ("goodbye", True),
+    ("ok bye", True),
+    ("exit", True),
+    ("shutdown", True),
+    ("stop listening", True),
+    # A bare substring test ended the session on ordinary speech that merely
+    # contains an exit word, so Jarvis went quiet mid-conversation.
+    ("i exited the app", False),
+    ("the exits are marked", False),
+    ("shutdowns are scheduled monthly", False),
+])
+def test_exit_command_matches_whole_words_only(query, ends_session):
+    assert app.is_exit_command(query) is ends_session
+
+
 class _FakeTaskManager:
     def __init__(self):
         self.reminders = []
@@ -14,13 +31,13 @@ class _FakeTaskManager:
 
 
 def test_sets_reminder(monkeypatch):
-    spoken = []
-    monkeypatch.setattr(app, "speak", lambda t: spoken.append(t))
+    responded = []
+    monkeypatch.setattr(app, "respond", lambda v: responded.append(v))
     monkeypatch.setattr(app, "extract_personal_info", lambda q: None)
     tm = _FakeTaskManager()
     app.process_query("remind me in 5 minutes to drink water", tm)
     assert tm.reminders == [(5, "drink water")]
-    assert any("Reminder set" in s for s in spoken)
+    assert responded == ["Reminder set for 5 minutes."]
 
 
 def test_fast_path_resolves_and_executes_tool(monkeypatch):
@@ -42,12 +59,12 @@ def test_fast_path_resolves_and_executes_tool(monkeypatch):
         return "Increasing volume."
 
     monkeypatch.setattr(app, "execute_tool", _fake_execute)
-    spoken = []
-    monkeypatch.setattr(app, "speak", lambda t: spoken.append(t))
+    responded = []
+    monkeypatch.setattr(app, "respond", lambda v: responded.append(v))
 
     app.process_query("volume up", _FakeTaskManager())
     assert ran["call"] == ToolCall("increase_volume", {})
-    assert spoken == ["Increasing volume."]
+    assert responded == ["Increasing volume."]
 
 
 def test_keyword_miss_falls_through_to_llm_tool_agent(monkeypatch):
@@ -64,23 +81,19 @@ def test_keyword_miss_falls_through_to_llm_tool_agent(monkeypatch):
         return "Opening spotify."
 
     monkeypatch.setattr(app, "execute_tool", _fake_execute)
-    monkeypatch.setattr(app, "speak", lambda t: None)
+    monkeypatch.setattr(app, "respond", lambda v: None)
 
     app.process_query("open spotify", _FakeTaskManager())
     assert ran["call"] == ToolCall("open_app", {"name": "spotify"})
 
 
-def test_llm_fallback_saves_memory(monkeypatch):
-    monkeypatch.setattr(app, "extract_personal_info", lambda q: None)
-    monkeypatch.setattr(app, "parse_reminder", lambda q: None)
-    monkeypatch.setattr(app, "resolve_keyword_tool", lambda q, raw=None: None)
-    monkeypatch.setattr(app, "decide_tool", lambda q, raw=None: None)
+def test_llm_turns_are_not_saved_to_long_term_memory(monkeypatch):
+    from core.memory import facts
+    _quiet_routing(monkeypatch)
     monkeypatch.setattr(app, "ask_llm", lambda q: "an answer")
-    saved = {}
-    monkeypatch.setattr(app, "save_memory", lambda q, r: saved.setdefault("v", (q, r)))
-    monkeypatch.setattr(app, "speak", lambda t: None)
     app.process_query("what is python", _FakeTaskManager())
-    assert saved["v"] == ("what is python", "an answer")
+    assert facts.all_facts() == []
+    assert not hasattr(app, "save_memory")
 
 
 def test_raw_query_preserves_case_for_routers(monkeypatch):
@@ -100,7 +113,7 @@ def test_raw_query_preserves_case_for_routers(monkeypatch):
     monkeypatch.setattr(app, "resolve_keyword_tool", _resolve)
     monkeypatch.setattr(app, "decide_tool", _decide)
     monkeypatch.setattr(app, "ask_llm", lambda q: "")
-    monkeypatch.setattr(app, "speak", lambda t: None)
+    monkeypatch.setattr(app, "respond", lambda v: None)
 
     app.process_query("copy hello world to clipboard", _FakeTaskManager(),
                       raw_query="copy Hello World to clipboard")
@@ -127,7 +140,7 @@ def test_process_query_records_latency_metrics(monkeypatch):
                         lambda q, raw=None: ToolCall("increase_volume", {}))
     monkeypatch.setattr(app, "decide_tool", lambda q, raw=None: None)
     monkeypatch.setattr(app, "execute_tool", lambda c: "ok")
-    monkeypatch.setattr(app, "speak", lambda t: None)
+    monkeypatch.setattr(app, "respond", lambda v: None)
 
     app.process_query("volume up", _FakeTaskManager())
 
@@ -161,3 +174,98 @@ def test_shutdown_handler_stops_services_then_exits(monkeypatch):
     assert exited["code"] == 0
     # Services stopped (mic released) before the process exits.
     assert {"stop_speaking", "stop_tts_queue", "tm.stop"} <= set(calls)
+
+
+def test_pull_model_always_pulls_the_configured_model(monkeypatch):
+    pulled = []
+    monkeypatch.setattr(app, "_spawn", lambda target, *a, **k: target(*a, **k))
+    monkeypatch.setattr(app, "pull_model", lambda name, on_progress=None: pulled.append(name))
+    monkeypatch.setattr(app.events, "emit", lambda *a, **k: None)
+    app._hud_on_pull_model("something-else")
+    assert pulled == [app.settings.MODEL_NAME]
+
+
+def test_save_name_closes_wizard_mode(monkeypatch):
+    import core.hud.ws_server as ws_mod
+    ws_mod.set_wizard_mode(True)
+    monkeypatch.setattr(app, "update_profile", lambda k, v: None)
+    monkeypatch.setattr(app.events, "emit", lambda *a, **k: None)
+    app._hud_on_save_name("Tony")
+    assert ws_mod._wizard_mode is False
+
+
+from core.state.conversation import conversation
+
+
+def _quiet_routing(monkeypatch):
+    monkeypatch.setattr(app, "extract_personal_info", lambda q: None)
+    monkeypatch.setattr(app, "parse_reminder", lambda q: None)
+    monkeypatch.setattr(app, "resolve_keyword_tool", lambda q, raw=None: None)
+    monkeypatch.setattr(app, "decide_tool", lambda q, raw=None: None)
+
+
+def test_repeat_that_replays_the_last_reply(monkeypatch):
+    _quiet_routing(monkeypatch)
+    conversation.add_turn("what is python", "A programming language.")
+    responded = []
+    monkeypatch.setattr(app, "respond", lambda v: responded.append(v))
+    app.process_query("repeat that", _FakeTaskManager())
+    assert responded == ["A programming language."]
+
+
+def test_tell_me_more_reasks_the_last_question_in_detail(monkeypatch):
+    _quiet_routing(monkeypatch)
+    conversation.add_turn("who is alan turing", "A mathematician.")
+    asked = {}
+
+    def fake_ask(q, detailed=False):
+        asked.update(q=q, detailed=detailed)
+        return "More."
+
+    monkeypatch.setattr(app, "ask_llm", fake_ask)
+    app.process_query("tell me more", _FakeTaskManager())
+    assert asked == {"q": "who is alan turing", "detailed": True}
+
+
+def test_llm_turns_are_remembered_for_follow_ups(monkeypatch):
+    _quiet_routing(monkeypatch)
+    monkeypatch.setattr(app, "ask_llm", lambda q: "Lima.")
+    app.process_query("capital of peru", _FakeTaskManager(), raw_query="Capital of Peru?")
+    assert conversation.history() == [("Capital of Peru?", "Lima.")]
+
+
+def test_yes_runs_the_pending_action(monkeypatch):
+    ran, responded = [], []
+    conversation.set_pending("do it", lambda: ran.append(1) or "Done.")
+    monkeypatch.setattr(app, "respond", lambda v: responded.append(v) or None)
+    app.process_query("yes", _FakeTaskManager())
+    assert ran == [1] and responded == ["Done."]
+
+
+def test_no_cancels_the_pending_action(monkeypatch):
+    ran, responded = [], []
+    conversation.set_pending("do it", lambda: ran.append(1))
+    monkeypatch.setattr(app, "respond", lambda v: responded.append(v) or None)
+    app.process_query("cancel", _FakeTaskManager())
+    assert ran == [] and responded == ["Cancelled."]
+
+
+def test_another_command_lets_the_confirmation_lapse(monkeypatch):
+    ran = []
+    conversation.set_pending("do it", lambda: ran.append(1))
+    _quiet_routing(monkeypatch)
+    monkeypatch.setattr(app, "ask_llm", lambda q: "")
+    app.process_query("what is python", _FakeTaskManager())
+    app.process_query("yes", _FakeTaskManager())
+    assert ran == []
+
+
+def test_a_tool_that_declines_falls_through_to_the_llm(monkeypatch):
+    monkeypatch.setattr(app, "extract_personal_info", lambda q: None)
+    monkeypatch.setattr(app, "parse_reminder", lambda q: None)
+    monkeypatch.setattr(app, "resolve_keyword_tool", lambda q, raw=None: ToolCall("lookup", {"topic": "x"}))
+    monkeypatch.setattr(app, "execute_tool", lambda call: None)
+    asked = []
+    monkeypatch.setattr(app, "ask_llm", lambda q: asked.append(q) or "An answer.")
+    app.process_query("who is x", _FakeTaskManager())
+    assert asked == ["who is x"]

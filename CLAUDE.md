@@ -25,7 +25,27 @@ psutil, PyAutoGUI.
 
 ---
 
-## 2. Where we are right now (2026-06-03)
+## 2. Where we are right now (2026-09-28)
+
+**v3.6.0 "Grounded & Compact" is released** (2026-09-29: merged to `main`,
+tagged `v3.6.0`, GitHub Release published). No feature branch is active; cut a
+fresh one per task. Spec: `docs/superpowers/specs/2026-09-28-v3.6-grounded-compact-design.md`,
+plan: `docs/superpowers/plans/2026-09-28-v3.6-grounded-compact.md`. **617 tests
+pass; build-breaking lint 0.** What changed, in one breath: one input normalizer
+(`core/text.py`) → pending-confirmation / conversation commands → a deterministic
+router of ordered matchers (memory, files, apps, info, maths, system, search,
+weather, lookup) backed by `@tool(..., llm=False)` tools → LLM tool agent →
+grounded LLM (date/time + online state, relevant facts, 3-turn history, hard
+two-sentence cap). Every reply goes through `core/speech/reply.respond()` (TTS
+queue + HUD). Long-term memory is explicit facts only (`core/memory/facts.py`;
+the old save-every-turn `semantic_memory.py` is gone). Online answers come from
+Wikipedia / DuckDuckGo / Open-Meteo behind `ONLINE_LOOKUPS`. Files: known folders
+(OneDrive-aware) with Recycle-Bin-only deletes behind a spoken "yes". HUD:
+380×360, native Windows 11 corners/outline via DWM, drag from the title bar only.
+First live voice run (2026-09-29) drove the voice-latency fix: run from the venv
+(`.\venv\Scripts\python.exe app.py --hud`); tune `STT_PAUSE_SECONDS` if speech gets cut off.
+
+### History (2026-06-03)
 
 The **v3.3.0 "Polish & Packaging" milestone — plus a HUD overhaul — is shipped**:
 merged to `main` (tip `5c27a76`), **tagged `v3.3.0`**, and a **GitHub Release is
@@ -181,6 +201,11 @@ Ubuntu/Python 3.11. **Keep CI green** — it's a public adoption signal.
 | [`core/tasks/`](core/tasks/) | Reminder parsing + scheduling + persistence |
 | [`core/hud/`](core/hud/) | Event bus, WebSocket server, stats/theme emitter (HUD core) |
 | [`hud/`](hud/) | pywebview window + `web/` vanilla UI |
+| [`core/text.py`](core/text.py) / [`core/calc.py`](core/calc.py) / [`core/net.py`](core/net.py) | Input normalizer + spoken time/filenames; offline arithmetic; connectivity check (stdlib-only) |
+| [`core/speech/reply.py`](core/speech/reply.py) | `respond()` — the one path for every spoken + shown reply |
+| [`core/state/conversation.py`](core/state/conversation.py) | In-RAM follow-up history, last file results, pending confirmations |
+| [`core/memory/facts.py`](core/memory/facts.py) | Explicit long-term memory (remember / forget) |
+| [`core/agent/`](core/agent/) tool modules | `info_tools`, `calc_tools`, `memory_tools`, `web_tools`, `search_tools`, `fs_tools` + `known_folders` (router-only, `llm=False`) |
 | [`tests/`](tests/) | Pure-logic unit tests (CI-safe) |
 
 ---

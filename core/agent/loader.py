@@ -33,18 +33,34 @@ def _import_file(path):
     spec.loader.exec_module(module)
 
 
+_BUILTIN_MODULES = (
+    "core.agent.builtins",
+    "core.agent.fs_tools",
+    "core.agent.info_tools",
+    "core.agent.calc_tools",
+    "core.agent.memory_tools",
+    "core.agent.web_tools",
+    "core.agent.search_tools",
+)
+
+
 def load_builtins():
 
     import sys
 
     # Remove from sys.modules so re-import always re-executes @tool decorators.
-    for mod in ("core.agent.builtins", "core.agent.fs_tools"):
+    for mod in _BUILTIN_MODULES:
 
         sys.modules.pop(mod, None)
 
-    import core.agent.builtins   # noqa: F401  (decorators register on import)
-
-    import core.agent.fs_tools   # noqa: F401  (decorators register on import)
+    # Static imports (not importlib) so PyInstaller bundles every module.
+    import core.agent.builtins     # noqa: F401  (decorators register on import)
+    import core.agent.fs_tools     # noqa: F401
+    import core.agent.info_tools   # noqa: F401
+    import core.agent.calc_tools   # noqa: F401
+    import core.agent.memory_tools   # noqa: F401
+    import core.agent.web_tools   # noqa: F401
+    import core.agent.search_tools   # noqa: F401
 
 
 def load_plugins(dirs):

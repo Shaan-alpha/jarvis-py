@@ -3,8 +3,8 @@ import uuid
 
 from datetime import datetime, timedelta
 
-from core.speech.engine import (
-    speak
+from core.speech.reply import (
+    announce_reminder
 )
 
 from core.tasks.task_storage import (
@@ -76,7 +76,7 @@ class TaskManager:
 
         try:
 
-            speak(f"Reminder. {task['message']}")
+            announce_reminder(task["message"])
 
         finally:
 
@@ -103,7 +103,21 @@ class TaskManager:
 
                 task["id"] = uuid.uuid4().hex
 
-            task_time = datetime.fromisoformat(task["time"])
+            # Restore runs at startup, before the mic check, so an unreadable row
+            # (truncated write, hand-edit, older schema) used to raise out of
+            # start() and Jarvis wouldn't boot at all. Drop the bad row instead;
+            # the rest of the reminders still get scheduled.
+            try:
+
+                task_time = datetime.fromisoformat(task["time"])
+
+            except (KeyError, TypeError, ValueError) as e:
+
+                logger.warning(
+                    f"Dropping unreadable reminder {task.get('id')}: {e}"
+                )
+
+                continue
 
             remaining = (task_time - now).total_seconds()
 

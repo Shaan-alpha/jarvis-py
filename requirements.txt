@@ -24,10 +24,17 @@ scipy==1.17.1   # signal.resample_poly: resample mic audio to 16kHz for openWake
 # System automation
 PyAutoGUI==0.9.54
 psutil==7.2.2
+Send2Trash==2.1.0   # delete_file: Recycle Bin only, never a permanent delete
 
 # Clipboard
 pyperclip==1.11.0
 
 # Desktop HUD (only used with `python app.py --hud`)
-websockets>=12.0
+# websockets >= 14 is required, not preferred: 14.0 is the release where
+# `websockets.serve` started aliasing the new asyncio implementation, whose
+# handler receives a ServerConnection with `.request`. Older releases alias it
+# to the deprecated legacy implementation, which exposes `request_headers`
+# instead — the HUD still runs, but core/hud/ws_server.py reads no Origin and
+# the check that keeps a web page from driving Jarvis silently allows everyone.
+websockets>=14.0
 pywebview>=5.0

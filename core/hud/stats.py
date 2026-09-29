@@ -14,7 +14,7 @@ from core.hud.theming import (
     theme_for_hour,
 )
 
-from core.speech.engine import (
+from core.net import (
     is_online,
 )
 
