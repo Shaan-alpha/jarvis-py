@@ -94,7 +94,7 @@ _INFO_PATTERNS = tuple(
          r"|what time is it(?: now| right now)?|(?:tell me|give me) the time"
          r"|(?:the )?current time|time now|the time|time", "get_time"),
         (r"(?:whats|what is) (?:the |todays )?date(?: today)?|todays date"
-         r"|what date is it(?: today)?|date today|the date", "get_date"),
+         r"|what date is it(?: today)?|date today|the date|(?:whats|what is) today", "get_date"),
         (r"(?:what|which) day (?:is it|is today|of the week is it)(?: today)?"
          r"|(?:whats|what is) (?:the )?day(?: today)?", "get_day"),
         (r"(?:(?:whats|what is|check|show|tell me)(?: my| the)? )?battery"
@@ -291,6 +291,23 @@ _RAW_RENAME = re.compile(
 _DELETE = re.compile(r"(?:delete|trash) (?:my |the )?(?:file )?(.+?)(?: file)?|remove (?:my |the )?file (.+?)")
 
 
+# "open my calculator" / "open youtube.com" are apps and websites, not files:
+# they fall through to the app / LLM tool path as before.
+_APP_WORDS = {
+    "calculator", "calc", "notepad", "paint", "explorer", "files", "cmd", "command prompt",
+    "terminal", "spotify", "chrome", "edge", "browser", "settings", "camera", "clock",
+    "calendar", "mail", "photos", "store", "word", "excel", "powerpoint", "outlook",
+    "teams", "vs code", "vscode", "code", "discord", "whatsapp", "telegram", "steam",
+}
+
+_WEB_ADDRESS = re.compile(r"\.(?:com|org|net|io|in|co|dev|app|ai|edu|gov|uk|me|tv)$")
+
+
+def _is_app_or_site(name):
+
+    return name in _APP_WORDS or _WEB_ADDRESS.search(name) is not None
+
+
 def _first_group(match):
 
     return next(group for group in match.groups() if group)
@@ -336,7 +353,7 @@ def _match_files(query, raw_query):
 
     match = _OPEN_MY_FILE.fullmatch(text) or _OPEN_NAMED_FILE.fullmatch(text)
 
-    if match:
+    if match and not _is_app_or_site(match.group(1)):
 
         return ToolCall("open_file", {"name": match.group(1)})
 
@@ -368,6 +385,10 @@ def _match_info(query, raw_query):
 
 _CITY = r"(?: in ([a-z][a-z .-]*?))?"
 
+# Only today's forecast is fetched, so any other day goes to the LLM (which says
+# it doesn't know) instead of reading today's weather as tomorrow's.
+_NOT_TODAY = re.compile(r"\b(?:tomorrow|yesterday|tonight|next week|weekend)\b")
+
 _WEATHER_PATTERNS = tuple(re.compile(pattern) for pattern in (
     rf"(?:(?:whats|what is|hows|how is) )?(?:the )?weather(?: like)?(?: today| now| right now)?{_CITY}"
     rf"(?: today| now| right now)?",
@@ -382,6 +403,10 @@ def _match_weather(query, raw_query):
     doesn't know rather than reading out today's forecast."""
 
     text = _strip_fillers(query)
+
+    if _NOT_TODAY.search(text):
+
+        return None
 
     for pattern in _WEATHER_PATTERNS:
 
@@ -408,13 +433,30 @@ _LOOKUP_PATTERNS = tuple(
     )
 )
 
-# Follow-ups and chit-chat, not topics: the LLM (with conversation history) takes them.
-_LOOKUP_STOP_WORDS = {
-    "he", "she", "it", "that", "this", "they", "him", "her", "them", "you",
-    "up", "new", "wrong", "happening", "going on", "your name",
+# Follow-ups and chit-chat, not topics: the LLM (with conversation history)
+# takes them. Any pronoun or relative day in the topic means it isn't a
+# thing to look up ("what are you doing", "who is he married to").
+_LOOKUP_STOP_ANY = {
+    "i", "me", "my", "mine", "you", "your", "yours", "yourself", "he", "him", "his",
+    "she", "her", "hers", "it", "its", "we", "us", "our", "they", "them", "their",
+    "there", "this", "that", "these", "those", "today", "tomorrow", "yesterday", "tonight",
 }
 
-_LOOKUP_STOP_FIRST = {"my", "your", "our", "this", "that", "it", "his", "her", "their"}
+_LOOKUP_STOP_TOPICS = {
+    "up", "new", "wrong", "matter", "happening", "going on", "calling", "winning",
+    "the plan", "the problem", "the deal", "the point",
+}
+
+
+def _is_lookup_topic(topic, max_words):
+
+    words = topic.split()
+
+    return (
+        0 < len(words) <= max_words
+        and topic not in _LOOKUP_STOP_TOPICS
+        and not any(word in _LOOKUP_STOP_ANY for word in words)
+    )
 
 
 def _match_lookup(query, raw_query):
@@ -431,9 +473,7 @@ def _match_lookup(query, raw_query):
 
         topic = match.group(1).strip()
 
-        words = topic.split()
-
-        if topic in _LOOKUP_STOP_WORDS or words[0] in _LOOKUP_STOP_FIRST or len(words) > max_words:
+        if not _is_lookup_topic(topic, max_words):
 
             return None
 

@@ -28,6 +28,8 @@ from core.net import (
 
 from core.paths import user_data_dir
 
+from core.text import normalize
+
 from core.utils.jsonio import (
     read_json,
     write_json_atomic,
@@ -143,6 +145,31 @@ def _spoken(text, prefix=""):
     }
 
 
+_FILLER_WORDS = {"the", "and", "for", "with", "about", "what", "who", "how", "are", "was", "were"}
+
+
+def _tokens(text):
+
+    return {word for word in normalize(text).split() if len(word) >= 3 and word not in _FILLER_WORDS}
+
+
+def _relevant(topic, title):
+    """Relevance search returns *some* article for almost any text, so the top
+    title must share a real word with the question (prefix match allows
+    plurals: "tower" / "towers"). Too little to judge -> accept."""
+
+    wanted, got = _tokens(topic), _tokens(title)
+
+    if not wanted:
+
+        return True
+
+    return any(
+        a == b or (min(len(a), len(b)) >= 4 and (a.startswith(b) or b.startswith(a)))
+        for a in wanted for b in got
+    )
+
+
 def _wikipedia(topic):
     """Relevance search, not opensearch: opensearch answers "Python" with the
     disambiguation page, relevance search with the programming language."""
@@ -153,7 +180,7 @@ def _wikipedia(topic):
 
     titles = [hit["title"] for hit in hits.get("query", {}).get("search", [])]
 
-    if not titles:
+    if not titles or not _relevant(topic, titles[0]):
 
         return None
 

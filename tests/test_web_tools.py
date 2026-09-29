@@ -178,3 +178,12 @@ def test_weather_offline_with_nothing_saved(monkeypatch):
 def test_weather_unknown_place(monkeypatch):
     _route(monkeypatch, {"geocoding-api.open-meteo.com": {"results": []}})
     assert web.weather("atlantis") == "I couldn't find a place called atlantis."
+
+
+def test_an_unrelated_top_article_is_not_read_out(monkeypatch):
+    _route(monkeypatch, {
+        "w/api.php": _search("Zebra"),
+        "page/summary/Zebra": {"type": "standard", "extract": "Zebras are African equines."},
+        "api.duckduckgo.com": {"AbstractText": "", "Answer": ""},
+    })
+    assert web.lookup("zorbonk") is None

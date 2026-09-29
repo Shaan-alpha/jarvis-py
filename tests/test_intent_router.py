@@ -312,3 +312,26 @@ def test_remove_in_ordinary_speech_is_not_a_delete():
 ])
 def test_search_commands_route(query, expected):
     assert resolve_keyword_tool(query) == expected
+
+
+# --- final-review fixes -------------------------------------------------------
+
+@pytest.mark.parametrize("query", [
+    "what are you doing", "tell me about yourself", "who is he married to",
+    "whats the matter", "who is there", "who is calling", "who is winning",
+    "what is the weather like tomorrow", "what is the weather in london tomorrow",
+])
+def test_chitchat_follow_ups_and_tomorrow_are_left_to_the_llm(query):
+    call = resolve_keyword_tool(query)
+    assert call is None or call.name not in {"lookup", "weather"}
+
+
+def test_what_is_today_is_a_date_question():
+    assert resolve_keyword_tool("what is today") == ToolCall("get_date", {})
+    assert resolve_keyword_tool("whats today") == ToolCall("get_date", {})
+
+
+@pytest.mark.parametrize("query", ["open my calculator", "open youtube.com", "open my spotify"])
+def test_apps_and_websites_are_not_file_opens(query):
+    call = resolve_keyword_tool(query)
+    assert call is None or call.name != "open_file"

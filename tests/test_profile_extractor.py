@@ -63,3 +63,14 @@ def test_extracts_more_profile_facts(query, expected):
 ])
 def test_rejects_non_facts(query):
     assert extract_personal_info(query) is None
+
+
+@pytest.mark.parametrize("query", [
+    "call me later", "call me back", "call me an uber", "i live in fear", "i live in the moment",
+])
+def test_rejects_call_me_and_live_in_idioms(query):
+    assert extract_personal_info(query) is None
+
+
+def test_a_two_word_city_is_kept():
+    assert extract_personal_info("i live in new delhi") == {"key": "city", "value": "new delhi"}

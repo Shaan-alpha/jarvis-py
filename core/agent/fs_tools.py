@@ -171,6 +171,52 @@ def _search_roots(roots):
     return unique
 
 
+# Reparse tags for links (IO_REPARSE_TAG_MOUNT_POINT = junction, _SYMLINK).
+# Other reparse points — OneDrive files-on-demand — are ordinary files to us.
+_LINK_TAGS = {0xA0000003, 0xA000000C}
+
+_HIDDEN_OR_SYSTEM = 0x2 | 0x4
+
+
+def _skip_entry(entry):
+    """Links could lead outside the allowed folders (a junction in Documents
+    exposed files anywhere to find, move and delete); hidden/system items are
+    Windows plumbing (desktop.ini, $RECYCLE.BIN, a hidden stash)."""
+
+    if entry.name.startswith((".", "~$")):
+
+        return True
+
+    try:
+
+        if entry.is_symlink():
+
+            return True
+
+        info = entry.stat(follow_symlinks=False)
+
+    except OSError:
+
+        return True
+
+    if getattr(info, "st_reparse_tag", 0) in _LINK_TAGS:
+
+        return True
+
+    return bool(getattr(info, "st_file_attributes", 0) & _HIDDEN_OR_SYSTEM)
+
+
+def _scan(folder):
+
+    try:
+
+        return list(os.scandir(folder))
+
+    except OSError:
+
+        return []
+
+
 def _walk(roots, clock=time.monotonic):
     """Yield files under the roots, bounded by depth, count and time."""
 
@@ -184,15 +230,7 @@ def _walk(roots, clock=time.monotonic):
 
         folder, depth = stack.pop()
 
-        try:
-
-            entries = list(os.scandir(folder))
-
-        except OSError:
-
-            continue
-
-        for entry in entries:
+        for entry in _scan(folder):
 
             seen += 1
 
@@ -200,19 +238,11 @@ def _walk(roots, clock=time.monotonic):
 
                 return
 
-            if entry.name.startswith((".", "~$")):
+            if _skip_entry(entry):
 
                 continue
 
-            try:
-
-                is_dir = entry.is_dir(follow_symlinks=False)
-
-            except OSError:
-
-                continue
-
-            if not is_dir:
+            if not entry.is_dir(follow_symlinks=False):
 
                 yield Path(entry.path)
 
@@ -370,38 +400,14 @@ def _ordinal(name):
 )
 def open_file(name):
 
-    index = _ordinal(name)
+    # Opening a near match is harmless (nothing changes), so no confirmation.
+    path, _exact, problem = _target(name, user_roots())
 
-    results = conversation.results()
+    if problem:
 
-    if index is not None and results:
+        return problem
 
-        if index >= len(results):
-
-            return f"I only found {plural(len(results), 'file')}."
-
-        return _open_path(Path(results[index]))
-
-    found = find_paths(name, user_roots())
-
-    if not found:
-
-        return f"I couldn't find {name}."
-
-    target = _match_key(name)
-
-    choices = [p for p in found if target in (_match_key(p.name), _match_key(p.stem))] or found
-
-    if len(choices) > 1:
-
-        conversation.set_results([str(path) for path in choices])
-
-        return Reply(
-            say=f"I found {len(choices)} files called {name}. Say 'open the first one', or be more specific.",
-            show=_numbered(choices),
-        )
-
-    return _open_path(choices[0])
+    return _open_path(path)
 
 
 @tool(
@@ -428,29 +434,60 @@ def open_folder(folder):
 _BAD_NAME_CHARS = set('\\/:*?"<>|')
 
 
-def _unique(name, roots):
-    """(path, None) for one clear match, else (None, what to say)."""
+def _target(name, roots):
+    """The file a command means, as (path, exact, problem).
+
+    "it" / "the second one" pick from the files just found — never a search
+    for a file literally named "it". Otherwise one exact name/stem match is
+    exact; a single near match (substring or close spelling) comes back with
+    exact=False so changes can confirm it first."""
+
+    index = _ordinal(name)
+
+    if index is not None:
+
+        results = conversation.results()
+
+        if not results:
+
+            return None, False, "Which file? Say 'find' and its name first."
+
+        if index >= len(results):
+
+            return None, False, f"I only found {plural(len(results), 'file')}."
+
+        return Path(results[index]), True, None
 
     found = find_paths(name, roots)
 
     target = _match_key(name)
 
-    choices = [p for p in found if target in (_match_key(p.name), _match_key(p.stem))] or found
+    exact = [p for p in found if target in (_match_key(p.name), _match_key(p.stem))]
+
+    choices = exact or found
 
     if not choices:
 
-        return None, f"I couldn't find {name}."
+        return None, False, f"I couldn't find {name}."
 
     if len(choices) > 1:
 
         conversation.set_results([str(path) for path in choices])
 
-        return None, Reply(
-            say=f"I found {len(choices)} files called {name}. Be more specific.",
+        return None, False, Reply(
+            say=f"I found {len(choices)} files called {name}. Say which one, like 'the first one'.",
             show=_numbered(choices),
         )
 
-    return choices[0], None
+    return choices[0], bool(exact), None
+
+
+def _confirm_near_match(name, path, verb, run):
+    """Never move or rename a file the user didn't name exactly without a yes."""
+
+    conversation.set_pending(f"{verb} {path}", run)
+
+    return f"I couldn't find {name} exactly. Did you mean {path.name}? Say yes to {verb} it."
 
 
 @tool(
@@ -474,25 +511,34 @@ def move_file(name, folder):
 
         return f"I don't know a folder called {folder}."
 
-    source, problem = _unique(name, roots)
+    source, exact, problem = _target(name, roots)
 
     if problem:
 
         return problem
 
+    if not exact:
+
+        return _confirm_near_match(name, source, "move", lambda: _move(source, destination, key))
+
+    return _move(source, destination, key)
+
+
+def _move(source, destination, label):
+
     target = destination / source.name
 
     if source.parent == destination:
 
-        return f"{source.name} is already in {key.capitalize()}."
+        return f"{source.name} is already in {label.capitalize()}."
 
     if target.exists():
 
-        return f"{source.name} already exists in {key.capitalize()}."
+        return f"{source.name} already exists in {label.capitalize()}."
 
     shutil.move(str(source), str(target))
 
-    return f"Moved {source.name} to {key.capitalize()}."
+    return f"Moved {source.name} to {label.capitalize()}."
 
 
 @tool(
@@ -512,11 +558,20 @@ def rename_file(name, new_name):
 
         return "That isn't a valid file name."
 
-    source, problem = _unique(name, user_roots())
+    source, exact, problem = _target(name, user_roots())
 
     if problem:
 
         return problem
+
+    if not exact:
+
+        return _confirm_near_match(name, source, "rename", lambda: _rename(source, new))
+
+    return _rename(source, new)
+
+
+def _rename(source, new):
 
     if not Path(new).suffix:
 
@@ -560,7 +615,9 @@ def delete_file(name):
 
     roots = user_roots()
 
-    source, problem = _unique(name, roots)
+    # Always confirmed, and the prompt names the actual file — so a near match
+    # is safe to offer here.
+    source, _exact, problem = _target(name, roots)
 
     if problem:
 

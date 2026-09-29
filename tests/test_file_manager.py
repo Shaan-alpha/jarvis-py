@@ -1,4 +1,6 @@
 import os
+import subprocess
+import sys
 
 import pytest
 
@@ -151,3 +153,84 @@ def test_delete_with_two_matches_asks_which_and_sets_no_confirmation(roots):
     out = fs_tools.delete_file("report")
     assert isinstance(out, Reply) and "2 files" in out.say
     assert conversation.has_pending() is False
+
+
+# --- final-review fixes -------------------------------------------------------
+
+def test_rename_asks_before_acting_on_a_near_match(roots):
+    (roots["documents"] / "resort.pdf").write_text("x")
+    assert fs_tools.rename_file("report", "final") == \
+        "I couldn't find report exactly. Did you mean resort.pdf? Say yes to rename it."
+    assert (roots["documents"] / "resort.pdf").exists()
+    assert conversation.take_pending().run() == "Renamed resort.pdf to final.pdf."
+
+
+def test_move_asks_before_acting_on_a_near_match(roots):
+    (roots["downloads"] / "resort.pdf").write_text("x")
+    assert fs_tools.move_file("report", "documents") == \
+        "I couldn't find report exactly. Did you mean resort.pdf? Say yes to move it."
+    assert (roots["downloads"] / "resort.pdf").exists()
+
+
+def test_delete_it_uses_the_file_just_found(roots, monkeypatch):
+    monkeypatch.setattr(fs_tools, "send2trash", lambda path: None)
+    (roots["downloads"] / "report.pdf").write_text("x")
+    (roots["documents"] / "kit.txt").write_text("x")
+    fs_tools.find_file("report")
+    assert fs_tools.delete_file("it") == \
+        "Move report.pdf from Downloads to the Recycle Bin? Say yes to confirm."
+
+
+def test_rename_it_uses_the_file_just_found(roots):
+    (roots["downloads"] / "report.pdf").write_text("x")
+    (roots["documents"] / "kit.txt").write_text("x")
+    fs_tools.find_file("report")
+    assert fs_tools.rename_file("it", "budget") == "Renamed report.pdf to budget.pdf."
+    assert (roots["documents"] / "kit.txt").exists()
+
+
+def test_move_the_second_one_uses_the_results(roots):
+    first, second = roots["downloads"] / "a report.pdf", roots["downloads"] / "b report.pdf"
+    first.write_text("x")
+    second.write_text("x")
+    os.utime(first, (2000, 2000))
+    os.utime(second, (1000, 1000))
+    fs_tools.find_file("report")
+    assert fs_tools.move_file("second one", "documents") == "Moved b report.pdf to Documents."
+
+
+def test_a_pronoun_with_nothing_found_asks_which_file(roots):
+    (roots["documents"] / "kit.txt").write_text("x")
+    assert fs_tools.delete_file("it") == "Which file? Say 'find' and its name first."
+    assert conversation.has_pending() is False
+
+
+def test_symlinked_folders_are_not_followed_out_of_the_roots(roots, tmp_path):
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "secret_plan.txt").write_text("x")
+    try:
+        os.symlink(outside, roots["documents"] / "linked", target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlinks need privileges here")
+    assert fs_tools.find_file("secret plan") == "I couldn't find secret plan."
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows junctions")
+def test_directory_junctions_are_not_followed_out_of_the_roots(roots, tmp_path):
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "secret_plan.txt").write_text("x")
+    subprocess.run(["cmd", "/c", "mklink", "/J", str(roots["documents"] / "linked"), str(outside)],
+                   check=True, capture_output=True)
+    assert fs_tools.find_file("secret plan") == "I couldn't find secret plan."
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows hidden attribute")
+def test_hidden_folders_are_skipped(roots):
+    import ctypes
+    hidden = roots["documents"] / "stash"
+    hidden.mkdir()
+    (hidden / "budget.xlsx").write_text("x")
+    ctypes.windll.kernel32.SetFileAttributesW(str(hidden), 0x2)
+    assert fs_tools.find_file("budget") == "I couldn't find budget."

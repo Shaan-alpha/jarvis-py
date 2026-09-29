@@ -51,3 +51,10 @@ def test_index_documents_reports_counts(monkeypatch):
     assert st.index_documents() == "Indexed 2 documents."
     monkeypatch.setattr(st, "build_index", lambda: (0, 0))
     assert st.index_documents().say == "I didn't find any PDFs to index."
+
+
+def test_search_local_ignores_a_leading_my(sources, monkeypatch):
+    seen = []
+    monkeypatch.setattr(st, "find_paths", lambda q, roots=None: seen.append(q) or [])
+    st.search_local("my notes")
+    assert seen == ["notes"]

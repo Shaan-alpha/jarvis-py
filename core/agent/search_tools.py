@@ -1,6 +1,8 @@
 """Local search across your files, indexed documents and remembered facts,
 plus document search and re-indexing. Router-only; works offline."""
 
+import re
+
 from core.agent.fs_tools import (
     find_paths,
     folder_label,
@@ -42,7 +44,8 @@ SNIPPET_WORDS = 25
 )
 def search_local(query):
 
-    query = (query or "").strip()
+    # "search for my notes" should find meeting_notes.docx: drop a leading my/the/a.
+    query = re.sub(r"^(?:my|the|a|an)\s+", "", (query or "").strip(), flags=re.IGNORECASE)
 
     roots = user_roots()
 

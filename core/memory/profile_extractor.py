@@ -56,9 +56,38 @@ def _trim_value(value):
     return value.strip(" .,!?")[:_VALUE_MAX].strip()
 
 
-def _acceptable(value):
+# "call me later / back / an uber" and "i live in fear / the moment" are idioms,
+# not a name or a city — storing them overwrote the real value.
+_NOT_NAMES = {
+    "a", "an", "the", "back", "later", "tomorrow", "tonight", "at", "in", "on", "when",
+    "after", "soon", "now", "again", "please", "if", "once", "sometime", "maybe", "anytime",
+}
 
-    return bool(value) and value not in _REJECT_VALUES and not value.startswith(_REJECT_PREFIXES)
+_NOT_PLACES = {
+    "a", "an", "the", "my", "your", "fear", "hope", "peace", "denial", "doubt", "pain",
+    "misery", "luxury", "poverty", "hell", "heaven", "dread", "terror", "harmony", "constant",
+}
+
+_MAX_WORDS = {"name": 3, "city": 3}
+
+
+def _acceptable(value, key=None):
+
+    if not value or value in _REJECT_VALUES or value.startswith(_REJECT_PREFIXES):
+
+        return False
+
+    words = value.split()
+
+    if len(words) > _MAX_WORDS.get(key, len(words)):
+
+        return False
+
+    if key == "name" and words[0] in _NOT_NAMES:
+
+        return False
+
+    return not (key == "city" and words[0] in _NOT_PLACES)
 
 
 def extract_personal_info(query):
@@ -91,6 +120,6 @@ def extract_personal_info(query):
 
             value = _trim_value(match.group(1))
 
-            return {"key": key, "value": value} if _acceptable(value) else None
+            return {"key": key, "value": value} if _acceptable(value, key) else None
 
     return None
