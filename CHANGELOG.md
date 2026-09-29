@@ -70,7 +70,7 @@ and has a compact, polished HUD. Spec:
   Bin behind a confirmation that expires in 30 s.
 - `pull_model` ignores the model name sent by the HUD page.
 
-Tests: 291 → 579, all CI-safe. Lint clean.
+Tests: 291 → 608, all CI-safe. Lint clean.
 
 ## v3.5.2 — HUD close button & app logo (2026-06-19)
 
