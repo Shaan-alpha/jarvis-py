@@ -16,6 +16,7 @@ from core.speech.engine import (
     speak,
     speak_sync,
     command,
+    request_calibration,
     stop_speaking
 )
 
@@ -102,7 +103,10 @@ from core.paths import is_frozen
 
 from core.text import normalize
 
-from core.warmup import warm_start
+from core.warmup import (
+    prime_model,
+    warm_start
+)
 
 from core.setup.checks import check_microphone
 
@@ -656,85 +660,141 @@ def main():
     _voice_loop(session, task_manager)
 
 
+def _on_wake(session):
+    """The wake word fired: start loading the model, then say "Yes Boss?" to the
+    end before listening — calibrating while it still played measured Jarvis's
+    own voice as room noise, and end-of-speech was then never detected."""
+
+    logger.info("Wake word activated")
+
+    stop_speaking()
+
+    prime_model()
+
+    request_calibration()
+
+    speak_sync("Yes Boss?")
+
+    session.activate()
+
+    events.emit("wake")
+
+
+def _process_with_barge_in(query, task_manager, raw_query):
+    """Answer `query` while listening for "hey jarvis": saying it while Jarvis is
+    still thinking cancels the answer and goes back to listening. (While it's
+    thinking nothing is playing, so the mic isn't fooled by Jarvis's voice.)"""
+
+    stop = threading.Event()
+
+    def _watch():
+
+        try:
+
+            if detect_wake_word(stop_event=stop, verbose=False):
+
+                logger.info("Barge-in while thinking: cancelling the answer")
+
+                cancel_generation()
+
+                stop_speaking()
+
+                clear_queue()
+
+        except Exception:
+
+            logger.exception("Wake watcher failed")
+
+    watcher = threading.Thread(target=_watch, daemon=True)
+
+    watcher.start()
+
+    try:
+
+        process_query(query, task_manager, raw_query=raw_query)
+
+    finally:
+
+        stop.set()
+
+        watcher.join(timeout=1.5)
+
+
+def _go_to_sleep(session, reason):
+    """End the voice session: say so, forget the short-term conversation."""
+
+    logger.info(reason)
+
+    stop_speaking()
+
+    speak("Going back to sleep.")
+
+    session.deactivate()
+
+    conversation.clear()
+
+    events.emit("state", state="idle")
+
+
+def _voice_turn(session, task_manager):
+    """One pass of the voice loop: wait for the wake word, or listen and answer."""
+
+    if not session.active:
+
+        detect_wake_word()
+
+        _on_wake(session)
+
+        return
+
+    if wait_until_done_or_barge_in():
+
+        logger.info("Barge-in: user interrupted")
+
+        cancel_generation()
+
+    events.emit("state", state="listening")
+
+    raw = command()
+
+    if raw == "none":
+
+        if session.is_expired():
+
+            _go_to_sleep(session, "Session expired")
+
+        return
+
+    query = normalize(raw)
+
+    if not query:
+
+        return
+
+    logger.info(f"User Query: {raw}")
+
+    print(f"\nUser: {raw}")
+
+    events.emit("transcript", role="user", text=raw)
+
+    session.update_interaction()
+
+    if is_exit_command(query):
+
+        _go_to_sleep(session, "Session manually ended")
+
+        return
+
+    _process_with_barge_in(query, task_manager, raw)
+
+
 def _voice_loop(session, task_manager):
 
     while True:
 
         try:
 
-            if not session.active:
-
-                detect_wake_word()
-
-                logger.info("Wake word activated")
-
-                stop_speaking()
-
-                speak("Yes Boss?")
-
-                session.activate()
-
-                events.emit("wake")
-
-                continue
-
-            if wait_until_done_or_barge_in():
-
-                logger.info("Barge-in: user interrupted")
-
-                cancel_generation()
-
-            events.emit("state", state="listening")
-
-            raw = command()
-
-            if raw == "none":
-
-                if session.is_expired():
-
-                    logger.info("Session expired")
-
-                    speak("Going back to sleep.")
-
-                    session.deactivate()
-
-                    conversation.clear()
-
-                    events.emit("state", state="idle")
-
-                continue
-
-            query = normalize(raw)
-
-            if not query:
-
-                continue
-
-            logger.info(f"User Query: {raw}")
-
-            print(f"\nUser: {raw}")
-
-            events.emit("transcript", role="user", text=raw)
-
-            session.update_interaction()
-
-            if is_exit_command(query):
-
-                logger.info("Session manually ended")
-
-                stop_speaking()
-
-                speak("Going back to sleep.")
-
-                session.deactivate()
-
-                conversation.clear()
-
-                events.emit("state", state="idle")
-
-                continue
-
-            process_query(query, task_manager, raw_query=raw)
+            _voice_turn(session, task_manager)
 
         except KeyboardInterrupt:
 

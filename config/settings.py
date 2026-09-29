@@ -24,7 +24,9 @@ LLM_KEEP_ALIVE = "10m"
 LLM_TEMPERATURE = 0.2
 
 # Warm-start skips preloading the model when less RAM than this (GiB) is free.
-MODEL_MIN_FREE_GB = 3.5
+# phi3 loaded fine with 2.2 GiB free (Windows pages it in); 3.5 skipped the
+# preload and the first question paid a 13.5s cold load.
+MODEL_MIN_FREE_GB = 1.5
 
 # Download size shown on the setup wizard's pull button.
 MODEL_PULL_SIZE = "2.3 GB"
@@ -58,6 +60,15 @@ VOICE_VOLUME = 1.0
 # dynamic_energy_threshold still adapts from this ceiling. Lower if Jarvis
 # ignores you; raise if it triggers on background noise. (sr default is 300.)
 MAX_ENERGY_THRESHOLD = 400
+
+# Silence (seconds) that ends an utterance. 1.2 made every reply wait 1.2s
+# after you stopped; 0.9 is snappier while still tolerating the gap between
+# words (0.8 once clipped "how are you" to "how").
+STT_PAUSE_SECONDS = 0.9
+
+# Longest utterance (seconds). If end-of-speech is never detected (noise), this
+# is the worst-case wait before Jarvis answers — it was 12.
+STT_PHRASE_LIMIT = 8
 
 MEMORY_SIMILARITY_THRESHOLD = 0.55
 

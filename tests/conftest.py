@@ -1,9 +1,14 @@
 import copy
+import logging
 
 import pytest
 
 from core.agent import registry
 from core.agent import loader
+from core.utils import logger as jarvis_logger
+
+# Keep test runs out of the user's real jarvis.log (they filled and rotated it).
+logging.getLogger().removeHandler(jarvis_logger._file_handler)
 from core.ai import llm_health
 from core import net
 from core.state.conversation import conversation

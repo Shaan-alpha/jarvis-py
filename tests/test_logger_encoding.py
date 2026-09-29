@@ -35,3 +35,10 @@ def test_log_file_rotates_instead_of_growing_forever():
     assert isinstance(lg._file_handler, RotatingFileHandler)
     assert lg._file_handler.maxBytes == 2 * 1024 * 1024
     assert lg._file_handler.backupCount == 3
+
+
+def test_the_test_suite_does_not_write_the_real_log():
+    # Test runs used to write thousands of lines into the user's jarvis.log and
+    # rotate it three times in one day, pushing out their real history.
+    import logging
+    assert lg._file_handler not in logging.getLogger().handlers

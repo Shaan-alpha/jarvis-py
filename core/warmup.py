@@ -75,6 +75,42 @@ def _warm_ollama():
     )
 
 
+def _prime_request():
+    """One-token request that makes Ollama load the model (errors ignored)."""
+
+    from config.settings import LLM_KEEP_ALIVE, LLM_NUM_CTX, MODEL_NAME, OLLAMA_URL
+
+    try:
+
+        _post(
+            OLLAMA_URL,
+            json={
+                "model": MODEL_NAME,
+                "prompt": "hi",
+                "stream": False,
+                "keep_alive": LLM_KEEP_ALIVE,
+                "options": {"num_predict": 1, "num_ctx": LLM_NUM_CTX},
+            },
+            timeout=WARM_TIMEOUT,
+        )
+
+    except Exception as e:
+
+        logger.info(f"prime_model: {e}")
+
+
+def prime_model():
+    """Load the model in the background the moment the wake word fires, so the
+    load overlaps with the user speaking instead of delaying the first answer
+    (a cold load measured 13.5s). No RAM guard: a query is coming anyway."""
+
+    thread = threading.Thread(target=_prime_request, daemon=True)
+
+    thread.start()
+
+    return thread
+
+
 def _warm_embedder():
     """Load the embedding model so the first memory/document search isn't cold."""
 
